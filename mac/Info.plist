@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>com.meetin-os.capture</string>
+<key>CFBundleExecutable</key><string>MeetinOS</string>
+<key>CFBundleName</key><string>Meetin-OS</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>LSMinimumSystemVersion</key><string>15.0</string>
+<key>NSMicrophoneUsageDescription</key><string>Meetin-OS capture votre voix pendant un enregistrement.</string>
+<key>NSScreenCaptureUsageDescription</key><string>Meetin-OS utilise la capture système pour enregistrer l’audio de votre appel. Aucune image n’est enregistrée.</string>
+</dict></plist>
