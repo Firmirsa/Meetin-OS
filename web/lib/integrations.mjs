@@ -1,9 +1,10 @@
 import { timingSafeEqual, createHash } from 'node:crypto';
 
 export class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, code) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 

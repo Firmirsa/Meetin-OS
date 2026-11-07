@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { prepareTask, executeTask } from './agent.mjs';
+import { agentAccess, prepareTask, executeTask } from './agent.mjs';
 
 const token = 'test-only-team-access-token';
 const env = {
@@ -81,4 +81,23 @@ test('a confirmed UI task is sent to H with its approved target and idempotency 
     return Response.json({id: sessionId, agent_view_url: 'https://invalid.example/not-the-provider'});
   });
   assert.deepEqual(result, {status: 'pending', executor: 'computer_use', sessionId, url: `https://platform.hcompany.ai/agent-view/${sessionId}`});
+});
+
+test('a private Trello task waits for the team browser profile and keeps its approval', async () => {
+  const setup = {...env, HAI_COMPUTER_USE_URL: 'https://trello.com/b/fixture/demo'};
+  assert.throws(() => agentAccess('incorrect', setup), {status: 401});
+  assert.deepEqual(agentAccess(token, setup), {planning: true, trello: false, devin: true});
+  const task = 'Créer « Relire le guide » dans À faire.';
+  const plan = await prepareTask({task}, token, setup, holo({status: 'ready', executor: 'computer_use', title: 'Relire le guide', task}));
+  const approval = {confirmed: true, approval: plan.approval};
+  await assert.rejects(executeTask(approval, token, setup, denied), {status: 503, code: 'trello_setup'});
+
+  const configured = {...setup, HAI_BROWSER_PROFILE_ID: '12b9ade5-309f-4508-b82a-52e124a51600'};
+  assert.deepEqual(agentAccess(token, configured), {planning: true, trello: true, devin: true});
+  const result = await executeTask(approval, token, configured, async (url, request) => {
+    assert.equal(url, 'https://agp.eu.hcompany.ai/api/v2/sessions');
+    assert.equal(JSON.parse(request.body).overrides['agent.environments[kind=web].browser_profile_id'], configured.HAI_BROWSER_PROFILE_ID);
+    return Response.json({id: '45463597-20b7-4af7-b3b3-f5fb778203ab'});
+  });
+  assert.equal(result.status, 'pending');
 });

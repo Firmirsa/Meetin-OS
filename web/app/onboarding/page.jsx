@@ -1,4 +1,5 @@
 import OnboardingCheckout from './checkout';
+import OpenMacIntegrations from './open-mac';
 import LangSwitch from '../lang-switch';
 import {dict, langFrom, withLang} from '../../lib/i18n.mjs';
 
@@ -24,6 +25,15 @@ export default async function OnboardingPage({searchParams}) {
       <li><h3>{o.sound}</h3><p>{o.soundText}</p></li>
       <li><h3>{o.config}</h3><p>{o.configText}</p></li>
     </ol>
+    <section className="mt-card onboarding-options" id="outils" aria-labelledby="integrations-heading">
+      <h2 id="integrations-heading">{o.toolsTitle}</h2>
+      <p>{o.toolsIntro}</p>
+      <ul className="onboarding-tools">
+        {o.tools.map(([name, purpose]) => <li key={name}><strong>{name}</strong><span>{purpose}</span></li>)}
+      </ul>
+      <OpenMacIntegrations label={o.openMac} />
+      <p className="onboarding-help">{o.openMacHelp}</p>
+    </section>
     {checkout === 'returned' && <p role="status">{o.returned}</p>}
     {checkout === 'canceled' && <p role="status">{o.canceled}</p>}
     <section className="mt-card checkout" id="subscription" aria-labelledby="subscription-heading">

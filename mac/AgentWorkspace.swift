@@ -12,12 +12,16 @@ final class AgentWorkspaceState {
     var clarifications: [AgentClarification] = []
     var busy = false
     var error = ""
+    var needsAccess = false
+    var trelloSetupRequired = false
 
     func invalidateReview() {
         preparation = nil
         clarifications = []
         answer = ""
         error = ""
+        needsAccess = false
+        trelloSetupRequired = false
     }
 
     func newRecording() {
@@ -26,20 +30,45 @@ final class AgentWorkspaceState {
         excerpt = ""
         execution = nil
     }
+
+    func prepare(using client: AgentClient, question: String? = nil) {
+        let task = request.trimmingCharacters(in: .whitespacesAndNewlines)
+        let transcript = excerpt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !busy, !task.isEmpty || !transcript.isEmpty else { return }
+        var turns = clarifications
+        if let question { turns.append(.init(question: question, answer: answer.trimmingCharacters(in: .whitespacesAndNewlines))) }
+        busy = true
+        error = ""
+        needsAccess = false
+        Task {
+            defer { busy = false }
+            do {
+                preparation = try await client.prepare(task: task, transcript: transcript, clarifications: turns)
+                clarifications = turns
+                answer = ""
+                execution = nil
+            } catch {
+                needsAccess = (error as? AgentClient.Failure)?.status == 401
+                self.error = error.localizedDescription
+            }
+        }
+    }
 }
 
 struct AgentWorkspace: View {
     @Bindable var state: AgentWorkspaceState
     let transcript: String
     let client: AgentClient?
-    let showSettings: () -> Void
+    let access: AgentAccess?
+    let showIntegrations: (IntegrationsPage) -> Void
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Tâche à exécuter").font(.mtSerif(36)).accessibilityAddTraits(.isHeader)
                 if client == nil {
-                    Button("Configurer l’accès agent", action: showSettings).buttonStyle(.mtGhost)
+                    Text("Vous pouvez préparer votre demande ici. L’accès de l’équipe sera demandé au moment d’utiliser l’agent.")
+                        .font(.callout).foregroundStyle(Color.mtInk2)
                 }
                 TextField("Demande", text: $state.request, axis: .vertical)
                     .lineLimit(2...4)
@@ -67,17 +96,20 @@ struct AgentWorkspace: View {
                         .textFieldStyle(.roundedBorder).disabled(state.busy)
                     Button("Ajouter cette précision") { prepare(question: question) }
                         .buttonStyle(.mtPrimary)
-                        .disabled(state.busy || client == nil || trimmed(state.answer).isEmpty)
+                        .disabled(state.busy || trimmed(state.answer).isEmpty)
                 case .review(let review):
                     reviewCard(review)
                 case nil:
                     Button("Préparer la tâche") { prepare() }
                         .buttonStyle(.mtPrimary)
-                        .disabled(state.busy || client == nil || (trimmed(state.request).isEmpty && trimmed(state.excerpt).isEmpty))
+                        .disabled(state.busy || (trimmed(state.request).isEmpty && trimmed(state.excerpt).isEmpty))
                 }
                 if state.busy { ProgressView().controlSize(.small).accessibilityLabel("L’agent traite la demande") }
                 if !state.error.isEmpty {
                     Text(state.error).foregroundStyle(Color.mtWarn).textSelection(.enabled)
+                }
+                if state.needsAccess {
+                    Button("Modifier l’accès de l’équipe") { showIntegrations(.agent) }.buttonStyle(.mtGhost)
                 }
                 if let execution = state.execution {
                     Text("Dernière session lancée").font(.headline)
@@ -100,7 +132,17 @@ struct AgentWorkspace: View {
             ForEach(Array(review.clarifications.enumerated()), id: \.offset) { _, turn in
                 Text("\(turn.question) \(turn.answer)").font(.callout)
             }
-            Button("Confirmer et lancer") { launch(review) }.buttonStyle(.mtPrimary).disabled(state.busy || client == nil)
+            if review.usesTrello && (access?.trello == false || state.trelloSetupRequired) {
+                Text("Votre équipe doit relier Trello. La proposition reste disponible ici.")
+                    .font(.callout).foregroundStyle(Color.mtInk2)
+                Button("Voir l’accès Trello") { showIntegrations(.catalog) }.buttonStyle(.mtPrimary)
+            } else if review.executor == .devin && access?.devin == false {
+                Text("Votre équipe doit activer Devin avant de lancer cette tâche.")
+                    .font(.callout).foregroundStyle(Color.mtInk2)
+                Button("Voir l’accès Devin") { showIntegrations(.catalog) }.buttonStyle(.mtPrimary)
+            } else {
+                Button("Confirmer et lancer") { launch(review) }.buttonStyle(.mtPrimary).disabled(state.busy || client == nil)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .mtCard()
@@ -109,21 +151,12 @@ struct AgentWorkspace: View {
     private func trimmed(_ value: String) -> String { value.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     private func prepare(question: String? = nil) {
-        guard let client, !state.busy else { return }
-        let task = trimmed(state.request)
-        let excerpt = trimmed(state.excerpt)
-        var turns = state.clarifications
-        if let question { turns.append(.init(question: question, answer: trimmed(state.answer))) }
-        state.busy = true
-        state.error = ""
-        Task {
-            defer { state.busy = false }
-            do {
-                state.preparation = try await client.prepare(task: task, transcript: excerpt, clarifications: turns)
-                state.clarifications = turns
-                state.answer = ""
-                state.execution = nil
-            } catch { state.error = error.localizedDescription }
+        if state.needsAccess || client == nil {
+            showIntegrations(question == nil ? .prepare : .agent)
+        } else if access?.planning == false {
+            showIntegrations(.catalog)
+        } else if let client {
+            state.prepare(using: client, question: question)
         }
     }
 
@@ -132,9 +165,17 @@ struct AgentWorkspace: View {
         state.busy = true
         state.error = ""
         Task {
-            defer { state.busy = false; state.preparation = nil }
-            do { state.execution = try await client.launch(review) }
-            catch { state.error = error.localizedDescription }
+            defer { state.busy = false }
+            do {
+                state.execution = try await client.launch(review)
+                state.preparation = nil
+            } catch {
+                let failure = error as? AgentClient.Failure
+                state.needsAccess = failure?.status == 401
+                state.trelloSetupRequired = failure?.code == "trello_setup"
+                if !state.needsAccess && !state.trelloSetupRequired { state.preparation = nil }
+                state.error = error.localizedDescription
+            }
         }
     }
 }

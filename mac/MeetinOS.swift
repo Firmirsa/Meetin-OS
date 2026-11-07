@@ -31,6 +31,7 @@ final class MeetingSession {
     var busy = false
     var key = ProcessInfo.processInfo.environment["GLADIA_API_KEY"] ?? ""
     var agentAccessCode = ""
+    var agentAccess: AgentAccess?
     let agent = AgentWorkspaceState()
     var status = "Prêt à enregistrer"
     var permissionHelp: AudioPermissionHelp?
@@ -69,7 +70,9 @@ struct CaptureView: View {
     @Bindable var session: MeetingSession
     var isMeetingWindow = false
     @AppStorage("detectZoomMeetings") private var detectZoomMeetings = false
+    @AppStorage("seenGuestIntro") private var seenGuestIntro = false
     @State private var showingSettings = false
+    @State private var integrationsRequest: IntegrationsRequest?
     @AppStorage("webWorkspaceURL") private var webWorkspaceURL = "http://localhost:3000"
     @State private var tab: MeetingTab = .transcription
 
@@ -95,6 +98,9 @@ struct CaptureView: View {
                     Text("Réunion").font(.mtSans(12)).foregroundStyle(Color.mtInk2)
                 }
                 Spacer()
+                Button("Intégrations", systemImage: "puzzlepiece.extension") { showIntegrations(.catalog) }
+                    .buttonStyle(.borderless)
+                    .disabled(session.agent.busy)
                 Button {
                     showingSettings = true
                 } label: {
@@ -134,6 +140,9 @@ struct CaptureView: View {
                             .accessibilityAddTraits(.isHeader)
                         Text("Prenez des notes pendant l’appel, puis retrouvez la transcription ici.")
                             .foregroundStyle(Color.mtInk2)
+                        if !isMeetingWindow && !seenGuestIntro && session.recording == nil && session.agentAccess == nil {
+                            guestIntro
+                        }
                         Text("Notes").font(.headline).accessibilityAddTraits(.isHeader)
                         ZStack(alignment: .topLeading) {
                             TextEditor(text: $session.notes)
@@ -241,8 +250,11 @@ struct CaptureView: View {
         .onDisappear {
             if !isMeetingWindow { session.notebookCount -= 1 }
         }
-        .onChange(of: webWorkspaceURL) { session.agent.invalidateReview() }
-        .onChange(of: session.agentAccessCode) { session.agent.invalidateReview() }
+        .onOpenURL { url in
+            guard !isMeetingWindow, !showingSettings, integrationsRequest == nil,
+                  let request = IntegrationsRequest.fromLink(url) else { return }
+            integrationsRequest = request
+        }
         .task(id: detectZoomMeetings) {
             guard !isMeetingWindow else { return }
             session.zoomDetector = ZoomMeetingDetector()
@@ -258,11 +270,6 @@ struct CaptureView: View {
         .sheet(isPresented: $showingSettings) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Réglages").font(.title2.bold())
-                Text("Meetin-OS utilise Gladia pour transcrire l’audio. La clé sert uniquement pendant cette session.")
-                    .foregroundStyle(Color.mtInk2)
-                SecureField("Clé API Gladia", text: $session.key)
-                    .textFieldStyle(.roundedBorder)
-                Rectangle().fill(Color.mtLine).frame(height: 1)
                 Text("Autorisations audio").font(.headline)
                 Text("Au premier enregistrement, macOS peut demander l’accès au micro et à l’audio du système.")
                     .foregroundStyle(Color.mtInk2)
@@ -271,12 +278,6 @@ struct CaptureView: View {
                     Button("Audio du système") { NSWorkspace.shared.open(AudioPermissionHelp.systemAudio.settingsURL) }
                 }
                 Rectangle().fill(Color.mtLine).frame(height: 1)
-                TextField("Adresse du site Meetin-OS", text: $webWorkspaceURL)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(session.agent.busy)
-                SecureField("Code d’accès agent", text: $session.agentAccessCode)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(session.agent.busy)
                 Toggle("Ouvrir la fenêtre quand je rejoins une réunion Zoom", isOn: $detectZoomMeetings)
                 if detectZoomMeetings {
                     Text("L’accès à l’accessibilité sert à détecter les fenêtres Zoom. L’enregistrement se lance manuellement.")
@@ -296,6 +297,9 @@ struct CaptureView: View {
             .frame(width: 420)
             .background(Color.mtCanvas)
         }
+        .sheet(item: $integrationsRequest) { request in
+            IntegrationsView(session: session, workspaceURL: $webWorkspaceURL, request: request, transcribe: transcribe)
+        }
         .toolbar {
             if !isMeetingWindow && session.meetingIsActive {
                 Button("Afficher la réunion", systemImage: "rectangle.on.rectangle") {
@@ -314,17 +318,34 @@ struct CaptureView: View {
     }
 
     private var agentClient: AgentClient? {
-        let code = session.agentAccessCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let base = URL(string: webWorkspaceURL.trimmingCharacters(in: .whitespacesAndNewlines)),
-              let host = base.host, base.user == nil, base.password == nil,
-              base.query == nil, base.fragment == nil, base.path.isEmpty || base.path == "/", !code.isEmpty,
-              base.scheme == "https" || (base.scheme == "http" && ["localhost", "127.0.0.1"].contains(host))
-        else { return nil }
-        return AgentClient(baseURL: base, accessCode: code)
+        guard session.agentAccess != nil, let base = AgentClient.serverURL(webWorkspaceURL) else { return nil }
+        return AgentClient(baseURL: base, accessCode: session.agentAccessCode)
     }
 
     private var agentPanel: some View {
-        AgentWorkspace(state: session.agent, transcript: session.transcript, client: agentClient) { showingSettings = true }
+        AgentWorkspace(state: session.agent, transcript: session.transcript, client: agentClient,
+                       access: session.agentAccess, showIntegrations: showIntegrations)
+    }
+
+    private var guestIntro: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("Votre premier carnet").font(.headline)
+            Text("Enregistrez et prenez des notes dès maintenant. Vous pourrez activer la transcription et les outils de l’équipe dans Intégrations.")
+                .font(.callout).foregroundStyle(Color.mtInk2)
+            HStack {
+                Button("Continuer sans compte") { seenGuestIntro = true }.buttonStyle(.mtPrimary)
+                Button("Voir les intégrations") {
+                    seenGuestIntro = true
+                    showIntegrations(.catalog)
+                }.buttonStyle(.mtGhost)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .mtCard()
+    }
+
+    private func showIntegrations(_ page: IntegrationsPage) {
+        integrationsRequest = IntegrationsRequest(page: page)
     }
 
     private func openRecording() {
@@ -384,7 +405,7 @@ struct CaptureView: View {
     private func transcribe() {
         guard !session.busy, let recording = session.recording else { return }
         guard hasKey else {
-            showingSettings = true
+            showIntegrations(.transcribe)
             return
         }
         session.busy = true
@@ -402,7 +423,7 @@ struct CaptureView: View {
                 session.status = "Transcription prête"
             } catch Gladia.RequestError.unauthorized {
                 session.status = Gladia.RequestError.unauthorized.localizedDescription
-                showingSettings = true
+                showIntegrations(.transcribe)
             } catch { session.status = error.localizedDescription }
         }
     }
