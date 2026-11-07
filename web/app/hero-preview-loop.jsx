@@ -8,7 +8,7 @@ import {useEffect} from 'react';
  * d'autre dans la page ; si le thème nuit n'est pas chargé, ça ne fait rien de visible.
  * Respecte prefers-reduced-motion : la pastille reste alors sur « À valider ».
  */
-export default function HeroPreviewLoop() {
+export default function HeroPreviewLoop({pending = 'À valider', done = 'Fiche à jour'}) {
   useEffect(() => {
     const pill = document.getElementById('etat-apercu');
     if (!pill || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
@@ -17,18 +17,18 @@ export default function HeroPreviewLoop() {
     let timers = [];
     function loop() {
       timers.push(setTimeout(() => {
-        pill.textContent = 'Fiche à jour';
+        pill.textContent = done;
         pill.classList.add('is-done');
       }, flipAt));
       timers.push(setTimeout(() => {
-        pill.textContent = 'À valider';
+        pill.textContent = pending;
         pill.classList.remove('is-done');
       }, resetAt));
     }
     loop();
     const interval = setInterval(loop, 6000);
     return () => { clearInterval(interval); timers.forEach(clearTimeout); };
-  }, []);
+  }, [pending, done]);
 
   return null;
 }

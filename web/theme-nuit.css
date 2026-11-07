@@ -78,6 +78,7 @@ h1 em {
   background-position: 0 58%;
   border-radius: 3px 9px 4px 10px / 8px 4px 9px 5px;
   padding: 0 .06em;
+  width: fit-content;             /* le surlignage suit le texte, pas toute la colonne */
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   animation: mtHeroSweep .68s .55s cubic-bezier(.65, 0, .35, 1) forwards;

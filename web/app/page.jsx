@@ -1,80 +1,89 @@
 import HeroPreviewLoop from './hero-preview-loop';
+import LangSwitch from './lang-switch';
+import DownloadIcon from './download-icon';
+import {dict, langFrom, withLang} from '../lib/i18n.mjs';
 
-export default function Landing() {
-return <>
+export default async function Landing({searchParams}) {
+  const lang = langFrom(await searchParams);
+  const t = dict(lang);
+  return <div lang={t.htmlLang}>
 
-  <HeroPreviewLoop />
+  <HeroPreviewLoop pending={t.preview.pending} done={t.preview.done} />
   <header className="shell site-header">
-    <a className="brand" href="./" aria-label="Meetin-OS, accueil">
+    <a className="brand" href={withLang('/', lang)} aria-label={t.nav.home}>
       <img src="/meetinos.svg" alt="" width="32" height="32" />
       Meetin-OS
     </a>
-    <nav aria-label="Navigation principale">
-      <a href="#fonctionnement">Le parcours</a>
-      <a href="/onboarding">Premiers pas</a>
+    <nav aria-label={t.nav.main}>
+      <a href="#fonctionnement">{t.nav.journey}</a>
+      <a href={withLang('/onboarding', lang)}>{t.nav.firstSteps}</a>
       <a className="nav-link" href="https://github.com/Firmirsa/Meetin-OS">GitHub <span aria-hidden="true">↗</span></a>
+      <LangSwitch lang={lang} path="/" label={t.nav.lang} />
     </nav>
   </header>
   <main>
     <section className="shell hero" aria-labelledby="titre">
       <div className="hero-copy">
-        <p className="eyebrow"><span></span> Prototype pour Mac et Windows</p>
-        <h1 id="titre">De l’appel à la <em>tâche validée.</em></h1>
-        <p className="intro">Prends tes notes pendant l’appel. Retrouve ensuite ce qui a été dit et garde le contexte des décisions.</p>
+        <p className="eyebrow"><span></span> {t.hero.eyebrow}</p>
+        <h1 id="titre">{t.hero.titleStart}<em>{t.hero.titleHighlight}</em></h1>
+        <p className="intro">{t.hero.intro}</p>
         <div className="install-actions" id="installation">
-          <a className="button" href="/downloads/Meetin-OS.pkg" download aria-describedby="install-mac">Installer sur Mac <span aria-hidden="true">↓</span></a>
-          <a className="button" href="/downloads/Meetin-OS-Windows.exe" download aria-describedby="install-windows">Installer sur Windows <span aria-hidden="true">↓</span></a>
+          <a className="button button--download" href={withLang('/telecharger', lang)}>
+            <DownloadIcon /> {t.hero.download}
+          </a>
         </div>
-        <p className="requirements" id="install-mac"><strong>macOS 15+</strong> · Ouvre le paquet pour ajouter Meetin-OS à Applications. La version de test n’est pas notariée. <a href="https://support.apple.com/fr-fr/102445">Aide Apple</a></p>
-        <p className="requirements" id="install-windows"><strong>Windows 10 ou 11 (x64)</strong> · Ouvre l’installateur pour ajouter Meetin-OS au menu Démarrer. Windows peut signaler cette version de test non signée.</p>
+        <p className="requirements">{t.hero.downloadHint}</p>
       </div>
       <figure className="preview">
         <div className="window">
           <div className="window-bar">
             <div className="lights" aria-hidden="true"><i></i><i></i><i></i></div>
-            <span>Carnet de réunion</span>
-            <span className="window-badge">APERÇU</span>
+            <span>{t.preview.window}</span>
+            <span className="window-badge">{t.preview.badge}</span>
           </div>
           <div className="window-body">
-            <p className="meeting-label">RÉUNION PRODUIT</p>
-            <p className="meeting-title">Point de lancement</p>
+            <p className="meeting-label">{t.preview.label}</p>
+            <p className="meeting-title">{t.preview.title}</p>
             <div className="note">
-              <strong>Notes</strong>
-              <p>Relire le guide avant le prochain point.</p>
+              <strong>{t.preview.notes}</strong>
+              <p>{t.preview.note}</p>
             </div>
             <div className="segment">
               <span className="timestamp">00:18</span>
-              <p>« Finalement, <mark>Karim s’en charge mardi.</mark> »</p>
+              <p>{t.preview.quoteStart}<mark>{t.preview.quoteHighlight}</mark>{t.preview.quoteEnd}</p>
             </div>
             <div className="task">
               <div>
-                <p className="task-label">ENGAGEMENT PROPOSÉ</p>
-                <strong>Relire le guide</strong>
-                <p className="task-meta">Karim · Mardi</p>
+                <p className="task-label">{t.preview.taskLabel}</p>
+                <strong>{t.preview.task}</strong>
+                <p className="task-meta">{t.preview.taskMeta}</p>
               </div>
-              <span className="task-state" id="etat-apercu">À valider</span>
+              <span className="task-state" id="etat-apercu">{t.preview.pending}</span>
             </div>
           </div>
         </div>
-        <figcaption>Aperçu du parcours dans l’app Mac</figcaption>
+        <figcaption>{t.preview.caption}</figcaption>
       </figure>
     </section>
     <section className="workflow" id="fonctionnement" aria-labelledby="parcours">
       <div className="shell">
-        <p className="eyebrow"><span></span> Le parcours</p>
-        <h2 id="parcours">Garder le fil après l’appel.</h2>
+        <p className="eyebrow"><span></span> {t.journey.eyebrow}</p>
+        <h2 id="parcours">{t.journey.title}</h2>
         <ol className="steps">
-          <li><span className="step-index">01</span><h3>Capturer</h3><p>Enregistre le micro et le son de l’appel. Note les points clés dans le même carnet.</p></li>
-          <li><span className="step-index">02</span><h3>Relire</h3><p>Lance la transcription avec Gladia et retrouve les passages grâce à leurs repères temporels.</p></li>
-          <li><span className="step-index">03 <span className="planned">À venir</span></span><h3>Valider</h3><p>Confirme l’engagement, son responsable et son échéance avant la mise à jour de la tâche.</p></li>
+          {t.journey.steps.map(([title, text], i) => (
+            <li key={title}>
+              <span className="step-index">0{i + 1}{i === 2 && <> <span className="planned">{t.journey.soon}</span></>}</span>
+              <h3>{title}</h3><p>{text}</p>
+            </li>
+          ))}
         </ol>
       </div>
     </section>
   </main>
   <footer className="shell site-footer">
-    <span>Meetin-OS · Projet du hackathon H Company × 42AI</span>
-    <a href="https://github.com/Firmirsa/Meetin-OS#readme">Documentation <span aria-hidden="true">↗</span></a>
+    <span>{t.footer.project}</span>
+    <a href="https://github.com/Firmirsa/Meetin-OS#readme">{t.footer.docs} <span aria-hidden="true">↗</span></a>
   </footer>
 
-</>;
+</div>;
 }

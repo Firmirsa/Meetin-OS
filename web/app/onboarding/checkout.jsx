@@ -2,7 +2,9 @@
 
 import {useRef, useState} from 'react';
 
-export default function OnboardingCheckout() {
+const DEFAULT_LABELS = {code: 'Code d’accès de l’équipe', open: 'Ouvrir Stripe Checkout', opening: 'Ouverture…', unavailable: 'Stripe Checkout est indisponible.'};
+
+export default function OnboardingCheckout({labels = DEFAULT_LABELS}) {
   const [token, setToken] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
@@ -22,7 +24,7 @@ export default function OnboardingCheckout() {
         body: '{}',
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Stripe Checkout est indisponible.');
+      if (!response.ok) throw new Error(result.error || labels.unavailable);
       window.location.assign(result.url);
     } catch (failure) {
       setError(failure.message);
@@ -32,10 +34,10 @@ export default function OnboardingCheckout() {
   }
 
   return <form onSubmit={checkout}>
-    <label>Code d’accès de l’équipe
+    <label>{labels.code}
       <input type="password" value={token} disabled={pending} onChange={(event) => setToken(event.target.value)} autoComplete="off" required />
     </label>
-    <button className="mt-btn mt-btn--ghost" disabled={pending || !token.trim()}>{pending ? 'Ouverture…' : 'Ouvrir Stripe Checkout'}</button>
+    <button className="mt-btn mt-btn--ghost" disabled={pending || !token.trim()}>{pending ? labels.opening : labels.open}</button>
     {error && <p className="checkout-error" role="alert">{error}</p>}
   </form>;
 }
