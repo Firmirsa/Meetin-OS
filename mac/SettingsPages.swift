@@ -69,10 +69,10 @@ struct SettingsPage: View {
                 }
             }
             SettingsSection(title: "Détection Zoom") {
-                Toggle("Ouvrir la fenêtre quand je rejoins une réunion Zoom", isOn: $detectZoomMeetings)
+                Toggle("Me prévenir quand je rejoins une réunion Zoom", isOn: $detectZoomMeetings)
                     .tint(Color.mtControlTint)
                 if detectZoomMeetings {
-                    Text("L’accès à l’accessibilité sert à détecter les fenêtres Zoom. L’enregistrement se lance manuellement.")
+                    Text("Autorise l’accessibilité et les notifications dans macOS. La fenêtre s’ouvre à ton arrivée dans Zoom. Clique sur Enregistrer dans la notification ou dans la fenêtre pour démarrer.")
                         .foregroundStyle(Color.mtInk2)
                     Button("Ouvrir les réglages d’accessibilité") {
                         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!

@@ -2,25 +2,34 @@ import AppKit
 import ApplicationServices
 
 struct ZoomMeetingDetector {
-    private(set) var inMeeting = false
+    private(set) var arrivalID: UUID?
     private var consecutiveAbsences = 0
+    var inMeeting: Bool { arrivalID != nil }
 
     // A failed AX read does not mean that the call ended.
     mutating func observe(_ titles: [String]?) -> Bool {
         guard let titles else { return false }
-        let meetingVisible = titles.contains {
-            let title = $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            return ["zoom meeting", "réunion zoom", "zoom webinar", "webinaire zoom"].contains(title)
-        }
-        if meetingVisible {
+        if Self.hasMeetingWindow(titles) {
             consecutiveAbsences = 0
             guard !inMeeting else { return false }
-            inMeeting = true
+            arrivalID = UUID()
             return true
         }
         consecutiveAbsences = min(consecutiveAbsences + 1, 2)
-        if consecutiveAbsences == 2 { inMeeting = false }
+        if consecutiveAbsences == 2 { arrivalID = nil }
         return false
+    }
+
+    func isCurrentArrival(_ id: UUID, titles: [String]?) -> Bool {
+        guard id == arrivalID, let titles else { return false }
+        return Self.hasMeetingWindow(titles)
+    }
+
+    private static func hasMeetingWindow(_ titles: [String]) -> Bool {
+        titles.contains {
+            let title = $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return ["zoom meeting", "réunion zoom", "zoom webinar", "webinaire zoom"].contains(title)
+        }
     }
 
     static func windowTitles() -> [String]? {

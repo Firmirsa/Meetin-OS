@@ -21,18 +21,38 @@ extension MeetingSession {
         guard enabled else {
             zoomMonitor?.cancel()
             zoomMonitor = nil
+            if let id = zoomDetector.arrivalID { TaskNotifications.shared.removeZoomArrival(id) }
             zoomDetector = ZoomMeetingDetector()
             return
         }
         guard zoomMonitor == nil else { return }
+        LiveAlerts.requestPermission()
         zoomMonitor = Task { [weak self] in
             while !Task.isCancelled, self != nil {
-                if self?.zoomDetector.observe(ZoomMeetingDetector.windowTitles()) == true {
-                    openWindow(id: "meeting")
-                }
+                self?.observeZoom(openWindow: openWindow)
                 do { try await Task.sleep(for: .seconds(2)) }
                 catch { return }
             }
+        }
+    }
+
+    private func observeZoom(openWindow: OpenWindowAction) {
+        let previous = zoomDetector.arrivalID
+        if zoomDetector.observe(ZoomMeetingDetector.windowTitles()), let id = zoomDetector.arrivalID {
+            openWindow(id: "meeting")
+            if capture == nil { TaskNotifications.shared.postZoomArrival(id) }
+        } else if let previous, !zoomDetector.inMeeting {
+            TaskNotifications.shared.removeZoomArrival(previous)
+        }
+    }
+
+    func handleZoomArrivalNotification(id: UUID, start: Bool) {
+        guard let openWindowAction,
+              zoomDetector.isCurrentArrival(id, titles: ZoomMeetingDetector.windowTitles()) else { return }
+        NSApp.activate()
+        openWindowAction(id: "meeting")
+        if start, capture == nil {
+            CaptureView.toggleRecording(session: self, openWindow: openWindowAction)
         }
     }
 
@@ -251,6 +271,7 @@ extension MeetingSession {
         }
         startedAt = Date()
         startedInZoom = zoomDetector.inMeeting
+        if let id = zoomDetector.arrivalID { TaskNotifications.shared.removeZoomArrival(id) }
         transcriptIncomplete = false
         detector = nil
         proposals = []
