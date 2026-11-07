@@ -9,6 +9,7 @@ struct TaskProposal: Codable, Identifiable {
     var review: AgentReview
     var state: State = .pending
     var sessionURL: URL?
+    var execution: AgentExecution?
 }
 
 struct MeetingRecord: Codable, Identifiable {

@@ -7,7 +7,7 @@ struct MeetinOS: App {
     @State private var meeting = MeetingSession()
 
     var body: some Scene {
-        WindowGroup("Meetin-OS", id: "notebook") {
+        Window("Meetin-OS", id: "notebook") {
             MainWindow(session: meeting)
         }
         .windowStyle(.hiddenTitleBar)
@@ -18,8 +18,13 @@ struct MeetinOS: App {
         Window("Réunion Meetin-OS", id: "meeting") {
             MeetingWindow(session: meeting)
                 .meetinNight()
+                .windowMinimizeBehavior(.disabled)
+                .windowFullScreenBehavior(.disabled)
         }
-        .defaultSize(width: 720, height: 520)
+        .defaultWindowPlacement { _, context in
+            let visible = context.defaultDisplay.visibleRect
+            return WindowPlacement(.trailing, size: CGSize(width: visible.width / 3, height: visible.height))
+        }
         .restorationBehavior(.disabled)
         .commandsRemoved()
     }
@@ -56,7 +61,8 @@ final class MeetingSession {
     var startedAt: Date?
     var startedInZoom = false
     var zoomDetector = ZoomMeetingDetector()
-    var notebookCount = 0
+    @ObservationIgnored var zoomMonitor: Task<Void, Never>?
+    var notebookIsOpen = false
     var meetingIsActive: Bool { capture != nil || zoomDetector.inMeeting }
 
     init() {
@@ -79,7 +85,7 @@ private struct MeetingWindow: View {
         }
         .onChange(of: session.meetingIsActive, initial: true) { wasActive, isActive in
             guard !isActive else { return }
-            if wasActive && session.notebookCount == 0 { openWindow(id: "notebook") }
+            if wasActive && !session.notebookIsOpen { openWindow(id: "notebook") }
             dismissWindow()
         }
     }
@@ -267,7 +273,7 @@ struct CaptureView: View {
             .padding(.vertical, 14)
         }
         .foregroundStyle(Color.mtInk)
-        .frame(minWidth: 560, minHeight: 420)
+        .frame(minWidth: isMeetingWindow ? 360 : 560, minHeight: 420)
         .sheet(item: $integrationsRequest) { request in
             IntegrationsView(session: session, workspaceURL: $webWorkspaceURL, request: request, transcribe: transcribe)
         }
@@ -300,7 +306,7 @@ struct CaptureView: View {
     }
 
     static func toggleRecording(session: MeetingSession, openWindow: OpenWindowAction) {
-        guard !session.busy, session.capture != nil || !session.agent.busy else { return }
+        guard !session.busy, session.capture != nil || (!session.agent.busy && session.launchingProposals.isEmpty) else { return }
         session.busy = true
         Task {
             defer { session.busy = false }

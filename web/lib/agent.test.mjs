@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { agentAccess, prepareTask, detectTasks, executeTask } from './agent.mjs';
+import { agentAccess, prepareTask, detectTasks, executeTask, trelloExecutionStatus } from './agent.mjs';
 
 const token = 'test-only-team-access-token';
 const env = {
@@ -100,6 +100,62 @@ test('a private Trello task waits for the team browser profile and keeps its app
     return Response.json({id: '45463597-20b7-4af7-b3b3-f5fb778203ab'});
   });
   assert.equal(result.status, 'pending');
+});
+
+test('a detected Trello task returns a card only after H verifies it on the approved board', async () => {
+  const configured = {
+    ...env,
+    HAI_COMPUTER_USE_URL: 'https://trello.com/b/board123/meetin-os-demo',
+    HAI_BROWSER_PROFILE_ID: '12b9ade5-309f-4508-b82a-52e124a51600',
+  };
+  const transcript = 'Je vais créer la fiche Vérifier le guide dans À faire.';
+  const {tasks: [plan]} = await detectTasks({transcript}, token, configured, holo({tasks: [{
+    executor: 'computer_use', title: 'Vérifier le guide', task: transcript, quote: transcript,
+  }]}), 100);
+  const id = '45463597-20b7-4af7-b3b3-f5fb778203ab';
+  const run = await executeTask({confirmed: true, approval: plan.approval}, token, configured, async (url, request) => {
+    const body = JSON.parse(request.body);
+    assert.equal(request.method, 'POST');
+    assert.equal(request.headers['Idempotency-Key'], plan.id);
+    assert.deepEqual(body.overrides['agent.answer_format'].required, ['verified', 'board_url', 'card_url']);
+    assert.match(body.messages, /après avoir rouvert la fiche/);
+    return Response.json({id});
+  }, 101);
+  assert.equal(run.status, 'pending');
+  const request = {trackingToken: run.trackingToken};
+  const read = (status, latest_answer, outcome = 'success') => async (url, options) => {
+    assert.equal(url, `https://agp.eu.hcompany.ai/api/v2/sessions/${id}`);
+    assert.equal(options.method, 'GET');
+    assert.equal(options.body, undefined);
+    return Response.json({id, status: {status, outcome}, latest_answer});
+  };
+  const answer = {
+    verified: true, board_url: 'https://www.trello.com/b/board123/new-slug',
+    card_url: 'https://trello.com/c/card1234/1-verifier-le-guide',
+  };
+
+  assert.deepEqual(await trelloExecutionStatus(request, token, configured, read('running', answer), 102), {status: 'pending'});
+  assert.deepEqual(await trelloExecutionStatus(request, token, configured, read('paused', answer), 102), {status: 'attention'});
+  assert.deepEqual(await trelloExecutionStatus(request, token, configured, read('completed', answer), 103), {
+    status: 'verified', cardUrl: 'https://trello.com/c/card1234',
+  });
+  for (const untrusted of [
+    {...answer, verified: false},
+    {...answer, board_url: 'https://trello.com/b/other123/meetin-os-demo'},
+    {...answer, card_url: 'https://trello.com.example/c/card1234'},
+    {...answer, card_url: 'https://trello.com/b/card1234'},
+  ]) {
+    assert.deepEqual(await trelloExecutionStatus(request, token, configured, read('completed', untrusted), 103), {status: 'unverified'});
+  }
+  assert.deepEqual(await trelloExecutionStatus(request, token, configured, read('completed', answer, 'partial'), 103), {status: 'unverified'});
+  assert.deepEqual(await trelloExecutionStatus(request, token, configured, read('failed', answer), 103), {status: 'unverified'});
+  await assert.rejects(trelloExecutionStatus(request, 'incorrect', configured, denied, 103), {status: 401});
+  await assert.rejects(trelloExecutionStatus({trackingToken: plan.approval}, token, configured, denied, 103), {code: 'trello_tracking'});
+  await assert.rejects(trelloExecutionStatus(request, token, configured, denied, 101 + 48 * 3600 * 1000), {code: 'trello_tracking'});
+  const [payload, signature] = run.trackingToken.split('.');
+  const other = {...JSON.parse(Buffer.from(payload, 'base64url')), sessionId: '12345678-1234-1234-1234-123456789abc'};
+  const forged = `${Buffer.from(JSON.stringify(other)).toString('base64url')}.${signature}`;
+  await assert.rejects(trelloExecutionStatus({trackingToken: forged}, token, configured, denied, 103), {code: 'trello_tracking'});
 });
 
 test('task detection proposes reviewable plans without executing anything', async () => {

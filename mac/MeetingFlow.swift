@@ -8,13 +8,32 @@ extension MeetingSession {
     static let systemAudioStateKey = "systemAudioState"
 
     var currentMeeting: MeetingRecord? { store.meeting(id: meetingID) }
-    var canSwitchMeeting: Bool { capture == nil && !busy && !agent.busy }
+    var canSwitchMeeting: Bool { capture == nil && !busy && !agent.busy && launchingProposals.isEmpty }
 
     func showMain(_ target: MainRoute, openWindow: OpenWindowAction) {
         route = target
-        if notebookCount == 0 { openWindow(id: "notebook") }
+        if !notebookIsOpen { openWindow(id: "notebook") }
         NSApp.activate()
         NSApp.windows.first { $0.identifier?.rawValue.hasPrefix("notebook") == true }?.makeKeyAndOrderFront(nil)
+    }
+
+    func setZoomDetection(_ enabled: Bool, openWindow: OpenWindowAction) {
+        guard enabled else {
+            zoomMonitor?.cancel()
+            zoomMonitor = nil
+            zoomDetector = ZoomMeetingDetector()
+            return
+        }
+        guard zoomMonitor == nil else { return }
+        zoomMonitor = Task { [weak self] in
+            while !Task.isCancelled, self != nil {
+                if self?.zoomDetector.observe(ZoomMeetingDetector.windowTitles()) == true {
+                    openWindow(id: "meeting")
+                }
+                do { try await Task.sleep(for: .seconds(2)) }
+                catch { return }
+            }
+        }
     }
 
     static let liveTranscriptionKey = "liveTranscription"
@@ -52,6 +71,7 @@ extension MeetingSession {
         }
         detector.onUpdatedProposal = { [weak self, weak detector] proposal in
             guard let self, self.detector === detector,
+                  !self.launchingProposals.contains(proposal.id),
                   let index = self.proposals.firstIndex(where: { $0.id == proposal.id }),
                   self.proposals[index].state == .pending else { return }
             self.proposals[index].review = proposal.review
@@ -119,12 +139,19 @@ extension MeetingSession {
                 guard let index = proposals.firstIndex(where: { $0.id == proposal.id }) else { return }
                 proposals[index].state = .launched
                 proposals[index].sessionURL = execution.url
+                proposals[index].execution = execution
                 TaskNotifications.shared.remove(proposal.id)
                 if notify { LiveAlerts.postTask("Tâche lancée", "\(review.title) · \(execution.executor.name)") }
             } catch {
                 reportTaskIssue(proposal, error.localizedDescription, notify: notify)
             }
         }
+    }
+
+    func saveTrelloResult(_ result: TrelloExecutionResult, for id: String, trackingToken: String?) {
+        guard let trackingToken, let index = proposals.firstIndex(where: { $0.id == id }),
+              proposals[index].execution?.trackingToken == trackingToken else { return }
+        proposals[index].execution?.trelloResult = result
     }
 
     private func reportTaskIssue(_ proposal: TaskProposal, _ message: String, notify: Bool) {

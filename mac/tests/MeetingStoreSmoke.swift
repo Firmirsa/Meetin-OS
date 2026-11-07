@@ -34,11 +34,17 @@ struct MeetingStoreSmoke {
             executor: .devin, destination: "Firmirsa/Meetin-OS", title: "Corriger l’export", task: "Corriger l’export.",
             quote: "extrait", clarifications: [], approval: "signature"
         )
+        let trello = AgentExecution(
+            executor: .computerUse, url: URL(string: "https://platform.hcompany.ai/agent-view/fixture")!,
+            trackingToken: "suivi", statusEndpoint: URL(string: "https://exemple.test/api/agent-trello-status"),
+            trelloResult: .init(status: .verified, cardURL: URL(string: "https://trello.com/c/card1234"))
+        )
         reloaded.update(first) {
             $0.proposals = [
                 TaskProposal(id: "a", review: review),
                 TaskProposal(id: "b", review: review, state: .ignored),
-                TaskProposal(id: "c", review: review, state: .launched, sessionURL: URL(string: "https://app.devin.ai/sessions/x"))
+                TaskProposal(id: "c", review: review, state: .launched, sessionURL: URL(string: "https://app.devin.ai/sessions/x")),
+                TaskProposal(id: "d", review: review, state: .launched, execution: trello)
             ]
         }
         reloaded.saveNow()
@@ -46,6 +52,9 @@ struct MeetingStoreSmoke {
         precondition(withTasks?.pendingProposals == 1, "seules les tâches en attente comptent")
         precondition(withTasks?.proposals?[0].review.approval == "signature", "plan signé relu")
         precondition(withTasks?.proposals?[2].sessionURL?.host == "app.devin.ai", "lien de session relu")
+        precondition(withTasks?.proposals?[2].execution == nil, "ancienne tâche lancée toujours lisible")
+        precondition(withTasks?.proposals?[3].execution?.trelloResult?.verifiedURL?.absoluteString == "https://trello.com/c/card1234",
+                     "lien de la fiche vérifiée relu après relance")
         precondition(reloaded.meetings.last?.pendingProposals == 0, "réunion sans tâche")
 
         let capture = folder.appendingPathComponent("capture", isDirectory: true)

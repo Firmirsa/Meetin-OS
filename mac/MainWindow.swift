@@ -31,10 +31,10 @@ struct MainWindow: View {
         .frame(minWidth: 940, minHeight: 620)
         .meetinNight()
         .onAppear {
-            session.notebookCount += 1
+            session.notebookIsOpen = true
             session.openWindowAction = openWindow
         }
-        .onDisappear { session.notebookCount -= 1 }
+        .onDisappear { session.notebookIsOpen = false }
         .onOpenURL { url in
             guard session.integrationsRequest == nil, let request = IntegrationsRequest.fromLink(url) else { return }
             session.integrationsRequest = request
@@ -42,16 +42,8 @@ struct MainWindow: View {
         .sheet(item: $session.integrationsRequest) { request in
             IntegrationsView(session: session, workspaceURL: $webWorkspaceURL, request: request, transcribe: {})
         }
-        .task(id: detectZoomMeetings) {
-            session.zoomDetector = ZoomMeetingDetector()
-            guard detectZoomMeetings else { return }
-            while !Task.isCancelled {
-                if session.zoomDetector.observe(ZoomMeetingDetector.windowTitles()) {
-                    openWindow(id: "meeting")
-                }
-                do { try await Task.sleep(for: .seconds(2)) }
-                catch { return }
-            }
+        .onChange(of: detectZoomMeetings, initial: true) {
+            session.setZoomDetection(detectZoomMeetings, openWindow: openWindow)
         }
     }
 

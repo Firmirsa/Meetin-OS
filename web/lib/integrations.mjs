@@ -40,10 +40,11 @@ export function safeURL(value, host) {
 }
 
 export async function provider(fetcher, url, key, body, label, contentType = 'application/json', headers = {}) {
+  const read = body === undefined;
   try {
     const response = await fetcher(url, {
-      method: 'POST',
-      headers: { ...headers, authorization: `Bearer ${key}`, 'content-type': contentType },
+      method: read ? 'GET' : 'POST',
+      headers: { ...headers, authorization: `Bearer ${key}`, ...(!read && {'content-type': contentType}) },
       body: contentType === 'application/json' ? JSON.stringify(body) : body,
       signal: AbortSignal.timeout(20_000),
       redirect: 'error',

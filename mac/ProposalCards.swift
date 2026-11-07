@@ -26,10 +26,12 @@ struct ProposalCards: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(proposal.review.title).font(.mtSans(16, weight: .medium))
                 Spacer()
-                MTPill(
-                    text: proposal.state == .launched ? "Lancée" : "À valider",
-                    kind: proposal.state == .launched ? .ok : .run
-                )
+                if proposal.execution?.statusEndpoint == nil && !session.launchingProposals.contains(proposal.id) {
+                    MTPill(
+                        text: proposal.state == .launched ? "Lancée" : "À valider",
+                        kind: proposal.state == .launched ? .ok : .run
+                    )
+                }
             }
             Text(proposal.review.task).textSelection(.enabled)
             Text("\(proposal.review.executor.name) · \(proposal.review.destination)")
@@ -45,9 +47,15 @@ struct ProposalCards: View {
                 Text(issue).font(.mtSans(13)).foregroundStyle(Color.mtWarn).textSelection(.enabled)
             }
             if proposal.state == .launched {
-                if let url = proposal.sessionURL {
+                if let execution = proposal.execution {
+                    AgentExecutionView(execution: execution, client: client, connect: { showIntegrations(.agent) }) { result in
+                        session.saveTrelloResult(result, for: proposal.id, trackingToken: execution.trackingToken)
+                    }
+                } else if let url = proposal.sessionURL {
                     Link("Suivre dans \(proposal.review.executor.name)", destination: url)
                 }
+            } else if session.launchingProposals.contains(proposal.id) {
+                ProgressView("En cours").controlSize(.small)
             } else {
                 actions(proposal)
             }
@@ -59,10 +67,11 @@ struct ProposalCards: View {
 
     private func actions(_ proposal: TaskProposal) -> some View {
         HStack(spacing: 8) {
-            if let client {
+            if proposal.review.usesTrello && session.agentAccess?.trello == false {
+                Button("Voir l’accès Trello") { showIntegrations(.catalog) }.buttonStyle(.mtGhost)
+            } else if let client {
                 Button("Confirmer et lancer") { session.launch(proposal, using: client) }
                     .buttonStyle(.mtGhost)
-                    .disabled(session.launchingProposals.contains(proposal.id))
             } else {
                 Button("Connecter l’agent") { showIntegrations(.agent) }.buttonStyle(.mtGhost)
             }
@@ -70,14 +79,10 @@ struct ProposalCards: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.mtInk2)
                 .padding(.horizontal, 8)
-                .disabled(session.agent.busy || session.launchingProposals.contains(proposal.id))
+                .disabled(session.agent.busy)
             Button("Ignorer") { session.ignore(proposal) }
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.mtInk2)
-                .disabled(session.launchingProposals.contains(proposal.id))
-            if session.launchingProposals.contains(proposal.id) {
-                ProgressView().controlSize(.small).accessibilityLabel("Lancement en cours")
-            }
         }
     }
 }

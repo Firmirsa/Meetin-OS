@@ -64,9 +64,28 @@ struct KnownTask: Encodable, Equatable {
     let task: String
 }
 
-struct AgentExecution: Decodable {
+struct AgentExecution: Codable {
     let executor: AgentExecutor
     let url: URL
+    let trackingToken: String?
+    var statusEndpoint: URL?
+    var trelloResult: TrelloExecutionResult?
+}
+
+struct TrelloExecutionResult: Codable {
+    enum State: String, Codable { case pending, attention, verified, unverified }
+
+    let status: State
+    let cardURL: URL?
+
+    private enum CodingKeys: String, CodingKey { case status, cardURL = "cardUrl" }
+
+    var verifiedURL: URL? {
+        guard status == .verified, let url = cardURL, url.scheme == "https", url.host == "trello.com",
+              url.port == nil, url.user == nil, url.password == nil, url.query == nil, url.fragment == nil,
+              url.path.range(of: "^/c/[A-Za-z0-9]{1,64}$", options: .regularExpression) != nil else { return nil }
+        return url
+    }
 }
 
 struct AgentAccess: Decodable {
@@ -146,10 +165,31 @@ struct AgentClient {
     }
 
     func launch(_ review: AgentReview) async throws -> AgentExecution {
-        let result: AgentExecution = try await post("agent-execute", Confirmation(approval: review.approval))
+        var result: AgentExecution = try await post("agent-execute", Confirmation(approval: review.approval))
         guard result.executor == review.executor, result.url.scheme == "https", result.url.host == result.executor.sessionHost,
               result.url.user == nil, result.url.password == nil, result.url.port == nil || result.url.port == 443 else {
             throw Failure("Le service n’a pas renvoyé de lien de session valide.")
+        }
+        result.statusEndpoint = review.usesTrello && result.trackingToken != nil ? trelloStatusEndpoint : nil
+        result.trelloResult = nil
+        return result
+    }
+
+    private var trelloStatusEndpoint: URL {
+        baseURL.appendingPathComponent("api").appendingPathComponent("agent-trello-status")
+    }
+
+    func canTrack(_ execution: AgentExecution) -> Bool {
+        execution.statusEndpoint == trelloStatusEndpoint && execution.trackingToken != nil
+    }
+
+    func trelloStatus(_ execution: AgentExecution) async throws -> TrelloExecutionResult {
+        guard canTrack(execution), let token = execution.trackingToken else {
+            throw Failure("Connectez l’agent au serveur utilisé pour cette tâche.")
+        }
+        let result: TrelloExecutionResult = try await post("agent-trello-status", ["trackingToken": token])
+        guard result.status != .verified || result.verifiedURL != nil else {
+            throw Failure("Le serveur n’a pas renvoyé de lien Trello valide.")
         }
         return result
     }

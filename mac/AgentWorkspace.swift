@@ -106,7 +106,13 @@ struct AgentWorkspace<Proposals: View>: View {
                         .buttonStyle(.mtPrimary)
                         .disabled(state.busy || (trimmed(state.request).isEmpty && trimmed(state.excerpt).isEmpty))
                 }
-                if state.busy { ProgressView().controlSize(.small).accessibilityLabel("L’agent traite la demande") }
+                if state.busy {
+                    if case .review? = state.preparation {
+                        ProgressView("En cours").controlSize(.small)
+                    } else {
+                        ProgressView().controlSize(.small).accessibilityLabel("L’agent traite la demande")
+                    }
+                }
                 if !state.error.isEmpty {
                     Text(state.error).foregroundStyle(Color.mtWarn).textSelection(.enabled)
                 }
@@ -115,7 +121,10 @@ struct AgentWorkspace<Proposals: View>: View {
                 }
                 if let execution = state.execution {
                     Text("Dernière session lancée").font(.headline)
-                    Link("Suivre dans \(execution.executor.name)", destination: execution.url)
+                    AgentExecutionView(execution: execution, client: client, connect: { showIntegrations(.agent) }) { result in
+                        guard state.execution?.trackingToken == execution.trackingToken else { return }
+                        state.execution?.trelloResult = result
+                    }
                 }
             }
             .frame(maxWidth: 620, alignment: .leading)
