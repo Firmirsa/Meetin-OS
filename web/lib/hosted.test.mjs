@@ -2,17 +2,47 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter, once } from 'node:events';
 import Stripe from 'stripe';
+import { accountAuth, requireUser } from './hosted-account.mjs';
 import { batchResult, startBatch } from './gladia-hosted.mjs';
 import { relayGladia } from './gladia-relay.mjs';
 import { accountBilling, stripeWebhook } from './hosted-stripe.mjs';
 
-const user = {id: '927135e3-68c8-4c7f-9d37-e80ea311f25a', email: 'recette@example.com', email_confirmed_at: '2026-11-07'};
+const user = {
+  id: '927135e3-68c8-4c7f-9d37-e80ea311f25a', email: 'recette@example.com', email_confirmed_at: '2026-11-07',
+  app_metadata: {providers: ['email', 'google']},
+};
+const fixtureToken = method => `fixture.${Buffer.from(JSON.stringify({sub: user.id, amr: [{method}]})).toString('base64url')}.fixture`;
+const googleToken = fixtureToken('oauth');
 const audioID = '11111111-1111-4111-8111-111111111111';
 const env = {
   MEETIN_WEB_URL: 'https://meetin.example.test', SUPABASE_URL: 'https://db.example.test',
   SUPABASE_PUBLISHABLE_KEY: 'publishable_fixture', SUPABASE_SECRET_KEY: 'secret_fixture', GLADIA_API_KEY: 'gladia_fixture',
 };
 const audioURL = env.MEETIN_WEB_URL + '/api/gladia';
+
+test('Google PKCE exchanges the code, and legacy OTP cannot open a session', async () => {
+  const challenge = 'a'.repeat(43);
+  const verifier = 'b'.repeat(43);
+  const fetcher = async (url, options) => {
+    assert.equal(url, `${env.SUPABASE_URL}/auth/v1/token?grant_type=pkce`);
+    assert.deepEqual(JSON.parse(options.body), {auth_code: audioID, code_verifier: verifier});
+    return Response.json({access_token: googleToken, refresh_token: 'refresh_fixture', expires_in: 3600, user});
+  };
+  const {url} = await accountAuth({action: 'google_start', challenge, redirect_to: 'https://example.com'}, null, env, fetcher);
+  const target = new URL(url);
+  assert.equal(target.searchParams.get('provider'), 'google');
+  assert.equal(target.searchParams.get('redirect_to'), 'meetinos-oauth://callback');
+  assert.equal(target.searchParams.get('code_challenge'), challenge);
+  const tokens = await accountAuth({action: 'google_exchange', code: audioID, verifier}, null, env, fetcher);
+  assert.equal(tokens.accessToken, googleToken);
+  for (const action of ['send_code', 'verify_code']) {
+    await assert.rejects(accountAuth({action, email: user.email}, null, env, fetcher), {status: 400});
+  }
+  await assert.rejects(requireUser(fixtureToken('otp'), env, async () => Response.json(user)), {status: 401});
+  await assert.rejects(requireUser(googleToken, env, async () => Response.json({
+    ...user, app_metadata: {providers: ['google', 'github']},
+  })), {status: 401});
+});
 
 test('paid audio requires a confirmed user and budget, and a foreign job is unavailable', async () => {
   let providerCalls = 0;
@@ -36,9 +66,9 @@ test('paid audio requires a confirmed user and budget, and a foreign job is unav
     }, body: Buffer.alloc(32_000),
   });
   await assert.rejects(startBatch(post(), env, fetcher), {status: 401});
-  await assert.rejects(startBatch(post('confirmed'), env, fetcher), {status: 429, code: 'audio_quota'});
+  await assert.rejects(startBatch(post(googleToken), env, fetcher), {status: 429, code: 'audio_quota'});
   await assert.rejects(batchResult(new Request(`${audioURL}?id=${audioID}`, {
-    headers: {authorization: 'Bearer confirmed'},
+    headers: {authorization: `Bearer ${googleToken}`},
   }), env, fetcher), {status: 404});
   assert.equal(providerCalls, 0);
 });
@@ -106,7 +136,7 @@ test('Checkout uses the signed-in identity and only a signed eligible subscripti
     return new Response(null, {status: 204});
   };
   await assert.rejects(accountBilling({action: 'checkout'}, null, env, fetcher, config), {status: 401});
-  await accountBilling({action: 'checkout', email: 'ignored@example.com'}, 'confirmed', env, fetcher, config);
+  await accountBilling({action: 'checkout', email: 'ignored@example.com'}, googleToken, env, fetcher, config);
   const raw = JSON.stringify({
     type: 'customer.subscription.updated', created: Math.floor(Date.now() / 1000), livemode: false,
     data: {object: {id: 'sub_fixture'}},

@@ -2,6 +2,21 @@ import { ApiError, requireAccess, setting } from './integrations.mjs';
 
 export const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const serverMessage = 'Le service de comptes Meetin-OS est indisponible.';
+const googleRequired = 'Connectez-vous avec Google pour utiliser Meetin-OS.';
+const googleRedirect = 'meetinos-oauth://callback';
+const pkceValue = /^[A-Za-z0-9_-]{43}$/;
+
+function isGoogleSession(user, token) {
+  const providers = user?.app_metadata?.providers;
+  if (!uuid.test(user?.id ?? '') || user.is_anonymous || !user.email || !user.email_confirmed_at ||
+      !Array.isArray(providers) || !providers.includes('google') ||
+      !providers.every(provider => provider === 'google' || provider === 'email')) return false;
+  // The JWT was just issued or verified by Supabase. A linked Google identity alone does not prove OAuth sign-in.
+  try {
+    const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+    return claims.sub === user.id && Array.isArray(claims.amr) && claims.amr.some(entry => entry?.method === 'oauth');
+  } catch { return false; }
+}
 
 function supabaseOrigin(env) {
   let origin;
@@ -54,27 +69,38 @@ export async function requireUser(token, env = process.env, fetcher = fetch) {
   }
   if (!response.ok) throw new ApiError(503, serverMessage);
   const user = await response.json();
-  if (!uuid.test(user?.id ?? '') || user.is_anonymous || !user.email || !user.email_confirmed_at) {
-    throw new ApiError(401, 'Un compte Meetin-OS confirmé est nécessaire.', 'account_required');
+  if (!isGoogleSession(user, token)) {
+    throw new ApiError(401, googleRequired, 'account_required');
   }
   return user;
 }
 
 export async function accountAuth(body, token, env = process.env, fetcher = fetch) {
-  const key = setting(env, 'SUPABASE_PUBLISHABLE_KEY');
   const action = body?.action;
+  if (action === 'google_start') {
+    if (typeof body.challenge !== 'string' || !pkceValue.test(body.challenge)) {
+      throw new ApiError(400, 'La demande de connexion Google est invalide.');
+    }
+    const url = new URL('/auth/v1/authorize', supabaseOrigin(env));
+    url.search = new URLSearchParams({
+      provider: 'google', redirect_to: googleRedirect, code_challenge: body.challenge,
+      code_challenge_method: 's256', prompt: 'select_account',
+    });
+    return {url: url.href};
+  }
+  if (!['google_exchange', 'refresh', 'sign_out'].includes(action)) {
+    throw new ApiError(400, googleRequired);
+  }
+  const key = setting(env, 'SUPABASE_PUBLISHABLE_KEY');
   let response;
-  if (action === 'send_code' || action === 'verify_code') {
-    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new ApiError(400, 'Saisissez une adresse e-mail valide.');
+  if (action === 'google_exchange') {
+    if (typeof body.code !== 'string' || !uuid.test(body.code) ||
+        typeof body.verifier !== 'string' || !pkceValue.test(body.verifier)) {
+      throw new ApiError(400, 'Le retour de la connexion Google est invalide.');
     }
-    if (action === 'send_code') {
-      response = await supabase('/auth/v1/otp', {key, body: {email, create_user: true}}, env, fetcher);
-    } else {
-      if (typeof body.code !== 'string' || !/^\d{6}$/.test(body.code)) throw new ApiError(400, 'Saisissez les six chiffres du code.');
-      response = await supabase('/auth/v1/verify', {key, body: {email, token: body.code, type: 'email'}}, env, fetcher);
-    }
+    response = await supabase('/auth/v1/token?grant_type=pkce', {
+      key, body: {auth_code: body.code, code_verifier: body.verifier},
+    }, env, fetcher);
   } else if (action === 'refresh') {
     if (typeof body.refreshToken !== 'string' || !body.refreshToken || body.refreshToken.length > 512) {
       throw new ApiError(401, 'Reconnectez-vous à Meetin-OS.', 'account_required');
@@ -86,21 +112,19 @@ export async function accountAuth(body, token, env = process.env, fetcher = fetc
     if (!token) return {signedOut: true};
     response = await supabase('/auth/v1/logout?scope=local', {key, bearer: token, method: 'POST'}, env, fetcher);
     if (response.status === 401 || response.status === 403) return {signedOut: true};
-  } else {
-    throw new ApiError(400, 'Action de connexion inconnue.');
   }
-  if (response.status === 429) throw new ApiError(429, 'Patientez avant de demander un nouveau code.');
+  if (response.status === 429) throw new ApiError(429, 'Patientez avant de réessayer de vous connecter.');
   if (!response.ok) {
     if (response.status >= 500) throw new ApiError(503, serverMessage);
     if (action === 'refresh') throw new ApiError(401, 'Reconnectez-vous à Meetin-OS.', 'account_required');
-    if (action === 'verify_code') throw new ApiError(400, 'Code incorrect ou expiré. Demandez-en un nouveau.');
-    throw new ApiError(503, 'L’envoi du code ou la déconnexion est momentanément indisponible.');
+    if (action === 'google_exchange') throw new ApiError(400, 'La connexion Google a expiré ou a échoué. Réessayez.');
+    throw new ApiError(503, 'La déconnexion est momentanément indisponible.');
   }
-  if (action === 'send_code') return {sent: true};
   if (action === 'sign_out') return {signedOut: true};
   const session = await response.json();
   if (!session?.access_token || !session.refresh_token || !session.user?.email ||
       !Number.isFinite(session.expires_in) || session.expires_in <= 0) throw new ApiError(503, serverMessage);
+  if (!isGoogleSession(session.user, session.access_token)) throw new ApiError(401, googleRequired, 'account_required');
   return {
     accessToken: session.access_token, refreshToken: session.refresh_token,
     expiresAt: Math.floor(Date.now() / 1000) + session.expires_in, email: session.user.email,

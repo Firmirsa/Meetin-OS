@@ -67,7 +67,7 @@ struct IntegrationsView: View {
         return VStack(alignment: .leading, spacing: 12) {
             Text("Intégrations").font(.title2.bold()).accessibilityAddTraits(.isHeader)
             Text(session.agentAccess == nil
-                 ? "Le carnet et l’enregistrement sont disponibles sans compte. Connectez l’agent quand vous en avez besoin."
+                 ? "Connectez l’agent quand vous avez besoin des outils de votre équipe."
                  : "Le code de l’équipe est validé pour cette session.")
                 .foregroundStyle(Color.mtInk2)
             if session.agentAccess?.planning == false {
@@ -107,7 +107,7 @@ struct IntegrationsView: View {
                 .textFieldStyle(.roundedBorder).focused($credentialFocused).disabled(checking)
                 .onSubmit(connect)
             HStack {
-                Button(session.agentAccess == nil ? "Continuer sans compte" : "Retour") {
+                Button(session.agentAccess == nil ? "Plus tard" : "Retour") {
                     if session.agentAccess == nil { dismiss() } else { show(.catalog) }
                 }
                 .keyboardShortcut(.cancelAction).disabled(checking)

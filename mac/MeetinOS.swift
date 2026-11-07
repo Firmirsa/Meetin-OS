@@ -302,6 +302,7 @@ struct CaptureView: View {
     }
 
     static func toggleRecording(session: MeetingSession, openWindow: OpenWindowAction) {
+        guard session.capture != nil || session.accountConnected else { return }
         guard !session.busy, session.capture != nil || (!session.agent.busy && session.launchingProposals.isEmpty) else { return }
         session.busy = true
         Task {

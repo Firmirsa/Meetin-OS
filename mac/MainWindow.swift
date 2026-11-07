@@ -9,6 +9,8 @@ struct MainWindow: View {
     @Bindable var session: MeetingSession
     @AppStorage("detectZoomMeetings") private var detectZoomMeetings = false
     @AppStorage("webWorkspaceURL") private var webWorkspaceURL = MeetinSite.defaultAddress
+    private var client: AccountClient? { MeetinSite.baseURL(webWorkspaceURL).map { AccountClient(baseURL: $0) } }
+    private var signedIn: Bool { session.account.connected(to: client?.baseURL) }
 
     // Ouverture à environ 80 % de la zone visible de l'écran.
     static func placement(in context: WindowPlacementContext) -> WindowPlacement {
@@ -17,6 +19,39 @@ struct MainWindow: View {
     }
 
     var body: some View {
+        Group {
+            if signedIn {
+                notebook
+            } else {
+                WelcomeView(account: session.account, client: client)
+            }
+        }
+        .frame(minWidth: 940, minHeight: 620)
+        .meetinNight()
+        .onAppear {
+            session.notebookIsOpen = true
+            session.openWindowAction = openWindow
+        }
+        .onDisappear { session.notebookIsOpen = false }
+        .onOpenURL { url in
+            guard signedIn, session.integrationsRequest == nil, let request = IntegrationsRequest.fromLink(url) else { return }
+            session.integrationsRequest = request
+        }
+        .sheet(item: $session.integrationsRequest) { request in
+            IntegrationsView(session: session, workspaceURL: $webWorkspaceURL, request: request, transcribe: {})
+        }
+        .onChange(of: signedIn && detectZoomMeetings, initial: true) { _, enabled in
+            session.setZoomDetection(enabled, openWindow: openWindow)
+        }
+        .task(id: signedIn) {
+            guard signedIn, let client else { return }
+            do { _ = try await session.account.refreshUsage(client) }
+            catch let failure as AccountClient.Failure where failure.status == 401 { session.account.forget(client) }
+            catch { /* A network outage keeps the local notebook available. */ }
+        }
+    }
+
+    private var notebook: some View {
         NavigationSplitView(columnVisibility: .constant(.all)) {
             Sidebar(session: session)
                 .frame(minWidth: 240, idealWidth: 250, maxWidth: 290)
@@ -28,23 +63,6 @@ struct MainWindow: View {
                 .background(MTMist().ignoresSafeArea())
         }
         .navigationSplitViewStyle(.balanced)
-        .frame(minWidth: 940, minHeight: 620)
-        .meetinNight()
-        .onAppear {
-            session.notebookIsOpen = true
-            session.openWindowAction = openWindow
-        }
-        .onDisappear { session.notebookIsOpen = false }
-        .onOpenURL { url in
-            guard session.integrationsRequest == nil, let request = IntegrationsRequest.fromLink(url) else { return }
-            session.integrationsRequest = request
-        }
-        .sheet(item: $session.integrationsRequest) { request in
-            IntegrationsView(session: session, workspaceURL: $webWorkspaceURL, request: request, transcribe: {})
-        }
-        .onChange(of: detectZoomMeetings, initial: true) {
-            session.setZoomDetection(detectZoomMeetings, openWindow: openWindow)
-        }
     }
 
     @ViewBuilder private var page: some View {

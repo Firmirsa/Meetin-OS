@@ -17,7 +17,7 @@ open mac/.build/Meetin-OS.app
 
 Le script construit et signe localement l’application. Au premier enregistrement, macOS peut demander l’accès au **Microphone** et à **Audio du système uniquement**. Si une piste manque, le carnet propose un lien vers les réglages concernés et conserve la piste disponible. Les deux raccourcis sont aussi dans **Paramètres → Autorisations audio**. Une nouvelle version signée localement peut demander à nouveau les autorisations.
 
-L’**Accueil**, le carnet et l’enregistrement restent disponibles sans compte. Ouvre **Compte** et connecte-toi avec un code reçu par e-mail pour transcrire. Le serveur Meetin-OS utilise la clé Gladia de l’équipe. **Compte** affiche le quota restant et permet de passer à Premium via Stripe si le paiement est configuré. [Configuration du serveur](../web/README.md#comptes-transcription-et-abonnement-mac)
+Au lancement de Mac 0.1.5, clique sur **Se connecter avec Google** pour ouvrir ton carnet. Compile la version de recette avec `MEETIN_WEB_URL` défini sur l’adresse du serveur de test. Le serveur Meetin-OS utilise la clé Gladia de l’équipe. **Compte** affiche le quota restant et permet de passer à Premium via Stripe si le paiement est configuré. [Configuration du serveur](../web/README.md#comptes-transcription-et-abonnement-mac)
 
 1. Lancez un appel de test avec un autre participant. Sur l’**Accueil**, cliquez sur **Commencer à enregistrer** (⌘R), faites parler chaque personne à tour de rôle, puis cliquez sur **Arrêter**.
 2. Cliquez sur **Écouter** pour vérifier les deux voix. **Voir les pistes** révèle le dossier de la réunion contenant le mix et les deux pistes séparées.

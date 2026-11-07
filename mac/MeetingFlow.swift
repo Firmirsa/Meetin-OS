@@ -186,6 +186,7 @@ extension MeetingSession {
 
     // Réponse à une notification de tâche. Sans lancement possible, ouvre la carte concernée.
     func handleTaskNotification(id: String, shownApproval: String?, confirm: Bool, context: String?) {
+        guard accountConnected else { return }
         if !proposals.contains(where: { $0.id == id }),
            let record = store.meetings.first(where: { $0.proposals?.contains { $0.id == id } == true }) {
             open(record)

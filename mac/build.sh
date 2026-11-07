@@ -16,6 +16,7 @@ for size in 16 32 128 256 512; do
 done
 iconutil -c icns "$work/MeetinOS.iconset" -o "$app/Contents/Resources/MeetinOS.icns"
 cp ../brand/logo/app-icon-1024.png "$app/Contents/Resources/MeetinOS.png"
+cp ../brand/logo/google-g.png "$app/Contents/Resources/GoogleG.png"
 mkdir -p "$app/Contents/Resources/Fonts"
 cp ../brand/fonts/*.ttf ../brand/fonts/OFL-*.txt "$app/Contents/Resources/Fonts/"
 cp Info.plist "$app/Contents/Info.plist"
@@ -25,7 +26,7 @@ fi
 
 compile() {
   swiftc -parse-as-library -target "$1-apple-macos$minimum_macos" \
-    MeetinOS.swift Capture.swift Gladia.swift AgentClient.swift AgentExecutionView.swift AgentWorkspace.swift Integrations.swift ZoomMeetingDetector.swift MainWindow.swift Sidebar.swift HomeView.swift MeetingsView.swift SettingsPages.swift MeetingStore.swift MeetingFlow.swift MeetinSite.swift NightTheme.swift HostedAccount.swift HostedAccountView.swift LiveTranscription.swift LiveTranscriptPanel.swift LiveAlerts.swift TaskDetection.swift ProposalCards.swift TaskActions.swift TaskNotifications.swift \
+    MeetinOS.swift Capture.swift Gladia.swift AgentClient.swift AgentExecutionView.swift AgentWorkspace.swift Integrations.swift ZoomMeetingDetector.swift MainWindow.swift Sidebar.swift HomeView.swift MeetingsView.swift SettingsPages.swift MeetingStore.swift MeetingFlow.swift MeetinSite.swift NightTheme.swift HostedAccount.swift HostedAccountView.swift GoogleSignIn.swift WelcomeView.swift LiveTranscription.swift LiveTranscriptPanel.swift LiveAlerts.swift TaskDetection.swift ProposalCards.swift TaskActions.swift TaskNotifications.swift \
     ../brand/MeetinTheme.swift ../brand/MeetinComponents.swift -o "$2"
 }
 

@@ -10,7 +10,7 @@ Développé par **Wael, Lenny et Samy** pour le **H Company × 42AI Computer Use
 
 ## Lancer le prototype Mac
 
-**Prérequis** · macOS 15 ou ultérieur. Le carnet et l’enregistrement s’utilisent sans compte. Dans la version Mac compilée depuis ces sources, un compte Meetin-OS suffit pour transcrire : le serveur de l’équipe fournit la clé Gladia.
+**Prérequis** · macOS 15 ou ultérieur. Connecte-toi avec Google pour ouvrir le carnet dans la version Mac compilée depuis ces sources. Le serveur de l’équipe fournit la clé Gladia.
 
 Depuis le site, clique sur **Installer sur Mac**, ouvre `Meetin-OS.pkg` et confirme. L’assistant macOS ajoute Meetin-OS à **Applications**. Le paquet de test publié avant le lot comptes peut encore demander une clé Gladia.
 
@@ -27,7 +27,7 @@ Le script compile et signe l’application localement. À la première capture, 
 
 1. Clique sur **Enregistrer**, puis prends tes notes dans le carnet pendant l’appel.
 2. Clique sur **Arrêter**, puis sur **Écouter** pour vérifier l’enregistrement. **Voir les pistes** permet d’inspecter séparément le micro et le son du Mac.
-3. Clique sur **Transcrire**. Connecte-toi avec le code reçu par e-mail si nécessaire. L’app reprend la transcription et affiche les passages horodatés. **Compte** affiche ton plan et le quota restant.
+3. Clique sur **Transcrire** pour afficher les passages horodatés. **Compte** affiche ton plan et le quota restant.
 
 Le [guide macOS](mac/README.md) détaille les permissions, les fichiers audio et la configuration de Gladia.
 
@@ -54,7 +54,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Le téléchargement est disponible sur [localhost:3000/telecharger](http://localhost:3000/telecharger) et les premiers pas sur [localhost:3000/onboarding](http://localhost:3000/onboarding). Le carnet et l’enregistrement sont accessibles sans compte. Pour utiliser l’agent sur Mac, configure les intégrations côté serveur puis saisis le code de l’équipe dans **Intégrations → Connecter l’agent**.
+Le téléchargement est disponible sur [localhost:3000/telecharger](http://localhost:3000/telecharger) et les premiers pas sur [localhost:3000/onboarding](http://localhost:3000/onboarding). Pour utiliser l’agent sur Mac, configure les intégrations côté serveur puis saisis le code de l’équipe dans **Intégrations → Connecter l’agent**.
 
 | Brique | Recette |
 |---|---|

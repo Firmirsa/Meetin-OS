@@ -48,12 +48,30 @@ struct AccountClient: Sendable {
 
     func url(_ operation: String) -> URL { baseURL.appendingPathComponent("api").appendingPathComponent(operation) }
 
-    func sendCode(to email: String) async throws {
-        let _: Empty = try await post("account-auth", ["action": "send_code", "email": email])
+    func googleURL(challenge: String) async throws -> URL {
+        struct Link: Decodable { let url: URL }
+        let link: Link
+        do {
+            link = try await post("account-auth", ["action": "google_start", "challenge": challenge])
+        } catch let failure as Failure where [401, 404, 405].contains(failure.status ?? 0) {
+            throw Failure(message: "La connexion Google n’est pas encore disponible sur ce serveur.")
+        }
+        let url = link.url
+        let host = url.host ?? ""
+        let hosted = url.scheme == "https" && host.hasSuffix(".supabase.co") && url.port == nil
+        let local = baseURL.scheme == "http" && url.scheme == "http" && ["localhost", "127.0.0.1"].contains(host)
+        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        func values(_ name: String) -> [String] { query.filter { $0.name == name }.compactMap(\.value) }
+        guard (hosted || local), url.path == "/auth/v1/authorize", url.user == nil, url.password == nil, url.fragment == nil,
+              values("provider") == ["google"], values("redirect_to") == ["meetinos-oauth://callback"],
+              values("code_challenge") == [challenge], values("code_challenge_method") == ["s256"] else {
+            throw Failure(message: "Le lien de connexion Google est invalide.")
+        }
+        return url
     }
 
-    func verify(email: String, code: String) async throws -> AccountTokens {
-        try await post("account-auth", ["action": "verify_code", "email": email, "code": code])
+    func exchangeGoogleCode(_ code: String, verifier: String) async throws -> AccountTokens {
+        try await post("account-auth", ["action": "google_exchange", "code": code, "verifier": verifier])
     }
 
     func refresh(_ token: String) async throws -> AccountTokens {
@@ -118,8 +136,8 @@ final class HostedAccount {
 
     func connected(to server: URL?) -> Bool { server != nil && login?.server == server }
 
-    func signIn(_ client: AccountClient, email: String, code: String) async throws {
-        let tokens = try await client.verify(email: email, code: code)
+    func signIn(_ client: AccountClient, googleCode: String, verifier: String) async throws {
+        let tokens = try await client.exchangeGoogleCode(googleCode, verifier: verifier)
         refreshing?.cancel()
         refreshing = nil
         usage = nil
@@ -184,7 +202,7 @@ final class HostedAccount {
         private static let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Bundle.main.bundleIdentifier ?? "com.meetin-os.capture",
-            kSecAttrAccount as String: "meetin-user-session-v1",
+            kSecAttrAccount as String: "meetin-google-session-v1",
         ]
 
         static func load() -> Login? {

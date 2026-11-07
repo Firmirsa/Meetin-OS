@@ -8,12 +8,12 @@ Le site Next.js sert les téléchargements à `/telecharger` et les premiers pas
 
 1. Ouvre le [SQL Editor du projet de Lenny](https://supabase.com/dashboard/project/lqqkgyvwilltwgkxlirb/sql/new). Vérifie le projet et exécute `select to_regclass('vault.decrypted_secrets'), to_regclass('meetin_private.quota_plans');`. La vue Vault doit exister et la table des quotas doit être absente pour une première application. Si la table existe déjà, vérifie l’état en base avant de relancer le SQL.
 2. Pour une première application, colle la [migration des comptes et quotas](../supabase/migrations/20261107190000_meetin_accounts_and_quota.sql) dans une nouvelle requête, entre `begin;` et `commit;`, et exécute le tout. Vérifie avec `select code, monthly_ms / 60000 as minutes from meetin_private.quota_plans order by code;` : `free` doit afficher 15 et `premium` 300. Cette requête ne lit aucun secret.
-3. Active la connexion par e-mail avec confirmation. Configure **Confirm signup** et **Magic Link** pour afficher `{{ .Token }}`, le code à six chiffres que l’app demande. Le SMTP Supabase par défaut livre uniquement aux membres de l’équipe du projet. Pour d’autres adresses, configure un [serveur SMTP](https://supabase.com/docs/guides/auth/auth-smtp). [Connexion Supabase par code e-mail](https://supabase.com/docs/guides/auth/auth-email-passwordless)
+3. Configure un client OAuth Google de type **Application Web**. Dans Google Cloud, ajoute l’URL de retour `https://lqqkgyvwilltwgkxlirb.supabase.co/auth/v1/callback`. Dans Supabase **Authentication → Providers**, active Google avec le client ID et le secret, puis désactive la connexion par e-mail et les autres fournisseurs pour ce projet. Dans **Authentication → URL Configuration**, ajoute l’URL de retour exacte `meetinos-oauth://callback`. Si Google est en mode test, ajoute l’adresse du testeur dans Google Cloud. [Configurer Google avec Supabase](https://supabase.com/docs/guides/auth/social-sign-in/auth-google)
 4. Dans [Supabase Vault](https://supabase.com/docs/guides/database/vault), vérifie l’entrée `gladia_api_key`. Les entrées `hai_api_key` et `devin_api_key` servent à l’agent. Les variables serveur `GLADIA_API_KEY`, `HAI_API_KEY` et `DEVIN_API_KEY` restent possibles et priment sur le Vault.
 
 ### Vercel
 
-Déploie la branche `codex/hosted-gladia`, avec `web` comme dossier racine. Choisis une URL HTTPS stable pour la recette et affecte les variables à ce déploiement, puis redéploie. Le Mac et Stripe doivent pouvoir joindre l’API à cette adresse sans passer par l’écran de connexion Vercel. Si la Preview est protégée, utilise une [exception limitée à son domaine de test](https://vercel.com/changelog/protect-production-deployments-for-free-on-every-plan) ou un projet de test dédié.
+Pour la recette de Mac 0.1.5, déploie la branche `codex/google-onboarding`, avec `web` comme dossier racine. Choisis une URL HTTPS stable et affecte les variables à ce déploiement, puis redéploie. Le Mac et Stripe doivent pouvoir joindre l’API à cette adresse sans passer par l’écran de connexion Vercel. Si la Preview est protégée, utilise une [exception limitée à son domaine de test](https://vercel.com/changelog/protect-production-deployments-for-free-on-every-plan) ou un projet de test dédié.
 
 | Variable serveur | Valeur pour la recette |
 |---|---|
@@ -34,13 +34,13 @@ Crée un produit **Premium** avec un tarif récurrent dans le même environnemen
 
 ### Vérifier le parcours sur Mac
 
-1. Compile Mac 0.1.4 avec `MEETIN_WEB_URL` pointant vers le domaine de test, ou saisis ce domaine dans **Compte → Adresse du serveur**. Connecte-toi et vérifie le plan Gratuit et ses 15 min. Stripe peut être configuré après ce premier contrôle.
+1. Compile Mac 0.1.5 avec `MEETIN_WEB_URL` pointant vers le domaine de test. L’écran d’accueil propose **Se connecter avec Google**. Après le retour de Google dans l’app, vérifie le plan Gratuit et ses 15 min dans **Compte**. Stripe peut être configuré après ce premier contrôle.
 2. Lance un vrai appel court avec l’accord des deux participants. Avec des écouteurs, faites parler les deux personnes à tour de rôle. Dans la fenêtre de réunion, vérifie une phrase en direct sous **Micro** et une sous **Audio de l’appel**. Arrête, vérifie que le texte est dans la réunion et actualise le solde dans **Compte**.
 3. Depuis **Compte**, lance **Passer à Premium** avec un [moyen de paiement Stripe de test](https://docs.stripe.com/testing). Vérifie la réponse `2xx` dans les livraisons Stripe, puis actualise **Compte**. Le plan doit afficher Premium et le plafond de 300 min, en conservant le débit du premier appel.
 
 **Gratuit : 15 min audio par mois. Premium : 300 min.** Le compteur repart le premier du mois à 00 h UTC. Le serveur mesure l’audio envoyé : une minute de micro et une minute de son de l’appel comptent pour deux minutes. Le direct et la transcription après l’appel partagent le quota. Les volumes se règlent en base dans `meetin_private.quota_plans`. En cas de quota épuisé, le carnet et la capture locale restent accessibles.
 
-Le site sert à installer l’app et à ouvrir **Compte** ou **Intégrations** avec l’adresse du serveur préremplie. La connexion, le solde et le lancement de Stripe Checkout se font dans **Compte** sur Mac. Le site ne contient pas de carnet.
+Le site sert à installer l’app et à ouvrir **Compte** ou **Intégrations**. La première connexion Google se fait depuis l’accueil Mac. **Compte** affiche le solde et ouvre Stripe Checkout.
 
 ## Intégrations de l’agent
 
