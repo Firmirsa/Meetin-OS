@@ -66,12 +66,17 @@ internal sealed class Notebook : Form
         transcriptionTab.Controls.Add(transcriptPanel);
         tabs.TabPages.Add(transcriptionTab);
 
-        var agentTab = new TabPage("Agent");
-        var openAgent = ActionButton("Ouvrir l’espace agent", true);
-        var agentActions = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(14), FlowDirection = FlowDirection.TopDown };
-        agentActions.Controls.Add(new Label { AutoSize = true, Text = "Copie un extrait de la transcription et relis la tâche dans l’espace agent." });
-        agentActions.Controls.Add(Row(copy, openAgent));
-        agentTab.Controls.Add(agentActions);
+        // Après la réunion : les engagements à valider (même design que le site et le Mac).
+        var agentTab = new TabPage("Engagements") { BackColor = Canvas };
+        var openAgent = ActionButton("Ouvrir l’espace agent"); // Un seul bouton citron dans cet onglet : « Valider ».
+        var engagements = new EngagementsPanel();
+        engagements.ShowTranscriptRequested += () => tabs.SelectedTab = transcriptionTab;
+        var agentLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(14, 10, 14, 6), BackColor = Canvas };
+        agentLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        agentLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        agentLayout.Controls.Add(engagements, 0, 0);
+        agentLayout.Controls.Add(Row(copy, openAgent), 0, 1);
+        agentTab.Controls.Add(agentLayout);
         tabs.TabPages.Add(agentTab);
 
         record.Click += async (_, _) => await RecordAsync();
