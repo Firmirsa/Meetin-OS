@@ -1,0 +1,46 @@
+{
+  "proposal": {
+    "proposalId": "proposal-demo-001",
+    "title": "Relire le guide de lancement",
+    "assignee": "Karim",
+    "dueDate": "2026-11-10",
+    "excerpt": {
+      "text": "Léa devait relire le guide. Finalement, Karim s’en charge mardi.",
+      "startMs": 18000,
+      "endMs": 24000
+    }
+  },
+  "validation": {
+    "validationId": "c3034078-28d8-48c0-a321-68b550a6da89",
+    "proposalId": "proposal-demo-001",
+    "title": "Relire le guide de lancement",
+    "assignee": "Karim",
+    "dueDate": "2026-11-10"
+  },
+  "execution": {
+    "pending": {
+      "validationId": "c3034078-28d8-48c0-a321-68b550a6da89",
+      "status": "pending"
+    },
+    "verified": {
+      "validationId": "c3034078-28d8-48c0-a321-68b550a6da89",
+      "status": "verified",
+      "taskUrl": "https://example.com/tasks/demo-42",
+      "observed": {
+        "title": "Relire le guide de lancement",
+        "assignee": "Karim",
+        "dueDate": "2026-11-10"
+      }
+    },
+    "needsClarification": {
+      "validationId": "c3034078-28d8-48c0-a321-68b550a6da89",
+      "status": "needs_clarification",
+      "message": "Deux fiches correspondent à « Relire le guide de lancement ». Précisez le projet."
+    },
+    "failed": {
+      "validationId": "c3034078-28d8-48c0-a321-68b550a6da89",
+      "status": "failed",
+      "message": "La fiche n’a pas pu être relue après la mise à jour."
+    }
+  }
+}

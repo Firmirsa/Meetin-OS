@@ -13,7 +13,7 @@ Consulter la [fiche du hackathon](hackathon.md) pour les règles, le barème et 
 ## Priorités de Wael
 
 1. **Valider la chaîne Mac → Gladia sur un vrai appel.** Faire parler deux personnes à tour de rôle, écouter les deux voix dans le mix et vérifier les passages horodatés dans la transcription.
-2. **Donner à Samy un exemple de données et le contrat d’intégration.** La proposition contient le titre, le responsable, l’échéance et l’extrait horodaté. Le front envoie les champs validés avec un identifiant de validation, puis affiche l’état de l’exécution, le lien de la fiche et les valeurs relues. Samy peut démarrer avec des données de test.
+2. **Donner à Samy un exemple de données et le contrat d’intégration.** La proposition contient le titre, le responsable, l’échéance et l’extrait horodaté. Le front envoie les champs validés avec un identifiant de validation, puis affiche l’état de l’exécution, le lien de la fiche et les valeurs relues. Samy peut démarrer avec le [contrat et les données de test](contrat-front-agent.md).
 3. **Prendre en charge l’intégration H sur un seul outil cible.** Choisir un tableau de test accessible, modifier une fiche existante et relire son état. Si plusieurs fiches correspondent, demander laquelle utiliser. Vérifier qu’une nouvelle tentative ne crée pas de doublon.
 4. **Répartir les intégrations restantes et préparer la recette commune.** Confirmer qui prend Linkup et la PR Stripe en mode test, éventuellement préparée avec Devin. Répéter le scénario complet avec Samy et les éléments de marque fournis par Lenny.
 
