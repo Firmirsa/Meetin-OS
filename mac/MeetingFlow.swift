@@ -32,6 +32,75 @@ extension MeetingSession {
         return "La transcription sera disponible après l’arrêt de l’enregistrement et l’envoi à Gladia."
     }
 
+    var pendingProposalCount: Int { proposals.filter { $0.state == .pending }.count }
+
+    // Détection seulement si le direct tourne et si l'équipe a validé l'accès à l'agent.
+    func startDetection(reading live: LiveTranscription) {
+        let address = UserDefaults.standard.string(forKey: "webWorkspaceURL") ?? "http://localhost:3000"
+        guard agentAccess?.planning == true, let base = AgentClient.serverURL(address) else { return }
+        let client = AgentClient(baseURL: base, accessCode: agentAccessCode)
+        let transcript = live.transcript
+        let detector = TaskDetector(text: { transcript.confirmedText }) { text, known in
+            try await client.detect(transcript: text, known: known)
+        }
+        detector.onNewProposal = { [weak self, weak detector] proposal in
+            guard let self, self.detector === detector else { return }
+            self.proposals.append(TaskProposal(id: proposal.id, review: proposal.review))
+        }
+        detector.onUpdatedProposal = { [weak self, weak detector] proposal in
+            guard let self, self.detector === detector,
+                  let index = self.proposals.firstIndex(where: { $0.id == proposal.id }),
+                  self.proposals[index].state == .pending else { return }
+            self.proposals[index].review = proposal.review
+            self.proposalIssues[proposal.id] = nil
+        }
+        self.detector = detector
+        detector.start()
+    }
+
+    // Le dernier passage se termine après l'ajout de la réunion : ses résultats y sont enregistrés.
+    private func finishDetection() {
+        guard let detector else { return }
+        detector.stop()
+        Task {
+            await detector.finish()
+            if self.detector === detector { self.detector = nil }
+        }
+    }
+
+    func ignore(_ proposal: TaskProposal) {
+        guard let index = proposals.firstIndex(where: { $0.id == proposal.id }) else { return }
+        proposals[index].state = .ignored
+        proposalIssues[proposal.id] = nil
+    }
+
+    // Reprend la tâche dans le formulaire de l'agent, pour la modifier ou préparer un nouveau plan.
+    func edit(_ proposal: TaskProposal) {
+        guard !agent.busy else { return }
+        agent.newRecording()
+        agent.request = proposal.review.task
+        agent.excerpt = proposal.review.quote
+        ignore(proposal)
+    }
+
+    // Validation explicite : seul ce clic lance le plan signé.
+    func launch(_ proposal: TaskProposal, using client: AgentClient) {
+        guard launchingProposal == nil, proposal.state == .pending else { return }
+        launchingProposal = proposal.id
+        proposalIssues[proposal.id] = nil
+        Task {
+            defer { launchingProposal = nil }
+            do {
+                let execution = try await client.launch(proposal.review)
+                guard let index = proposals.firstIndex(where: { $0.id == proposal.id }) else { return }
+                proposals[index].state = .launched
+                proposals[index].sessionURL = execution.url
+            } catch {
+                proposalIssues[proposal.id] = error.localizedDescription
+            }
+        }
+    }
+
     func makeLive() -> LiveTranscription? {
         guard liveTranscriptionEnabled, !trimmedKey.isEmpty else { return nil }
         LiveAlerts.requestPermission()
@@ -51,6 +120,7 @@ extension MeetingSession {
             transcriptIncomplete = live.isIncomplete
         }
         self.live = nil
+        finishDetection()
     }
 
     func meetingDidStart() {
@@ -61,6 +131,9 @@ extension MeetingSession {
         startedAt = Date()
         startedInZoom = zoomDetector.inMeeting
         transcriptIncomplete = false
+        detector = nil
+        proposals = []
+        proposalIssues = [:]
         route = .home
     }
 
@@ -104,7 +177,8 @@ extension MeetingSession {
                 )
             },
             source: startedInZoom ? "Zoom" : nil,
-            transcriptIncomplete: transcriptIncomplete ? true : nil
+            transcriptIncomplete: transcriptIncomplete ? true : nil,
+            proposals: proposals.isEmpty ? nil : proposals
         ))
         meetingID = id
         startedAt = nil
@@ -120,6 +194,7 @@ extension MeetingSession {
             if !transcript.isEmpty { $0.transcript = transcript }
             $0.notes = notes
             $0.transcriptIncomplete = transcriptIncomplete ? true : nil
+            $0.proposals = proposals.isEmpty ? nil : proposals
         }
     }
 
@@ -146,6 +221,9 @@ extension MeetingSession {
         transcript = record.transcript
         notes = record.notes
         transcriptIncomplete = record.transcriptIncomplete == true
+        detector = nil
+        proposals = record.proposals ?? []
+        proposalIssues = [:]
         agent.newRecording()
         permissionHelp = nil
         status = FileManager.default.fileExists(atPath: record.audioPath)
@@ -181,7 +259,8 @@ extension MeetingSession {
             notes: "",
             tracks: nil,
             source: nil,
-            transcriptIncomplete: nil
+            transcriptIncomplete: nil,
+            proposals: nil
         )
         store.add(record)
         open(record)

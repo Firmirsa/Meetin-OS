@@ -15,6 +15,7 @@ final class TaskDetector {
     private(set) var lastError: String?
     // Une seule fois par tâche : pas à chaque mise à jour.
     @ObservationIgnored var onNewProposal: ((Proposal) -> Void)?
+    @ObservationIgnored var onUpdatedProposal: ((Proposal) -> Void)?
 
     @ObservationIgnored private let interval: Double
     @ObservationIgnored private let text: () -> String
@@ -50,6 +51,16 @@ final class TaskDetector {
         loop = nil
     }
 
+    // Dernier passage à l'arrêt, sur le texte complet : attend l'appel en cours, sans bloquer plus de 40 s.
+    func finish() async {
+        stop()
+        let deadline = Date().addingTimeInterval(40)
+        while running, Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        await tick()
+    }
+
     // Sans nouveau texte, aucun appel. Un seul appel à la fois, et le texte n'est marqué envoyé qu'en cas de succès.
     func tick() async {
         guard !running, !isStopped else { return }
@@ -80,6 +91,7 @@ final class TaskDetector {
         for task in found {
             if let index = proposals.firstIndex(where: { $0.id == task.replaces || Self.sameTitle($0.review.title, task.review.title) }) {
                 proposals[index].review = task.review
+                onUpdatedProposal?(proposals[index])
             } else {
                 let proposal = Proposal(id: task.id, review: task.review)
                 proposals.append(proposal)

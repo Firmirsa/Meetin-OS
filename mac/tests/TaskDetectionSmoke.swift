@@ -22,6 +22,8 @@ struct TaskDetectionSmoke {
             return try responses.removeFirst().get()
         }
         detector.onNewProposal = { announced.append($0.review.title) }
+        var updated: [String] = []
+        detector.onUpdatedProposal = { updated.append($0.id) }
 
         // Sans texte, puis sans texte nouveau : aucun appel
         await detector.tick()
@@ -41,6 +43,7 @@ struct TaskDetectionSmoke {
         precondition(detector.proposals.count == 1 && detector.proposals[0].id == "a", "identifiant stable")
         precondition(detector.proposals[0].review.approval == "signature-b", "dernier plan signé")
         precondition(announced.count == 1, "une seule annonce par tâche")
+        precondition(updated == ["a"], "mise à jour signalée")
 
         // Doublon de titre : mise à jour, pas de nouvelle tâche
         text += "\n[00:15] Micro · Oui, le devis."
@@ -55,6 +58,13 @@ struct TaskDetectionSmoke {
         precondition(detector.lastError != nil && !detector.isStopped)
         await detector.tick()
         precondition(calls.count == 5 && detector.lastError == nil, "nouvel essai après une panne")
+
+        // Dernier passage à l'arrêt : le texte final part une fois
+        let before = calls.count
+        text += "\n[00:25] Micro · Dernière phrase."
+        responses = [.success([])]
+        await detector.finish()
+        precondition(calls.count == before + 1, "dernier passage à l'arrêt")
 
         // Accès refusé : plus aucun appel
         text += "\n[00:30] Micro · Encore."

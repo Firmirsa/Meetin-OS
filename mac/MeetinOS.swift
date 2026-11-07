@@ -36,6 +36,10 @@ final class MeetingSession {
     var live: LiveTranscription?
     var statusBelongsToMeeting = false
     var transcriptIncomplete = false { didSet { syncMeeting() } }
+    var proposals: [TaskProposal] = [] { didSet { syncMeeting() } }
+    var detector: TaskDetector?
+    var launchingProposal: String?
+    var proposalIssues: [String: String] = [:]
     var agentAccessCode = ""
     var agentAccess: AgentAccess?
     var integrationsRequest: IntegrationsRequest?
@@ -119,7 +123,7 @@ struct CaptureView: View {
             if isMeetingWindow || session.recording != nil {
                 Picker("Vue de la réunion", selection: $tab) {
                     Text("Transcription").tag(MeetingTab.transcription)
-                    Text("Agent").tag(MeetingTab.agent)
+                    Text(session.pendingProposalCount > 0 ? "Agent (\(session.pendingProposalCount))" : "Agent").tag(MeetingTab.agent)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -272,7 +276,9 @@ struct CaptureView: View {
 
     private var agentPanel: some View {
         AgentWorkspace(state: session.agent, transcript: session.transcript, client: agentClient,
-                       access: session.agentAccess, showIntegrations: showIntegrations)
+                       access: session.agentAccess, showIntegrations: showIntegrations) {
+            ProposalCards(session: session, client: agentClient, showIntegrations: showIntegrations)
+        }
     }
 
     private func showIntegrations(_ page: IntegrationsPage) {
@@ -324,6 +330,7 @@ struct CaptureView: View {
                     session.capture = next
                     session.live = live
                     live?.start()
+                    if let live { session.startDetection(reading: live) }
                     session.status = "Enregistrement en cours"
                     openWindow(id: "meeting")
                 }

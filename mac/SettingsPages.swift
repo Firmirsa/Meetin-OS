@@ -84,7 +84,7 @@ struct SettingsPage: View {
                 Rectangle().fill(Color.mtLine).frame(height: 1)
                 Toggle("Transcription en direct pendant l’enregistrement", isOn: $liveTranscription)
                     .tint(Color.mtControlTint)
-                Text("L’audio est envoyé en continu à Gladia pendant l’enregistrement.")
+                Text("L’audio est envoyé en continu à Gladia pendant l’enregistrement. Si l’agent est connecté, le texte part aussi chez Holo (H Company) toutes les 15 s pour proposer des tâches. Rien n’est lancé sans ta validation.")
                     .font(.mtSans(13))
                     .foregroundStyle(Color.mtInk2)
             }

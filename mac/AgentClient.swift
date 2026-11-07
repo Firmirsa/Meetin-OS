@@ -5,7 +5,7 @@ struct AgentClarification: Codable {
     let answer: String
 }
 
-enum AgentExecutor: String, Decodable {
+enum AgentExecutor: String, Codable {
     case devin
     case computerUse = "computer_use"
 
@@ -13,7 +13,7 @@ enum AgentExecutor: String, Decodable {
     var sessionHost: String { self == .devin ? "app.devin.ai" : "platform.hcompany.ai" }
 }
 
-struct AgentReview: Decodable {
+struct AgentReview: Codable {
     let executor: AgentExecutor
     let destination: String
     let title: String

@@ -30,6 +30,8 @@ L’historique est conservé sur ce Mac dans `~/Library/Application Support/Meet
 
 **Transcription en direct** : avec une clé Gladia et l’option activée dans **Paramètres**, le texte s’écrit pendant l’appel dans la fenêtre de réunion. L’audio est alors envoyé en continu à Gladia, une session par piste. À l’arrêt, ce texte devient la transcription de la réunion, et **Transcrire** le remplace par la version différée. Si le direct échoue, l’enregistrement continue : une notification macOS prévient si la clé est refusée, si le direct ne démarre pas ou s’il reste coupé 30 s, et la réunion affiche alors « Incomplète ».
 
+**Tâches proposées** : si le direct tourne et que l’agent est connecté, le texte définitif part chez Holo (H Company) toutes les 15 s quand il a changé. Les tâches détectées apparaissent en cartes dans l’onglet **Agent** et restent enregistrées dans la réunion, affichée « N à valider ». Rien ne part sans **Confirmer et lancer**. Un plan expire après 15 minutes : **Modifier** le reprend dans le formulaire pour en préparer un nouveau.
+
 Au démarrage de la capture, Meetin-OS ouvre une fenêtre dédiée avec les onglets **Transcription** et **Agent**. Le bouton **Afficher la réunion** permet de rouvrir la fenêtre pendant un appel détecté ou un enregistrement. À la fin de la réunion, la fenêtre principale ouvre sa fiche. Tu peux y transcrire le fichier, relire le texte et préparer la tâche. Un fichier importé s’ouvre de la même façon.
 
 Pour ouvrir la fenêtre en rejoignant un appel, active **Ouvrir la fenêtre quand je rejoins une réunion Zoom** dans les **Paramètres** de Meetin-OS et autorise l’app dans **Confidentialité et sécurité → Accessibilité**. Garde la fenêtre principale ouverte. La détection repose sur les titres de fenêtres de Zoom Workplace en français ou en anglais. Clique ensuite sur **Enregistrer** dans la fenêtre de réunion.
@@ -49,7 +51,7 @@ Le test de l’historique local s’exécute sans audio :
 
 ```sh
 swiftc -parse-as-library -target "$(uname -m)-apple-macos15.0" \
-  mac/MeetingStore.swift mac/MeetinSite.swift mac/tests/MeetingStoreSmoke.swift -o mac/.build/store-smoke
+  mac/AgentClient.swift mac/MeetingStore.swift mac/MeetinSite.swift mac/tests/MeetingStoreSmoke.swift -o mac/.build/store-smoke
 mac/.build/store-smoke
 ```
 

@@ -29,6 +29,7 @@ private struct MeetingRow: View {
     }
 
     private var statusText: String {
+        if record.pendingProposals > 0 { return "\(record.pendingProposals) à valider" }
         if record.transcript.isEmpty { return "À transcrire" }
         return record.transcriptIncomplete == true ? "Incomplète" : "Transcrite"
     }
@@ -41,7 +42,10 @@ private struct MeetingRow: View {
                     Text(meta).font(.mtSans(12)).foregroundStyle(Color.mtInk2).lineLimit(1)
                 }
                 Spacer(minLength: 12)
-                MTPill(text: statusText, kind: record.transcript.isEmpty || record.transcriptIncomplete == true ? .run : .wait)
+                MTPill(
+                    text: statusText,
+                    kind: record.pendingProposals > 0 || record.transcript.isEmpty || record.transcriptIncomplete == true ? .run : .wait
+                )
                 Text(MeetingFormat.duration(record.duration))
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundStyle(Color.mtInk2)

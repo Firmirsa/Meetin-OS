@@ -1,7 +1,17 @@
 import AppKit
 import Foundation
 
-struct MeetingRecord: Codable, Identifiable, Hashable {
+// Tâche proposée pendant une réunion. Rien ne part sans validation.
+struct TaskProposal: Codable, Identifiable {
+    enum State: String, Codable { case pending, launched, ignored }
+
+    let id: String
+    var review: AgentReview
+    var state: State = .pending
+    var sessionURL: URL?
+}
+
+struct MeetingRecord: Codable, Identifiable {
     struct StoredTracks: Codable, Hashable {
         var microphonePath: String
         var systemPath: String
@@ -19,6 +29,9 @@ struct MeetingRecord: Codable, Identifiable, Hashable {
     var tracks: StoredTracks?
     var source: String?
     var transcriptIncomplete: Bool?
+    var proposals: [TaskProposal]?
+
+    var pendingProposals: Int { proposals?.filter { $0.state == .pending }.count ?? 0 }
 }
 
 // Historique local : Application Support/Meetin-OS/meetings.json et un dossier audio par réunion.
@@ -62,10 +75,7 @@ final class MeetingStore {
 
     func update(_ id: UUID, _ change: (inout MeetingRecord) -> Void) {
         guard let index = meetings.firstIndex(where: { $0.id == id }) else { return }
-        var record = meetings[index]
-        change(&record)
-        guard record != meetings[index] else { return }
-        meetings[index] = record
+        change(&meetings[index])
         scheduleSave()
     }
 
