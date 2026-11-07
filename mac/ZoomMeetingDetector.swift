@@ -2,7 +2,7 @@ import AppKit
 import ApplicationServices
 
 struct ZoomMeetingDetector {
-    private var inMeeting = false
+    private(set) var inMeeting = false
     private var consecutiveAbsences = 0
 
     // A failed AX read does not mean that the call ended.

@@ -18,7 +18,7 @@ Le script construit et signe localement l’application. Au premier lancement de
 
 Pour reprendre un essai après avoir relancé l’app, utilise **Ouvrir un enregistrement** et choisis le fichier M4A. Avant de quitter l’app, **Voir les pistes** permet de retrouver et copier ce fichier hors du dossier temporaire. Si Gladia refuse la clé, les réglages se rouvrent et le fichier reste prêt pour une nouvelle tentative.
 
-Au démarrage de la capture, Meetin-OS ouvre une fenêtre dédiée. L’onglet **Transcription** regroupe les notes et le texte renvoyé par Gladia après l’appel. L’onglet **Agent** permet de copier la transcription et d’ouvrir l’espace de revue des tâches. Le bouton **Afficher la réunion** permet de rouvrir la fenêtre.
+Au démarrage de la capture, Meetin-OS ouvre une fenêtre dédiée. L’onglet **Transcription** regroupe les notes et le texte renvoyé par Gladia après l’appel. L’onglet **Agent** permet de copier la transcription et d’ouvrir l’espace de revue des tâches. Le bouton **Afficher la réunion** permet de rouvrir la fenêtre pendant un appel détecté ou un enregistrement. À la fin de la réunion, le carnet principal reprend la main. Tu peux y transcrire le fichier, relire le texte et ouvrir l’espace agent. Un fichier importé s’ouvre directement dans le carnet.
 
 Pour ouvrir la fenêtre en rejoignant un appel, active **Ouvrir la fenêtre quand je rejoins une réunion Zoom** dans les réglages de Meetin-OS et autorise l’app dans **Confidentialité et sécurité → Accessibilité**. Garde le carnet principal ouvert. La détection repose sur les titres de fenêtres de Zoom Workplace en français ou en anglais. Clique ensuite sur **Enregistrer** dans la fenêtre de réunion.
 

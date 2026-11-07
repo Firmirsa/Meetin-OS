@@ -8,11 +8,17 @@ struct MeetinOS: App {
     @State private var meeting = MeetingSession()
 
     var body: some Scene {
-        WindowGroup { CaptureView(session: meeting) }
+        WindowGroup("Meetin-OS", id: "notebook") {
+            CaptureView(session: meeting)
+        }
+        .defaultSize(width: 660, height: 540)
+        .restorationBehavior(.disabled)
         Window("Réunion Meetin-OS", id: "meeting") {
-            CaptureView(session: meeting, isMeetingWindow: true)
+            MeetingWindow(session: meeting)
         }
         .defaultSize(width: 720, height: 520)
+        .restorationBehavior(.disabled)
+        .commandsRemoved()
     }
 }
 
@@ -28,6 +34,29 @@ final class MeetingSession {
     var transcript = ""
     var notes = ""
     var zoomDetector = ZoomMeetingDetector()
+    var notebookCount = 0
+    var meetingIsActive: Bool { capture != nil || zoomDetector.inMeeting }
+}
+
+private struct MeetingWindow: View {
+    @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(\.openWindow) private var openWindow
+    let session: MeetingSession
+
+    var body: some View {
+        Group {
+            if session.meetingIsActive {
+                CaptureView(session: session, isMeetingWindow: true)
+            } else {
+                Color.clear
+            }
+        }
+        .onChange(of: session.meetingIsActive, initial: true) { wasActive, isActive in
+            guard !isActive else { return }
+            if wasActive && session.notebookCount == 0 { openWindow(id: "notebook") }
+            dismissWindow()
+        }
+    }
 }
 
 struct CaptureView: View {
@@ -78,7 +107,7 @@ struct CaptureView: View {
 
             Rectangle().fill(Color.mtLine).frame(height: 1)
 
-            if isMeetingWindow {
+            if isMeetingWindow || session.recording != nil {
                 Picker("Vue de la réunion", selection: $tab) {
                     Text("Transcription").tag(MeetingTab.transcription)
                     Text("Agent").tag(MeetingTab.agent)
@@ -88,7 +117,7 @@ struct CaptureView: View {
                 .padding(.vertical, 12)
             }
 
-            if isMeetingWindow && tab == .agent {
+            if (isMeetingWindow || session.recording != nil) && tab == .agent {
                 agentPanel
             } else {
                 ScrollView {
@@ -196,6 +225,12 @@ struct CaptureView: View {
         .background(Color.mtCanvas)
         .foregroundStyle(Color.mtInk)
         .frame(minWidth: 560, minHeight: 420)
+        .onAppear {
+            if !isMeetingWindow { session.notebookCount += 1 }
+        }
+        .onDisappear {
+            if !isMeetingWindow { session.notebookCount -= 1 }
+        }
         .onChange(of: session.transcript) { copiedForAgent = false }
         .task(id: detectZoomMeetings) {
             guard !isMeetingWindow else { return }
@@ -239,7 +274,7 @@ struct CaptureView: View {
             .background(Color.mtCanvas)
         }
         .toolbar {
-            if !isMeetingWindow && (session.capture != nil || session.recording != nil) {
+            if !isMeetingWindow && session.meetingIsActive {
                 Button("Afficher la réunion", systemImage: "rectangle.on.rectangle") {
                     openWindow(id: "meeting")
                 }
@@ -322,7 +357,7 @@ struct CaptureView: View {
             session.recording = file
             session.transcript = ""
             session.status = "Fichier audio prêt"
-            openWindow(id: "meeting")
+            tab = .transcription
         }
     }
 
@@ -333,7 +368,7 @@ struct CaptureView: View {
             defer { session.busy = false }
             do {
                 if let current = session.capture {
-                    session.capture = nil
+                    defer { session.capture = nil }
                     session.status = "Préparation du fichier audio…"
                     let result = try await current.stop()
                     session.recording = result.mix
