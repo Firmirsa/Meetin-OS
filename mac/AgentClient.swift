@@ -43,6 +43,27 @@ enum AgentPreparation: Decodable {
     }
 }
 
+struct DetectedTask: Decodable {
+    let id: String
+    let replaces: String?
+    let review: AgentReview
+
+    private enum Keys: CodingKey { case id, replaces }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: Keys.self)
+        id = try values.decode(String.self, forKey: .id)
+        replaces = try values.decodeIfPresent(String.self, forKey: .replaces)
+        review = try AgentReview(from: decoder)
+    }
+}
+
+struct KnownTask: Encodable, Equatable {
+    let ref: String
+    let title: String
+    let task: String
+}
+
 struct AgentExecution: Decodable {
     let executor: AgentExecutor
     let url: URL
@@ -112,6 +133,16 @@ struct AgentClient {
 
     func prepare(task: String, transcript: String, clarifications: [AgentClarification]) async throws -> AgentPreparation {
         try await post("agent-prepare", Preparation(task: task, transcript: transcript, clarifications: clarifications))
+    }
+
+    func detect(transcript: String, known: [KnownTask]) async throws -> [DetectedTask] {
+        struct Request: Encodable {
+            let transcript: String
+            let known: [KnownTask]
+        }
+        struct Response: Decodable { let tasks: [DetectedTask] }
+        let response: Response = try await post("agent-detect", Request(transcript: transcript, known: known))
+        return response.tasks
     }
 
     func launch(_ review: AgentReview) async throws -> AgentExecution {

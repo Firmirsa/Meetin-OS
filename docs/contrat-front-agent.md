@@ -48,3 +48,9 @@ type Execution =
 6. **Branchement.** Pour l’instant, branche les vues sur la fixture via `lib/contract.ts`. L’onglet Agent de l’app Mac prépare une tâche et attend sa confirmation avant d’ouvrir une session Devin ou H Computer Use. Le retour structuré de ce contrat reste à relier à l’interface de revue.
 
 Pour la démo, affiche d’abord la proposition pour Karim, change éventuellement l’échéance, valide et affiche le lien de la fiche avec les valeurs relues. Utilise la variante ambiguë pour vérifier que l’interface explique le blocage.
+
+## Détection pendant l’appel
+
+`POST /api/agent-detect` reçoit `{ transcript, known }` : au plus 5 000 caractères de texte définitif, et au plus 10 tâches déjà trouvées (`ref`, `title`, `task` limité à 400 caractères). La réponse est `{ tasks }`, au plus 3 entrées. Chacune est un plan signé, comme `agent-prepare`, avec `replaces` : la `ref` corrigée, ou `null` pour une nouvelle tâche.
+
+La détection n’exécute rien : seul `agent-execute`, avec `confirmed: true`, lance une tâche. Une entrée dont la citation n’est pas exacte, ou dont l’outil n’est pas configuré, est ignorée. Sans destination configurée, Holo n’est pas appelé.

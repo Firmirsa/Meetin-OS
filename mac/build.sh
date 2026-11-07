@@ -22,7 +22,7 @@ cp Info.plist "$app/Contents/Info.plist"
 
 compile() {
   swiftc -parse-as-library -target "$1-apple-macos$minimum_macos" \
-    MeetinOS.swift Capture.swift Gladia.swift AgentClient.swift AgentWorkspace.swift Integrations.swift ZoomMeetingDetector.swift MainWindow.swift Sidebar.swift HomeView.swift MeetingsView.swift SettingsPages.swift MeetingStore.swift MeetingFlow.swift MeetinSite.swift NightTheme.swift GladiaKeyStore.swift LiveTranscription.swift LiveTranscriptPanel.swift LiveAlerts.swift \
+    MeetinOS.swift Capture.swift Gladia.swift AgentClient.swift AgentWorkspace.swift Integrations.swift ZoomMeetingDetector.swift MainWindow.swift Sidebar.swift HomeView.swift MeetingsView.swift SettingsPages.swift MeetingStore.swift MeetingFlow.swift MeetinSite.swift NightTheme.swift GladiaKeyStore.swift LiveTranscription.swift LiveTranscriptPanel.swift LiveAlerts.swift TaskDetection.swift \
     ../brand/MeetinTheme.swift ../brand/MeetinComponents.swift -o "$2"
 }
 

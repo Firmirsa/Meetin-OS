@@ -370,6 +370,9 @@ final class LiveTranscript {
         .sorted { ($0.time, $0.id) < ($1.time, $1.id) }
     }
 
+    // Texte définitif uniquement : c'est lui que lit la détection de tâches.
+    var confirmedText: String { lines.filter(\.isFinal).map(\.formatted).joined(separator: "\n") }
+
     // Un texte encore provisoire à l'arrêt est gardé : mieux vaut lui que rien.
     var finalText: String { lines.map(\.formatted).joined(separator: "\n") }
 }

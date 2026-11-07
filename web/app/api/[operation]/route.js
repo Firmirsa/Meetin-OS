@@ -1,5 +1,5 @@
 import { ApiError, execute } from '../../../lib/integrations.mjs';
-import { agentAccess, prepareTask, executeTask } from '../../../lib/agent.mjs';
+import { agentAccess, prepareTask, detectTasks, executeTask } from '../../../lib/agent.mjs';
 
 export async function POST(request, { params }) {
   try {
@@ -36,6 +36,7 @@ export async function POST(request, { params }) {
     let result;
     if (operation === 'agent-access') result = agentAccess(token);
     else if (operation === 'agent-prepare') result = await prepareTask(body, token);
+    else if (operation === 'agent-detect') result = await detectTasks(body, token);
     else if (operation === 'agent-execute') result = await executeTask(body, token);
     else result = await execute(operation, body, token);
     return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
