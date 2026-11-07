@@ -64,6 +64,7 @@ La landing est disponible sur [localhost:3000](http://localhost:3000/) et l’es
 
 ## Documentation
 
+- [Suivi du projet](docs/suivi.md) · État des tests et prochaines actions.
 - [Guide macOS](mac/README.md) · Installation, capture et transcription.
 - [Guide Windows](windows/README.md) · Installation, capture et compilation.
 - [Guide Next.js](web/README.md) · Configuration des clés serveur, tests et espace agent.
