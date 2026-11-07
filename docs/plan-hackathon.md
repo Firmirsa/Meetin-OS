@@ -6,14 +6,16 @@ Consulter la [fiche du hackathon](hackathon.md) pour les règles, le barème et 
 
 | Responsable | Livrable | Outils |
 |---|---|---|
-| Wael | Développer l’app Mac (capture micro et son de l’appel, puis transcription) et l’écran de revue. Extraire les engagements et afficher l’extrait source. L’utilisateur peut corriger le responsable ou l’échéance avant validation. | Gladia pour la transcription horodatée, Holo pour structurer les engagements, Next.js et TypeScript pour l’écran de revue. |
-| Lenny | Retrouver la fiche existante dans un tableau de test, appliquer la mise à jour validée, puis rouvrir la fiche et renvoyer les valeurs relues. | H Company Agents API pour piloter le navigateur. Linkup pour joindre une source publique utile lorsqu’une tâche le demande. |
-| Samy | Participant Meetin-OS. Lot à définir avec l’équipe. | À définir. |
-| Devin, piloté par Wael | Préparer une PR séparée pour l’abonnement de test et l’activation de l’accès dans l’app. Wael vérifie le parcours et intègre la PR. | Cognition / Devin et Stripe Checkout en mode test. |
+| Wael | App Mac et intégration de bout en bout. Valider la capture sur un vrai appel, vérifier Gladia, puis relier la transcription, la revue et l’exécution. | SwiftUI, ScreenCaptureKit et Gladia. |
+| Lenny | Branding de Meetin-OS. Définir l’identité visuelle et fournir les éléments de marque pour l’interface et la démo. | Logo, palette, typographie et éléments de présentation. |
+| Samy | Front-end de revue. Afficher la tâche proposée et son extrait source, permettre de corriger le responsable et l’échéance, puis afficher le résultat après validation. | Next.js et TypeScript selon le plan du projet. |
 
-## Contrat entre les deux lots
+## Priorités de Wael
 
-Wael transmet l’identifiant de la validation, le titre de la tâche, son responsable, son échéance et l’extrait horodaté. Lenny renvoie l’état de l’exécution, le lien de la fiche et les valeurs relues. Si plusieurs fiches correspondent, l’agent demande laquelle utiliser. Lenny peut démarrer avec une tâche saisie à la main pendant que Wael branche Gladia.
+1. **Valider la chaîne Mac → Gladia sur un vrai appel.** Faire parler deux personnes à tour de rôle, écouter les deux voix dans le mix et vérifier les passages horodatés dans la transcription.
+2. **Donner à Samy un exemple de données et le contrat d’intégration.** La proposition contient le titre, le responsable, l’échéance et l’extrait horodaté. Le front envoie les champs validés avec un identifiant de validation, puis affiche l’état de l’exécution, le lien de la fiche et les valeurs relues. Samy peut démarrer avec des données de test.
+3. **Prendre en charge l’intégration H sur un seul outil cible.** Choisir un tableau de test accessible, modifier une fiche existante et relire son état. Si plusieurs fiches correspondent, demander laquelle utiliser. Vérifier qu’une nouvelle tentative ne crée pas de doublon.
+4. **Répartir les intégrations restantes et préparer la recette commune.** Confirmer qui prend Linkup et la PR Stripe en mode test, éventuellement préparée avec Devin. Répéter le scénario complet avec Samy et les éléments de marque fournis par Lenny.
 
 ## Premier jalon
 
@@ -26,11 +28,11 @@ Intégrer Linkup et la PR Stripe après avoir fait passer ce parcours de bout en
 
 ## Intégrations et soumission
 
-Pour Meetin-OS, les quatre intégrations dans le produit sont H Company, Gladia, Linkup et Stripe. Devin intervient sur la PR de l’abonnement. La manière dont l’usage de Devin pendant le développement est comptabilisé reste à confirmer avec les organisateurs.
+Pour Meetin-OS, les quatre intégrations dans le produit sont H Company, Gladia, Linkup et Stripe. Devin est envisagé pour la PR de l’abonnement. La manière dont l’usage de Devin pendant le développement est comptabilisé reste à confirmer avec les organisateurs.
 
 **Objectif interne : soumettre dimanche 8 novembre à 13 h, heure de Paris.** La date limite officielle est à 14 h.
 
 ## À faire
 
 - [ ] **Wael · Notification d’arrivée en réunion.** Détecter l’entrée dans un appel sur un premier outil, puis proposer « Enregistrer » ou « Ignorer », dans l’esprit de Wispr Flow ou Otter. La notification demande une action explicite avant de démarrer la capture.
-- [ ] Définir le lot de Samy avec l’équipe.
+- [ ] Attribuer Linkup et Stripe / Devin.

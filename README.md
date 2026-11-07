@@ -6,6 +6,8 @@ Meetin-OS est un carnet de réunion pour Mac. Il enregistre le micro et l’audi
 
 Développé par **Wael, Lenny et Samy** pour le **H Company × 42AI Computer Use Agents Hackathon**, les 7 et 8 novembre 2026 à Paris.
 
+**Équipe** · Wael, app Mac et intégration technique · Lenny, branding · Samy, front-end.
+
 ## Lancer le prototype Mac
 
 **Prérequis** · macOS 15 ou ultérieur, Xcode et une clé API Gladia pour la transcription.
