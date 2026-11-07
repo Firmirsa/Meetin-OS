@@ -8,6 +8,7 @@ return <>
     </a>
     <nav aria-label="Navigation principale">
       <a href="#fonctionnement">Le parcours</a>
+      <a href="/reunions">Réunions</a>
       <a href="/agent">Espace agent</a>
       <a className="nav-link" href="https://github.com/Firmirsa/Meetin-OS">GitHub <span aria-hidden="true">↗</span></a>
     </nav>

@@ -1,0 +1,147 @@
+{
+  "meetings": [
+    {
+      "id": "point-de-lancement",
+      "title": "Point de lancement",
+      "startedAt": "2026-11-07T10:30:00+01:00",
+      "durationMs": 1920000,
+      "tool": "Zoom",
+      "participants": [
+        {"name": "Inès Roux", "initials": "IR"},
+        {"name": "Léa Martin", "initials": "LM"},
+        {"name": "Karim Benali", "initials": "KB"}
+      ],
+      "brief": "Le lancement est confirmé pour la fin du mois. Karim reprend la relecture du guide, Léa envoie le devis à Atlas et la démo du jury reste à attribuer.",
+      "notes": [
+        {"kind": "heading", "text": "Budget"},
+        {"kind": "mine", "text": "Budget validé côté Léa"},
+        {"kind": "ai", "text": "Léa confirme l’enveloppe de lancement, sans dépassement prévu ce trimestre."},
+        {"kind": "heading", "text": "Guide de lancement"},
+        {"kind": "mine", "text": "Guide à relire avant le prochain point"},
+        {"kind": "ai", "text": "Léa devait s’en charger. ", "highlight": {"proposalId": "proposal-demo-001", "text": "Finalement, Karim s’en charge mardi."}},
+        {"kind": "heading", "text": "Client Atlas"},
+        {"kind": "marker", "atMs": 761000, "text": "Repère · devis Atlas"},
+        {"kind": "mine", "text": "Devis client à relancer"},
+        {"kind": "ai", "text": "Atlas attend une proposition chiffrée avant la fin de semaine. ", "highlight": {"proposalId": "proposal-demo-002", "text": "Léa envoie le devis jeudi."}},
+        {"kind": "heading", "text": "Démo du jury"},
+        {"kind": "ai", "text": "La démo doit montrer le parcours complet, de l’appel à la tâche validée. ", "highlight": {"proposalId": "proposal-demo-003", "text": "Personne n’a encore été désigné."}}
+      ],
+      "transcript": [
+        {"speaker": "Inès Roux", "startMs": 4000, "text": "On fait le point sur le lancement. Léa, le budget ?"},
+        {"speaker": "Léa Martin", "startMs": 9000, "text": "Budget validé, on reste dans l’enveloppe prévue pour le trimestre."},
+        {"speaker": "Inès Roux", "startMs": 18000, "text": "Léa devait relire le guide. Finalement, Karim s’en charge mardi."},
+        {"speaker": "Karim Benali", "startMs": 25000, "text": "Oui, je le relis mardi et je vous fais un retour dans la foulée."},
+        {"speaker": "Inès Roux", "startMs": 402000, "text": "Côté calendrier, on garde le lancement pour la fin du mois."},
+        {"speaker": "Inès Roux", "startMs": 757000, "text": "Atlas attend toujours notre proposition chiffrée."},
+        {"speaker": "Léa Martin", "startMs": 763000, "text": "Je m’en occupe, j’envoie le devis à Atlas jeudi."},
+        {"speaker": "Karim Benali", "startMs": 1534000, "text": "Il faudrait que quelqu’un prépare la démo pour le jury, on verra qui."},
+        {"speaker": "Inès Roux", "startMs": 1541000, "text": "Notons-le, on décidera au prochain point."},
+        {"speaker": "Inès Roux", "startMs": 1890000, "text": "Merci à tous, on se retrouve vendredi."}
+      ],
+      "proposals": [
+        {
+          "proposalId": "proposal-demo-001",
+          "title": "Relire le guide de lancement",
+          "assignee": "Karim",
+          "dueDate": "2026-11-10",
+          "excerpt": {
+            "text": "Léa devait relire le guide. Finalement, Karim s’en charge mardi.",
+            "startMs": 18000,
+            "endMs": 24000
+          }
+        },
+        {
+          "proposalId": "proposal-demo-002",
+          "title": "Envoyer le devis à Atlas",
+          "assignee": "Léa",
+          "dueDate": "2026-11-12",
+          "excerpt": {
+            "text": "Je m’en occupe, j’envoie le devis à Atlas jeudi.",
+            "startMs": 763000,
+            "endMs": 768000
+          }
+        },
+        {
+          "proposalId": "proposal-demo-003",
+          "title": "Préparer la démo pour le jury",
+          "assignee": null,
+          "dueDate": null,
+          "excerpt": {
+            "text": "Il faudrait que quelqu’un prépare la démo pour le jury, on verra qui.",
+            "startMs": 1534000,
+            "endMs": 1540000
+          }
+        }
+      ]
+    },
+    {
+      "id": "entretien-atlas",
+      "title": "Entretien client Atlas",
+      "startedAt": "2026-11-06T11:00:00+01:00",
+      "durationMs": 1680000,
+      "tool": "Google Meet",
+      "participants": [
+        {"name": "Léa Martin", "initials": "LM"},
+        {"name": "Paul Girard", "initials": "PG"}
+      ],
+      "brief": "Atlas veut une démo de la revue des tâches avant de signer. Le budget est validé de leur côté.",
+      "notes": [
+        {"kind": "mine", "text": "Atlas intéressé, veut voir la revue des tâches"},
+        {"kind": "ai", "text": "Paul demande une démo en visio. ", "highlight": {"proposalId": "proposal-atlas-001", "text": "Léa la cale la semaine prochaine."}}
+      ],
+      "transcript": [
+        {"speaker": "Paul Girard", "startMs": 312000, "text": "On aimerait voir la revue des tâches en vrai avant de signer."},
+        {"speaker": "Léa Martin", "startMs": 318000, "text": "Je vous cale une démo la semaine prochaine."}
+      ],
+      "proposals": [
+        {
+          "proposalId": "proposal-atlas-001",
+          "title": "Planifier la démo avec Atlas",
+          "assignee": "Léa",
+          "dueDate": "2026-11-13",
+          "excerpt": {
+            "text": "Je vous cale une démo la semaine prochaine.",
+            "startMs": 318000,
+            "endMs": 322000
+          }
+        }
+      ]
+    },
+    {
+      "id": "retro-sprint-12",
+      "title": "Rétro du sprint 12",
+      "startedAt": "2026-11-06T16:00:00+01:00",
+      "durationMs": 2700000,
+      "tool": "Zoom",
+      "participants": [
+        {"name": "Inès Roux", "initials": "IR"},
+        {"name": "Karim Benali", "initials": "KB"},
+        {"name": "Léa Martin", "initials": "LM"}
+      ],
+      "brief": "La capture audio avance bien. La revue des tâches reste à brancher sur l’agent.",
+      "notes": [
+        {"kind": "mine", "text": "Capture audio : OK sur Mac"},
+        {"kind": "ai", "text": "La version Windows suit avec la même transcription."}
+      ],
+      "transcript": [],
+      "proposals": []
+    },
+    {
+      "id": "synchro-design",
+      "title": "Synchro design",
+      "startedAt": "2026-11-04T14:00:00+01:00",
+      "durationMs": 1200000,
+      "tool": "Microsoft Teams",
+      "participants": [
+        {"name": "Inès Roux", "initials": "IR"},
+        {"name": "Karim Benali", "initials": "KB"}
+      ],
+      "brief": "Palette crème et citron vert retenue. Un seul bouton citron par écran.",
+      "notes": [
+        {"kind": "mine", "text": "Palette crème + citron vert validée"}
+      ],
+      "transcript": [],
+      "proposals": []
+    }
+  ]
+}

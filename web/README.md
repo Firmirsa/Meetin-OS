@@ -11,4 +11,10 @@ Les clés prestataires sont configurées côté serveur. Le code de démo est sa
 
 [Linkup Search](https://docs.linkup.so/pages/documentation/endpoints/search/reference) · [API Devin](https://docs.devin.ai/api-reference/getting-started/teams-quickstart) · [Stripe Checkout](https://docs.stripe.com/api/checkout/sessions/create)
 
-Pour publier le site, le dossier racine Next.js est `web`. `brand-tokens.css` reprend les tokens officiels de `../brand/tokens.css` dans le périmètre du build web. En cas de changement de DA, mets les deux fichiers à jour ensemble.
+Pour publier le site, le dossier racine Next.js est `web`. `brand-tokens.css` reprend les tokens officiels de `../brand/tokens.css` dans le périmètre du build web, et `brand-components.css` reprend `../brand/components/components.css`. En cas de changement de DA, mets les fichiers à jour ensemble.
+
+## Réunions et revue des tâches
+
+`/reunions` liste les réunions par jour. `/reunions/[id]` affiche le carnet de la réunion, avec les onglets Notes (le résumé « En bref », tes notes, les ajouts de Meetin-OS et les repères) et Transcription (par intervenant, horodatée). Les engagements à valider sont dans une colonne à droite. Une seule carte est ouverte à la fois, avec le seul bouton citron « Valider ». Cliquer un passage surligné ouvre sa carte, et l’horodatage d’une carte ouvre la transcription à ce moment. `/revue` renvoie vers la réunion de démo.
+
+Les données viennent de `lib/reunions-demo.json` (`lib/meetings.mjs`). Les engagements suivent le [contrat front ↔ agent](../docs/contrat-front-agent.md) via `lib/contract.mjs`. L’agent est **simulé** : `lib/revue-tache.json` est une copie de `../docs/fixtures/revue-tache.json` que `npm test` garde identique, tout comme les données de démo des apps Mac et Windows. Le menu **Démo** choisit le scénario : `?scenario=verified`, `ambigu` ou `failed`. Pour brancher la vraie route agent, remplace `createFixtureAgent` par un client HTTP qui garde la même méthode `submit(validation)`.
