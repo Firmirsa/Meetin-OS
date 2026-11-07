@@ -10,7 +10,11 @@ Développé par **Wael, Lenny et Samy** pour le **H Company × 42AI Computer Use
 
 ## Lancer le prototype Mac
 
-**Prérequis** · macOS 15 ou ultérieur, Xcode et une clé API Gladia pour la transcription.
+**Prérequis** · macOS 15 ou ultérieur et une clé API Gladia pour la transcription.
+
+Depuis le site, clique sur **Installer sur Mac**, ouvre `Meetin-OS.pkg` et confirme. L’assistant macOS ajoute Meetin-OS à **Applications**. La version du site est un paquet de test sans notarisation Apple.
+
+Pour compiler depuis les sources, utilise Xcode :
 
 ```bash
 git clone https://github.com/Firmirsa/Meetin-OS.git

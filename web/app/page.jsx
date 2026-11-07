@@ -18,8 +18,9 @@ return <>
         <p className="eyebrow"><span></span> Prototype pour macOS</p>
         <h1 id="titre">De l’appel à la <em>tâche validée.</em></h1>
         <p className="intro">Prends tes notes pendant l’appel. Retrouve ensuite ce qui a été dit et garde le contexte des décisions.</p>
-        <a className="button" href="https://github.com/Firmirsa/Meetin-OS/tree/main/mac#meetin-os-pour-macos">Essayer le prototype Mac <span aria-hidden="true">↗</span></a>
-        <p className="requirements">macOS 15 ou ultérieur · Installation depuis le code source</p>
+        <a className="button" href="/downloads/Meetin-OS.pkg" download aria-describedby="install-help">Installer sur Mac <span aria-hidden="true">↓</span></a>
+        <p className="requirements" id="install-help">macOS 15 ou ultérieur. Ouvre le fichier téléchargé et confirme l’installation. Meetin-OS apparaîtra dans Applications.</p>
+        <p className="requirements">Version de test sans notarisation Apple. Si macOS bloque l’ouverture, <a href="https://support.apple.com/fr-fr/102445">consulte l’aide d’Apple</a>.</p>
       </div>
       <figure className="preview">
         <div className="window">

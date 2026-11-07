@@ -1,6 +1,12 @@
 # Meetin-OS pour macOS
 
-Prototype natif SwiftUI pour macOS 15 ou ultérieur, à compiler avec Xcode. La capture utilise ScreenCaptureKit et écrit le micro et l’audio système dans deux pistes CAF, puis exporte un M4A mixé. Aucune image n’est enregistrée. Fermez les autres sources sonores pendant la démo : le prototype capte le son système de la session.
+Prototype natif SwiftUI pour macOS 15 ou ultérieur. La capture utilise ScreenCaptureKit et écrit le micro et l’audio système dans deux pistes CAF, puis exporte un M4A mixé. Aucune image n’est enregistrée. Fermez les autres sources sonores pendant la démo : le prototype capte le son système de la session.
+
+## Installer depuis le site
+
+Clique sur **Installer sur Mac**, ouvre `Meetin-OS.pkg` dans Téléchargements et confirme dans l’assistant macOS. Celui-ci installe `Meetin-OS.app` dans **Applications**. Le paquet contient une version pour Apple Silicon et Intel. La version de test n’est pas notariée par Apple et macOS peut bloquer son ouverture. [Aide Apple sur l’ouverture des logiciels téléchargés](https://support.apple.com/fr-fr/102445)
+
+## Compiler avec Xcode
 
 Depuis la racine du dépôt :
 
@@ -32,3 +38,13 @@ swiftc -parse-as-library -target "$(uname -m)-apple-macos15.0" \
   mac/Capture.swift mac/Gladia.swift mac/tests/GladiaSmoke.swift -o mac/.build/gladia-smoke
 mac/.build/gladia-smoke
 ```
+
+## Régénérer l’installateur du site
+
+Depuis la racine du dépôt, sur un Mac équipé de Xcode :
+
+```sh
+./mac/package.sh --beta web/public/downloads/Meetin-OS.pkg
+```
+
+Pour distribuer une version notariée, configure `MEETIN_APP_SIGN_IDENTITY` et `MEETIN_INSTALLER_SIGN_IDENTITY` avec les identités Developer ID installées dans le trousseau. Configure `MEETIN_NOTARY_PROFILE` avec le nom d’un profil `notarytool`, puis exécute la même commande sans `--beta`. Mets à jour la mention sur la page en même temps que le paquet. [Distribution macOS avec Developer ID](https://developer.apple.com/macos/distribution/)
