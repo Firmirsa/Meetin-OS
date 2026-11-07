@@ -119,8 +119,8 @@ protocol LiveSocket: AnyObject, Sendable {
 final class URLSessionLiveSocket: LiveSocket, @unchecked Sendable {
     private let task: URLSessionWebSocketTask
 
-    init(url: URL, session: URLSession = .shared) {
-        task = session.webSocketTask(with: url)
+    init(request: URLRequest, session: URLSession = AccountClient.http) {
+        task = session.webSocketTask(with: request)
         task.resume()
     }
 
@@ -144,36 +144,6 @@ final class URLSessionLiveSocket: LiveSocket, @unchecked Sendable {
 }
 
 enum GladiaLive {
-    private struct Created: Decodable { let url: URL }
-
-    static func createSession(key: String, session: URLSession = .shared) async throws -> URL {
-        var request = URLRequest(url: URL(string: "https://api.gladia.io/v2/live")!, timeoutInterval: 15)
-        request.httpMethod = "POST"
-        request.setValue(key, forHTTPHeaderField: "x-gladia-key")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "encoding": "wav/pcm",
-            "sample_rate": 16_000,
-            "bit_depth": 16,
-            "channels": 1,
-            "language_config": ["languages": ["fr", "en"], "code_switching": true],
-            "messages_config": ["receive_partial_transcripts": true]
-        ] as [String: Any])
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw Gladia.RequestError.invalidResponse(stage: "ouverture du direct")
-        }
-        if http.statusCode == 401 { throw Gladia.RequestError.unauthorized }
-        guard (200..<300).contains(http.statusCode) else {
-            throw Gladia.RequestError.http(stage: "ouverture du direct", status: http.statusCode)
-        }
-        guard let created = try? JSONDecoder().decode(Created.self, from: data),
-              created.url.scheme == "wss", created.url.host == "api.gladia.io" else {
-            throw Gladia.RequestError.invalidResponse(stage: "ouverture du direct")
-        }
-        return created.url
-    }
-
     struct Transcript: Equatable {
         let id: String
         let text: String
@@ -218,26 +188,24 @@ actor GladiaLiveSession {
         case finished
     }
 
-    private let createSession: @Sendable () async throws -> URL
-    private let connect: @Sendable (URL) -> LiveSocket
+    private let openSocket: @Sendable () async throws -> LiveSocket
     private let audio: AsyncStream<Data>
     private let events: @MainActor @Sendable (Event) -> Void
     private let retryDelay: Double
     private var socket: LiveSocket?
     private var aborted = false
     private var serverClosed = false
+    private var relayStopped = false
 
     init(
         audio: AsyncStream<Data>,
         retryDelay: Double = 1,
-        createSession: @escaping @Sendable () async throws -> URL,
-        connect: @escaping @Sendable (URL) -> LiveSocket,
+        openSocket: @escaping @Sendable () async throws -> LiveSocket,
         events: @escaping @MainActor @Sendable (Event) -> Void
     ) {
         self.audio = audio
         self.retryDelay = retryDelay
-        self.createSession = createSession
-        self.connect = connect
+        self.openSocket = openSocket
         self.events = events
     }
 
@@ -252,29 +220,35 @@ actor GladiaLiveSession {
     }
 
     private func stream() async {
-        let url: URL
-        do {
-            url = try await createSession()
-        } catch Gladia.RequestError.unauthorized {
-            await events(.unauthorized)
-            return
-        } catch {
-            await events(.failed(error.localizedDescription))
-            return
-        }
-
         var iterator = audio.makeAsyncIterator()
         var unsent: Data?
         var delay = retryDelay
+        var sentBytes = 0
+        var connection = 0
         while !aborted, !Task.isCancelled {
-            let current = connect(url)
+            let current: LiveSocket
+            do {
+                current = try await openSocket()
+            } catch let error as AccountClient.Failure where error.status == 401 {
+                await events(.unauthorized)
+                return
+            } catch {
+                await events(.failed(error.localizedDescription))
+                return
+            }
+            if aborted || Task.isCancelled { current.close(); return }
             socket = current
             serverClosed = false
-            let receiver = Task { try await self.receiveAll(from: current) }
+            relayStopped = false
+            connection += 1
+            let offset = Double(sentBytes) / 32_000
+            let number = connection
+            let receiver = Task { try await self.receiveAll(from: current, offset: offset, connection: number) }
             do {
                 var announced = false
                 if let chunk = unsent {
                     try await current.send(chunk)
+                    sentBytes += chunk.count
                     unsent = nil
                     announced = true
                     await events(.connected)
@@ -282,6 +256,7 @@ actor GladiaLiveSession {
                 while let chunk = await iterator.next() {
                     unsent = chunk
                     try await current.send(chunk)
+                    sentBytes += chunk.count
                     unsent = nil
                     delay = retryDelay
                     if !announced {
@@ -298,8 +273,8 @@ actor GladiaLiveSession {
                 _ = await receiver.result
                 if aborted || Task.isCancelled { return }
                 // Fermeture normale en plein appel, par exemple la limite de 3 h : pas de reprise possible.
-                if serverClosed {
-                    await events(.ended)
+                if serverClosed || relayStopped {
+                    if !relayStopped { await events(.ended) }
                     return
                 }
                 await events(.reconnecting)
@@ -309,10 +284,18 @@ actor GladiaLiveSession {
         }
     }
 
-    private func receiveAll(from socket: LiveSocket) async throws {
+    private func receiveAll(from socket: LiveSocket, offset: Double, connection: Int) async throws {
+        struct RelayMessage: Decodable { let type: String; let message: String? }
         while let text = try await socket.receive() {
             if let transcript = GladiaLive.parse(text) {
-                await events(.transcript(transcript))
+                await events(.transcript(.init(
+                    id: "\(connection)-\(transcript.id)", text: transcript.text,
+                    start: transcript.start + offset, isFinal: transcript.isFinal
+                )))
+            } else if let relay = try? JSONDecoder().decode(RelayMessage.self, from: Data(text.utf8)),
+                      ["meetinos_limit", "meetinos_error"].contains(relay.type) {
+                relayStopped = true
+                await events(.failed(relay.message ?? "Le direct a été interrompu."))
             }
         }
         serverClosed = true
@@ -418,8 +401,7 @@ final class LiveTranscription {
     // Appelé une fois par panne durable.
     @ObservationIgnored var onProblem: ((String) -> Void)?
 
-    @ObservationIgnored private let createSession: @Sendable () async throws -> URL
-    @ObservationIgnored private let connect: @Sendable (URL) -> LiveSocket
+    @ObservationIgnored private let openSocket: @Sendable () async throws -> LiveSocket
     @ObservationIgnored private let retryDelay: Double
     @ObservationIgnored private let finishTimeout: Double
     @ObservationIgnored private let outageAlertDelay: Double
@@ -431,25 +413,27 @@ final class LiveTranscription {
     @ObservationIgnored private var finishedCount = 0
     @ObservationIgnored nonisolated(unsafe) private var pipes: [AudioTrack: LiveAudioPipe] = [:]
 
-    convenience init(key: String) {
-        self.init(
-            createSession: { try await GladiaLive.createSession(key: key) },
-            connect: { URLSessionLiveSocket(url: $0) }
-        )
-    }
-
-    init(
+    convenience init(
         retryDelay: Double = 1,
         finishTimeout: Double = 8,
         outageAlertDelay: Double = 30,
         createSession: @escaping @Sendable () async throws -> URL,
         connect: @escaping @Sendable (URL) -> LiveSocket
     ) {
+        self.init(retryDelay: retryDelay, finishTimeout: finishTimeout, outageAlertDelay: outageAlertDelay,
+                  openSocket: { connect(try await createSession()) })
+    }
+
+    init(
+        retryDelay: Double = 1,
+        finishTimeout: Double = 8,
+        outageAlertDelay: Double = 30,
+        openSocket: @escaping @Sendable () async throws -> LiveSocket
+    ) {
         self.retryDelay = retryDelay
         self.finishTimeout = finishTimeout
         self.outageAlertDelay = outageAlertDelay
-        self.createSession = createSession
-        self.connect = connect
+        self.openSocket = openSocket
         for track in AudioTrack.allCases {
             pipes[track] = LiveAudioPipe(
                 onFirstBuffer: { [weak self] seconds in
@@ -475,7 +459,7 @@ final class LiveTranscription {
         for track in AudioTrack.allCases {
             guard let pipe = pipes[track] else { continue }
             let session = GladiaLiveSession(
-                audio: pipe.stream, retryDelay: retryDelay, createSession: createSession, connect: connect
+                audio: pipe.stream, retryDelay: retryDelay, openSocket: openSocket
             ) { [weak self] event in
                 self?.handle(event, track: track)
             }
@@ -538,10 +522,13 @@ final class LiveTranscription {
         // Une piste définitivement perdue compte même si l'autre continue.
         if states.contains(.unauthorized) {
             isIncomplete = true
-            alert("Gladia a refusé la clé. L’enregistrement continue.")
-        } else if states.contains(where: { if case .failed = $0 { true } else { false } }) {
+            alert("La connexion à Meetin-OS a expiré. L’enregistrement continue.")
+        } else if let failure = states.compactMap({ state -> String? in
+            if case .failed(let message) = state { return message }
+            return nil
+        }).first {
             isIncomplete = true
-            alert("Le direct n’a pas pu démarrer. L’enregistrement continue.")
+            alert("\(failure) L’enregistrement continue.")
         } else if states.contains(.ended) {
             isIncomplete = true
             alert("Le direct s’est arrêté. L’enregistrement continue.")

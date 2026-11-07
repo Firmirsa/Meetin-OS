@@ -1,26 +1,11 @@
 import AVFoundation
 import Foundation
 
+// Audio goes to the authenticated Meetin-OS API. Provider credentials stay on the server.
 struct Gladia {
-    let key: String
-    var session: URLSession = .shared
-
-    enum RequestError: LocalizedError {
-        case unauthorized
-        case http(stage: String, status: Int)
-        case invalidResponse(stage: String)
-
-        var errorDescription: String? {
-            switch self {
-            case .unauthorized:
-                return "Gladia a refusé la clé API. Remplacez-la dans les réglages, puis relancez la transcription."
-            case let .http(stage, status):
-                return "Gladia · \(stage) impossible (HTTP \(status))."
-            case let .invalidResponse(stage):
-                return "Gladia · réponse illisible pendant \(stage)."
-            }
-        }
-    }
+    let client: AccountClient
+    let token: @Sendable () async throws -> String
+    private static let chunkBytes = 90 * 32_000
 
     struct Segment: Decodable {
         let start: Double
@@ -28,29 +13,21 @@ struct Gladia {
         let text: String
     }
 
-    private struct Upload: Decodable { let audio_url: String }
-    private struct Job: Decodable { let result_url: URL }
+    private struct Started: Decodable { let id: UUID }
     private struct Result: Decodable {
-        struct Details: Decodable {
-            struct Transcription: Decodable {
-                let full_transcript: String
-                let utterances: [Segment]?
-
-                var segments: [Segment] {
-                    if let utterances, !utterances.isEmpty { return utterances }
-                    let text = full_transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-                    return text.isEmpty ? [] : [Segment(start: 0, speaker: nil, text: text)]
-                }
-            }
-            let transcription: Transcription?
-        }
         let status: String
-        let result: Details?
+        let segments: [Segment]?
+    }
+
+    static func audioMs(_ files: [URL]) throws -> Double {
+        try files.reduce(0) { sum, url in
+            let file = try AVAudioFile(forReading: url)
+            return sum + 1_000 * Double(file.length) / file.processingFormat.sampleRate
+        }
     }
 
     func transcribe(_ file: URL) async throws -> String {
-        let transcript = try await fetchTranscript(file)
-        let segments = transcript.segments
+        let segments = try await transcribeTrack(file)
         guard !segments.isEmpty else { return "Aucune parole reconnue." }
         return segments.map {
             let label = $0.speaker.map { "Voix \($0 + 1)" } ?? "Voix"
@@ -80,69 +57,61 @@ struct Gladia {
         return "[\(time)] \(label) · \(text)"
     }
 
-    private func transcribeTrack(_ file: URL) async throws -> [Segment] {
-        let output = file.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".m4a")
-        defer { try? FileManager.default.removeItem(at: output) }
-        try await AudioCapture.exportAudio([(file, 0)], to: output)
-        return try await fetchTranscript(output).segments
+    private func transcribeTrack(_ url: URL) async throws -> [Segment] {
+        let file = try AVAudioFile(forReading: url)
+        let converter = LiveAudioConverter()
+        guard let input = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 8_192) else {
+            throw CaptureError("Impossible de préparer cette piste audio.")
+        }
+        var audio = Data()
+        var sent = 0
+        var segments: [Segment] = []
+        while file.framePosition < file.length {
+            try Task.checkCancellation()
+            try file.read(into: input)
+            guard input.frameLength > 0 else { break }
+            if let converted = converter.convert(input) { audio.append(converted) }
+            if audio.count >= Self.chunkBytes {
+                let chunk = Data(audio.prefix(Self.chunkBytes))
+                segments += try await transcribeChunk(chunk, offset: Double(sent) / 32_000)
+                sent += chunk.count
+                audio.removeFirst(chunk.count)
+            }
+        }
+        if !audio.isEmpty {
+            segments += try await transcribeChunk(audio, offset: Double(sent) / 32_000)
+        }
+        return segments
     }
 
-    private func fetchTranscript(_ file: URL) async throws -> Result.Details.Transcription {
-        let boundary = UUID().uuidString
-        let audio = try Data(contentsOf: file)
-        var body = Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"audio\"; filename=\"reunion.m4a\"\r\nContent-Type: audio/mp4\r\n\r\n".utf8)
-        body.append(audio)
-        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
-        let upload: Upload = try await request(
-            URL(string: "https://api.gladia.io/v2/upload")!, stage: "envoi de l’audio", body: body,
-            type: "multipart/form-data; boundary=\(boundary)"
-        )
-        let payload = try JSONSerialization.data(withJSONObject: [
-            "audio_url": upload.audio_url,
-            "diarization": true,
-            "language_config": ["languages": ["fr", "en"], "code_switching": true]
-        ] as [String: Any])
-        let job: Job = try await request(URL(string: "https://api.gladia.io/v2/pre-recorded")!, stage: "lancement de la transcription", body: payload)
-        guard job.result_url.scheme == "https", job.result_url.host == "api.gladia.io" else {
-            throw CaptureError("URL de résultat Gladia inattendue.")
+    private func transcribeChunk(_ audio: Data, offset: Double) async throws -> [Segment] {
+        let id = UUID()
+        let endpoint = client.url("gladia")
+        let started: Started
+        do {
+            started = try await client.request(endpoint, token: token(), body: audio,
+                                               type: "application/octet-stream", idempotency: id)
+        } catch let error as URLError where error.code == .networkConnectionLost || error.code == .timedOut {
+            // The same ID is safe even if the first request already reached the server.
+            started = try await client.request(endpoint, token: token(), body: audio,
+                                               type: "application/octet-stream", idempotency: id)
         }
+        guard started.id == id, var parts = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
+            throw CaptureError("Identifiant de transcription inattendu.")
+        }
+        parts.queryItems = [URLQueryItem(name: "id", value: id.uuidString)]
+        guard let resultURL = parts.url else { throw CaptureError("Adresse de transcription invalide.") }
         for _ in 0..<90 {
-            let result: Result = try await request(job.result_url, stage: "récupération du résultat")
+            let result: Result = try await client.request(resultURL, token: token())
             switch result.status {
             case "done":
-                guard let transcript = result.result?.transcription else {
-                    throw CaptureError("Gladia a terminé sans renvoyer de transcription.")
+                return (result.segments ?? []).map {
+                    Segment(start: $0.start + offset, speaker: offset == 0 ? $0.speaker : nil, text: $0.text)
                 }
-                return transcript
-            case "error", "failed":
-                throw CaptureError("La transcription a échoué chez Gladia.")
-            default:
-                try await Task.sleep(for: .seconds(2))
+            case "failed": throw CaptureError("La transcription a échoué chez Gladia.")
+            default: try await Task.sleep(for: .seconds(2))
             }
         }
         throw CaptureError("Le résultat Gladia n’est pas disponible après le délai d’attente.")
-    }
-
-    private func request<T: Decodable>(_ url: URL, stage: String, body: Data? = nil, type: String = "application/json") async throws -> T {
-        var request = URLRequest(url: url, timeoutInterval: 30)
-        request.setValue(key, forHTTPHeaderField: "x-gladia-key")
-        if let body {
-            request.httpMethod = "POST"
-            request.setValue(type, forHTTPHeaderField: "Content-Type")
-            request.httpBody = body
-        }
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw RequestError.invalidResponse(stage: stage)
-        }
-        if http.statusCode == 401 { throw RequestError.unauthorized }
-        guard (200..<300).contains(http.statusCode) else {
-            throw RequestError.http(stage: stage, status: http.statusCode)
-        }
-        do {
-            return try JSONDecoder().decode(T.self, from: data)
-        } catch {
-            throw RequestError.invalidResponse(stage: stage)
-        }
     }
 }

@@ -1,4 +1,3 @@
-import OnboardingCheckout from './checkout';
 import OpenMacIntegrations from './open-mac';
 import LangSwitch from '../lang-switch';
 import {dict, langFrom, withLang} from '../../lib/i18n.mjs';
@@ -39,7 +38,8 @@ export default async function OnboardingPage({searchParams}) {
     <section className="mt-card checkout" id="subscription" aria-labelledby="subscription-heading">
       <p className="mt-label">{o.stripeLabel}</p>
       <h2 id="subscription-heading">{o.stripeTitle}</h2>
-      <OnboardingCheckout labels={o.checkout} />
+      <p>{o.stripeText}</p>
+      <OpenMacIntegrations label={o.openAccount} account />
     </section>
   </main>;
 }

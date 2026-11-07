@@ -73,29 +73,5 @@ export async function execute(operation, body, token, env = process.env, fetcher
     return { answer: result.answer, sources };
   }
 
-  if (operation === 'checkout') {
-    const key = setting(env, 'STRIPE_SECRET_KEY');
-    if (!/^(sk|rk)_test_/.test(key)) throw new ApiError(503, 'Stripe nécessite une clé de test.');
-    const appURL = setting(env, 'MEETIN_WEB_URL');
-    let origin;
-    try {
-      const url = new URL(appURL);
-      if (url.username || url.password || !(url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname)))) throw new Error();
-      origin = url.origin;
-    } catch { throw new ApiError(503, 'Adresse publique du site invalide.'); }
-    const data = new URLSearchParams({
-      mode: 'subscription',
-      'line_items[0][price]': setting(env, 'STRIPE_PRICE_ID'),
-      'line_items[0][quantity]': '1',
-      success_url: `${origin}/onboarding?checkout=returned`,
-      cancel_url: `${origin}/onboarding?checkout=canceled`,
-    });
-    const result = await provider(fetcher, 'https://api.stripe.com/v1/checkout/sessions', key,
-      data, 'Stripe', 'application/x-www-form-urlencoded');
-    const url = safeURL(result?.url, 'checkout.stripe.com');
-    if (!url || result.livemode !== false) throw new ApiError(502, 'Stripe n’a pas renvoyé de lien de test valide.');
-    return { url };
-  }
-
   throw new ApiError(404, 'Action inconnue.');
 }

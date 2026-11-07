@@ -7,16 +7,16 @@ final class StubGladia: URLProtocol {
     override func stopLoading() {}
 
     override func startLoading() {
-        let authorized = request.value(forHTTPHeaderField: "x-gladia-key") == "fixture"
+        let authorized = request.value(forHTTPHeaderField: "Authorization") == "Bearer fixture"
+        precondition(request.url?.host == "localhost" && request.value(forHTTPHeaderField: "x-gladia-key") == nil)
         let body: String
         switch (request.httpMethod, request.url!.path) {
-        case ("POST", "/v2/upload"):
-            precondition(request.value(forHTTPHeaderField: "Content-Type")?.contains("multipart/form-data") == true)
-            body = #"{"audio_url":"https://example.invalid/test.m4a"}"#
-        case ("POST", "/v2/pre-recorded"):
-            body = #"{"result_url":"https://api.gladia.io/v2/pre-recorded/test"}"#
-        case ("GET", "/v2/pre-recorded/test"):
-            body = #"{"status":"done","result":{"transcription":{"full_transcript":"Bonjour.","utterances":[{"start":1,"speaker":0,"text":"Bonjour."}]}}}"#
+        case ("POST", "/api/gladia"):
+            precondition(request.value(forHTTPHeaderField: "Content-Type") == "application/octet-stream")
+            let id = request.value(forHTTPHeaderField: "Idempotency-Key")!
+            body = #"{"id":"\#(id)"}"#
+        case ("GET", "/api/gladia"):
+            body = #"{"status":"done","segments":[{"start":1,"speaker":0,"text":"Bonjour."}]}"#
         default:
             fatalError("Unexpected Gladia request")
         }
@@ -50,12 +50,13 @@ struct GladiaSmoke {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubGladia.self]
         let session = URLSession(configuration: configuration)
+        let api = AccountClient(baseURL: URL(string: "http://localhost:3000")!, http: session)
         do {
-            _ = try await Gladia(key: "wrong", session: session).transcribe(mix)
+            _ = try await Gladia(client: api, token: { "wrong" }).transcribe(mix)
             fatalError("Expected an authentication error")
-        } catch Gladia.RequestError.unauthorized {}
+        } catch let error as AccountClient.Failure where error.status == 401 {}
 
-        let client = Gladia(key: "fixture", session: session)
+        let client = Gladia(client: api, token: { "fixture" })
         let mixedTranscript = try await client.transcribe(mix)
         precondition(mixedTranscript == "[00:01] Voix 1 · Bonjour.")
         let trackTranscript = try await client.transcribe(tracks: tracks)
@@ -64,7 +65,7 @@ struct GladiaSmoke {
             microphone: [.init(start: 1, speaker: 0, text: "Bonjour.")], system: [], tracks: tracks
         )
         precondition(silentTrack.contains("Audio de l’appel · aucune parole reconnue."))
-        print("Mix, horodatage, pistes séparées, silence et refus de clé vérifiés avec Gladia simulé.")
+        print("Mix, horodatage, pistes séparées, silence et compte requis vérifiés avec le serveur Meetin-OS simulé.")
     }
 
     static func writeTone(at url: URL) throws {

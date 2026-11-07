@@ -46,42 +46,12 @@ struct SettingsPage: View {
     @Bindable var session: MeetingSession
     @AppStorage("detectZoomMeetings") private var detectZoomMeetings = false
     @AppStorage(MeetingSession.liveTranscriptionKey) private var liveTranscription = true
-    @State private var draftKey = ""
-    @State private var keyMessage = ""
-
-    private var trimmedDraft: String { draftKey.trimmingCharacters(in: .whitespacesAndNewlines) }
-
     var body: some View {
         SettingsScaffold(title: "Paramètres", session: session) {
             SettingsSection(title: "Transcription") {
-                HStack {
-                    Text("Clé API Gladia").font(.mtSans(14, weight: .medium))
-                    Spacer()
-                    MTPill(
-                        text: session.trimmedKey.isEmpty ? "Aucune clé" : "Clé enregistrée",
-                        kind: session.trimmedKey.isEmpty ? .wait : .ok
-                    )
-                }
-                Text("Meetin-OS utilise Gladia pour transcrire l’audio. La clé est gardée dans le trousseau de ce Mac.")
+                Text("La transcription utilise ton quota Meetin-OS. Ouvre Compte pour te connecter ou consulter ton plan.")
                     .foregroundStyle(Color.mtInk2)
-                SecureField(session.trimmedKey.isEmpty ? "Colle ta clé ici" : "Colle une nouvelle clé pour la remplacer", text: $draftKey)
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel("Clé API Gladia")
-                    .onSubmit(saveKey)
-                HStack(spacing: 10) {
-                    Button("Enregistrer la clé", action: saveKey)
-                        .buttonStyle(.mtPrimary)
-                        .disabled(trimmedDraft.isEmpty)
-                    if !session.trimmedKey.isEmpty {
-                        Button("Retirer", action: removeKey).buttonStyle(.mtGhost)
-                    }
-                    Link("Obtenir une clé", destination: URL(string: "https://app.gladia.io/apikeys")!)
-                        .font(.mtSans(13))
-                }
-                if !keyMessage.isEmpty {
-                    Text(keyMessage).font(.mtSans(13)).foregroundStyle(Color.mtInk2)
-                }
-                Rectangle().fill(Color.mtLine).frame(height: 1)
+                Button("Ouvrir le compte") { session.route = .account }.buttonStyle(.mtGhost)
                 Toggle("Transcription en direct pendant l’enregistrement", isOn: $liveTranscription)
                     .tint(Color.mtControlTint)
                 Text("L’audio est envoyé en continu à Gladia pendant l’enregistrement. Si l’agent est connecté, le texte part aussi chez Holo (H Company) toutes les 15 s pour proposer des tâches. Rien n’est lancé sans ta validation.")
@@ -115,30 +85,27 @@ struct SettingsPage: View {
     }
 }
 
-private extension SettingsPage {
-    func saveKey() {
-        guard !trimmedDraft.isEmpty else { return }
-        session.key = trimmedDraft
-        keyMessage = GladiaKeyStore.save(trimmedDraft)
-            ? "Clé enregistrée. Gladia la vérifiera à la première transcription."
-            : "Trousseau indisponible : la clé servira uniquement jusqu’à la fermeture de l’app."
-        draftKey = ""
-    }
-
-    func removeKey() {
-        session.key = ""
-        keyMessage = GladiaKeyStore.delete() ? "Clé retirée de ce Mac." : "Impossible de retirer la clé du trousseau."
-    }
-}
-
 struct AccountPage: View {
     @Bindable var session: MeetingSession
-    @AppStorage("webWorkspaceURL") private var webWorkspaceURL = "http://localhost:3000"
+    @AppStorage("webWorkspaceURL") private var webWorkspaceURL = MeetinSite.defaultAddress
+
+    private var accountAddress: Binding<String> {
+        Binding(get: { webWorkspaceURL }, set: { address in
+            if MeetinSite.baseURL(address) != MeetinSite.baseURL(webWorkspaceURL) {
+                session.agentAccessCode = ""
+                session.agentAccess = nil
+            }
+            webWorkspaceURL = address
+        })
+    }
 
     var body: some View {
         SettingsScaffold(title: "Compte", session: session) {
+            SettingsSection(title: "Compte Meetin-OS") {
+                HostedAccountView(session: session, address: accountAddress)
+            }
             SettingsSection(title: "Accès de l’équipe") {
-                Text("Meetin-OS n’a pas de compte utilisateur. Le carnet et l’enregistrement restent disponibles sans accès. L’onglet Agent et l’abonnement passent par le site de l’équipe.")
+                Text("Le code de l’équipe donne accès aux outils de l’onglet Agent.")
                     .foregroundStyle(Color.mtInk2)
                 LabeledContent("Adresse du site", value: webWorkspaceURL).font(.mtSans(14))
                 LabeledContent("Code d’accès", value: session.agentAccess == nil ? "Non connecté" : "Validé pour cette session")

@@ -12,7 +12,7 @@ struct LiveTranscriptPanel: View {
         case .connecting: "Connexion à Gladia…"
         case .live: "En direct"
         case .reconnecting: "Connexion perdue, nouvelle tentative. L’enregistrement continue."
-        case .unauthorized: "Gladia a refusé la clé. L’enregistrement continue."
+        case .unauthorized: "La connexion à Meetin-OS a expiré. L’enregistrement continue."
         case .ended: "Le direct s’est arrêté. L’enregistrement continue."
         case .failed(let message): "Direct indisponible : \(message) L’enregistrement continue."
         }
@@ -35,7 +35,7 @@ struct LiveTranscriptPanel: View {
                     .foregroundStyle(Color.mtInk2)
                     .accessibilityAddTraits(.updatesFrequently)
                 if live.state == .unauthorized {
-                    Button("Modifier la clé", action: openSettings).buttonStyle(.link)
+                    Button("Se reconnecter", action: openSettings).buttonStyle(.link)
                 }
             }
             if live.lostAudio, live.state == .live || live.state == .reconnecting {

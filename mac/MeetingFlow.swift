@@ -42,11 +42,16 @@ extension MeetingSession {
         UserDefaults.standard.object(forKey: Self.liveTranscriptionKey) as? Bool ?? true
     }
 
-    var trimmedKey: String { key.trimmingCharacters(in: .whitespacesAndNewlines) }
+    var accountClient: AccountClient? {
+        let address = UserDefaults.standard.string(forKey: "webWorkspaceURL") ?? MeetinSite.defaultAddress
+        return MeetinSite.baseURL(address).map { AccountClient(baseURL: $0) }
+    }
+
+    var accountConnected: Bool { account.connected(to: accountClient?.baseURL) }
 
     var liveWaitingMessage: String {
-        if liveTranscriptionEnabled, trimmedKey.isEmpty {
-            return "Ajoute une clé Gladia dans Paramètres pour le direct. L’enregistrement continue."
+        if liveTranscriptionEnabled, !accountConnected {
+            return "Connecte-toi à Meetin-OS pour transcrire. L’enregistrement continue sur ce Mac."
         }
         return "La transcription sera disponible après l’arrêt de l’enregistrement et l’envoi à Gladia."
     }
@@ -55,7 +60,7 @@ extension MeetingSession {
 
     // Détection seulement si le direct tourne et si l'équipe a validé l'accès à l'agent.
     func startDetection(reading live: LiveTranscription) {
-        let address = UserDefaults.standard.string(forKey: "webWorkspaceURL") ?? "http://localhost:3000"
+        let address = UserDefaults.standard.string(forKey: "webWorkspaceURL") ?? MeetinSite.defaultAddress
         guard agentAccess?.planning == true, let base = AgentClient.serverURL(address) else { return }
         let client = AgentClient(baseURL: base, accessCode: agentAccessCode)
         let transcript = live.transcript
@@ -108,7 +113,7 @@ extension MeetingSession {
     }
 
     var agentClient: AgentClient? {
-        let address = UserDefaults.standard.string(forKey: "webWorkspaceURL") ?? "http://localhost:3000"
+        let address = UserDefaults.standard.string(forKey: "webWorkspaceURL") ?? MeetinSite.defaultAddress
         guard agentAccess != nil, let base = AgentClient.serverURL(address) else { return nil }
         return AgentClient(baseURL: base, accessCode: agentAccessCode)
     }
@@ -205,9 +210,22 @@ extension MeetingSession {
     }
 
     func makeLive() -> LiveTranscription? {
-        guard liveTranscriptionEnabled, !trimmedKey.isEmpty else { return nil }
+        guard liveTranscriptionEnabled, let client = accountClient, accountConnected else { return nil }
         LiveAlerts.requestPermission()
-        let live = LiveTranscription(key: trimmedKey)
+        let live = LiveTranscription(openSocket: { [account] in
+            let usage = try await account.refreshUsage(client)
+            guard usage.remainingMs > 0 else {
+                throw CaptureError("Ton quota audio est atteint. Consulte ton plan dans Compte.")
+            }
+            guard let url = usage.liveUrl, url.host == client.baseURL.host, url.user == nil,
+                  url.password == nil, url.query == nil, url.fragment == nil,
+                  url.scheme == "wss" || (url.scheme == "ws" && ["localhost", "127.0.0.1"].contains(url.host ?? "")) else {
+                throw CaptureError("Le direct n’est pas disponible sur ce serveur.")
+            }
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(try await account.token(client))", forHTTPHeaderField: "Authorization")
+            return URLSessionLiveSocket(request: request)
+        })
         live.onProblem = { LiveAlerts.post($0) }
         return live
     }

@@ -37,7 +37,7 @@ final class MeetingSession {
     var recording: URL?
     var recordedTracks: AudioCapture.Tracks?
     var busy = false
-    var key = ProcessInfo.processInfo.environment["GLADIA_API_KEY"] ?? GladiaKeyStore.load() ?? ""
+    let account = HostedAccount()
     var live: LiveTranscription?
     var statusBelongsToMeeting = false
     var transcriptIncomplete = false { didSet { syncMeeting() } }
@@ -98,12 +98,8 @@ struct CaptureView: View {
     @Bindable var session: MeetingSession
     var isMeetingWindow = false
     @State private var integrationsRequest: IntegrationsRequest?
-    @AppStorage("webWorkspaceURL") private var webWorkspaceURL = "http://localhost:3000"
+    @AppStorage("webWorkspaceURL") private var webWorkspaceURL = MeetinSite.defaultAddress
     @State private var tab: MeetingTab = .transcription
-
-    private var hasKey: Bool {
-        !session.key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -157,7 +153,7 @@ struct CaptureView: View {
                         if let live = session.live {
                             Text("Transcription").font(.headline).accessibilityAddTraits(.isHeader)
                             LiveTranscriptPanel(live: live) {
-                                session.showMain(.settings, openWindow: openWindow)
+                                session.showMain(.account, openWindow: openWindow)
                             }
                         } else if isMeetingWindow {
                             Text("PENDANT ET APRÈS L’APPEL")
@@ -359,26 +355,33 @@ struct CaptureView: View {
 
     private func transcribe() {
         guard !session.busy, let recording = session.recording else { return }
-        guard hasKey else {
+        guard let client = session.accountClient, session.accountConnected else {
             showIntegrations(.transcribe)
             return
         }
         session.busy = true
-        session.transcript = ""
         session.status = "Envoi et transcription en cours…"
+        let tracks = session.recordedTracks
+        let account = session.account
         Task {
             defer { session.busy = false }
             do {
-                let gladia = Gladia(key: session.key.trimmingCharacters(in: .whitespacesAndNewlines))
-                if let tracks = session.recordedTracks {
+                let usage = try await account.refreshUsage(client)
+                let files = tracks.map { [$0.microphone, $0.system] } ?? [recording]
+                guard try Gladia.audioMs(files) <= Double(usage.remainingMs) else {
+                    throw CaptureError("Ton quota audio restant est trop petit pour cet enregistrement. Consulte ton plan dans Compte.")
+                }
+                let gladia = Gladia(client: client, token: { try await account.token(client) })
+                if let tracks {
                     session.transcript = try await gladia.transcribe(tracks: tracks)
                 } else {
                     session.transcript = try await gladia.transcribe(recording)
                 }
                 session.transcriptIncomplete = false
                 session.status = "Transcription prête"
-            } catch Gladia.RequestError.unauthorized {
-                session.status = Gladia.RequestError.unauthorized.localizedDescription
+            } catch let error as AccountClient.Failure where error.status == 401 {
+                account.forget(client)
+                session.status = error.localizedDescription
                 showIntegrations(.transcribe)
             } catch { session.status = error.localizedDescription }
         }

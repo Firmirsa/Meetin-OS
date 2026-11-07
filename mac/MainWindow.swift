@@ -8,7 +8,7 @@ struct MainWindow: View {
     @Environment(\.openWindow) private var openWindow
     @Bindable var session: MeetingSession
     @AppStorage("detectZoomMeetings") private var detectZoomMeetings = false
-    @AppStorage("webWorkspaceURL") private var webWorkspaceURL = "http://localhost:3000"
+    @AppStorage("webWorkspaceURL") private var webWorkspaceURL = MeetinSite.defaultAddress
 
     // Ouverture à environ 80 % de la zone visible de l'écran.
     static func placement(in context: WindowPlacementContext) -> WindowPlacement {

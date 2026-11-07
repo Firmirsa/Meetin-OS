@@ -19,10 +19,6 @@ struct HomeView: View {
         return formatter.string(from: Date()).uppercased(with: formatter.locale)
     }
 
-    private var hasKey: Bool {
-        !session.key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
@@ -100,18 +96,18 @@ struct HomeView: View {
         HStack(spacing: 18) {
             statusDot(microphoneText, microphoneColor)
             statusDot(systemAudioText, systemAudioColor)
-            if hasKey {
-                statusDot("Clé Gladia enregistrée", .mtAccent)
+            if session.accountConnected {
+                statusDot("Compte connecté", .mtAccent)
             } else {
-                Button { session.route = .settings } label: {
+                Button { session.route = .account } label: {
                     HStack(spacing: 7) {
                         Circle().fill(Color.mtWarn).frame(width: 7, height: 7).accessibilityHidden(true)
-                        Text("Ajouter la clé Gladia").font(.mtSans(13)).underline().foregroundStyle(Color.mtInk)
+                        Text("Se connecter pour transcrire").font(.mtSans(13)).underline().foregroundStyle(Color.mtInk)
                     }
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("Ouvre les paramètres")
+                .accessibilityHint("Ouvre le compte")
             }
         }
     }

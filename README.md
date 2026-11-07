@@ -10,9 +10,9 @@ Développé par **Wael, Lenny et Samy** pour le **H Company × 42AI Computer Use
 
 ## Lancer le prototype Mac
 
-**Prérequis** · macOS 15 ou ultérieur et une clé API Gladia pour la transcription.
+**Prérequis** · macOS 15 ou ultérieur. Le carnet et l’enregistrement s’utilisent sans compte. Dans la version Mac compilée depuis ces sources, un compte Meetin-OS suffit pour transcrire : le serveur de l’équipe fournit la clé Gladia.
 
-Depuis le site, clique sur **Installer sur Mac**, ouvre `Meetin-OS.pkg` et confirme. L’assistant macOS ajoute Meetin-OS à **Applications**. La version du site est un paquet de test sans notarisation Apple.
+Depuis le site, clique sur **Installer sur Mac**, ouvre `Meetin-OS.pkg` et confirme. L’assistant macOS ajoute Meetin-OS à **Applications**. Le paquet de test publié avant le lot comptes peut encore demander une clé Gladia.
 
 Pour compiler depuis les sources, utilise Xcode :
 
@@ -27,7 +27,7 @@ Le script compile et signe l’application localement. À la première capture, 
 
 1. Clique sur **Enregistrer**, puis prends tes notes dans le carnet pendant l’appel.
 2. Clique sur **Arrêter**, puis sur **Écouter** pour vérifier l’enregistrement. **Voir les pistes** permet d’inspecter séparément le micro et le son du Mac.
-3. Clique sur **Transcrire**. Si une clé Gladia est nécessaire, l’app te la demande à ce moment. Elle affiche ensuite les passages horodatés et permet de copier le texte.
+3. Clique sur **Transcrire**. Connecte-toi avec le code reçu par e-mail si nécessaire. L’app reprend la transcription et affiche les passages horodatés. **Compte** affiche ton plan et le quota restant.
 
 Le [guide macOS](mac/README.md) détaille les permissions, les fichiers audio et la configuration de Gladia.
 
@@ -43,7 +43,7 @@ Le [guide Windows](windows/README.md) décrit la capture des deux pistes et le t
 2. Dans l’onglet **Agent** de l’app Mac, sélectionne un extrait de la transcription ou saisis une demande. Clique sur **Préparer la tâche**. Holo propose une action ou pose une question s’il lui manque un détail.
 3. Relis la tâche, sa destination et le contexte, puis clique sur **Confirmer et lancer**. Devin traite le travail de code ; H Computer Use agit dans le tableau de test configuré. L’app affiche le lien de suivi de la session.
 
-Le site sert à télécharger l’app et à l’installer. Sa page **Premiers pas** inclut le parcours d’abonnement de démonstration via Stripe Checkout en mode test.
+Le site sert à télécharger l’app et à l’installer. Sur Mac, **Compte** ouvre Stripe Checkout pour passer de Gratuit (15 min audio par mois) à Premium (300 min), une fois Stripe configuré par l’équipe.
 
 ## Lancer le site Next.js
 
@@ -59,7 +59,7 @@ Le téléchargement est disponible sur [localhost:3000/telecharger](http://local
 | Brique | Recette |
 |---|---|
 | **Mac** | Accès au micro et à l’audio du système, deux pistes et export vérifiés avec un son de test sur macOS 26.5.2. |
-| **Gladia** | Sur un vrai appel le 7 novembre, Gladia a renvoyé des passages horodatés sur les deux pistes. Le repère du micro est reconnu ; celui de la voix distante reste à confirmer. |
+| **Gladia** | La version précédente a renvoyé du texte sur les deux pistes pendant un vrai appel le 7 novembre. Le nouveau relais et les quotas ont été testés avec Supabase local et Gladia simulé. |
 | **Agent Mac** | Préparation, clarification, confirmation et réponse des routes de session testées avec des prestataires simulés. La recette réelle de Devin et H Computer Use reste à faire avec les accès de l’équipe. |
 
 ## Documentation

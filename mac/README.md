@@ -4,7 +4,7 @@ Prototype natif SwiftUI pour macOS 15 ou ultérieur. Meetin-OS capture le micro 
 
 ## Installer depuis le site
 
-Clique sur **Installer sur Mac**, ouvre `Meetin-OS.pkg` dans Téléchargements et confirme dans l’assistant macOS. Celui-ci installe `Meetin-OS.app` dans **Applications**. Le paquet contient une version pour Apple Silicon et Intel. La version de test n’est pas notariée par Apple et macOS peut bloquer son ouverture. [Aide Apple sur l’ouverture des logiciels téléchargés](https://support.apple.com/fr-fr/102445)
+Clique sur **Installer sur Mac**, ouvre `Meetin-OS.pkg` dans Téléchargements et confirme dans l’assistant macOS. Celui-ci installe `Meetin-OS.app` dans **Applications**. Le paquet contient une version pour Apple Silicon et Intel. La version de test n’est pas notariée par Apple et macOS peut bloquer son ouverture. Le paquet publié avant la version 0.1.4 utilise encore le réglage Gladia local. [Aide Apple sur l’ouverture des logiciels téléchargés](https://support.apple.com/fr-fr/102445)
 
 ## Compiler avec Xcode
 
@@ -17,18 +17,18 @@ open mac/.build/Meetin-OS.app
 
 Le script construit et signe localement l’application. Au premier enregistrement, macOS peut demander l’accès au **Microphone** et à **Audio du système uniquement**. Si une piste manque, le carnet propose un lien vers les réglages concernés et conserve la piste disponible. Les deux raccourcis sont aussi dans **Paramètres → Autorisations audio**. Une nouvelle version signée localement peut demander à nouveau les autorisations.
 
-L’**Accueil**, le carnet et l’enregistrement restent disponibles sans compte. **Intégrations**, dans la barre latérale et la fenêtre de réunion, permet d’activer Gladia ou de connecter l’agent plus tard.
+L’**Accueil**, le carnet et l’enregistrement restent disponibles sans compte. Ouvre **Compte** et connecte-toi avec un code reçu par e-mail pour transcrire. Le serveur Meetin-OS utilise la clé Gladia de l’équipe. **Compte** affiche le quota restant et permet de passer à Premium via Stripe si le paiement est configuré. [Configuration du serveur](../web/README.md#comptes-transcription-et-abonnement-mac)
 
 1. Lancez un appel de test avec un autre participant. Sur l’**Accueil**, cliquez sur **Commencer à enregistrer** (⌘R), faites parler chaque personne à tour de rôle, puis cliquez sur **Arrêter**.
 2. Cliquez sur **Écouter** pour vérifier les deux voix. **Voir les pistes** révèle le dossier de la réunion contenant le mix et les deux pistes séparées.
-3. Cliquez sur **Transcrire** pour envoyer les pistes micro et appel séparément. Si une clé Gladia est nécessaire, l’app ouvre le formulaire correspondant et reprend l’envoi quand vous cliquez sur **Transcrire** dans ce formulaire. La clé peut aussi s’ajouter dans **Paramètres** ou **Intégrations** et reste dans le trousseau de ce Mac. La variable d’environnement `GLADIA_API_KEY` a la priorité si le binaire est lancé depuis le terminal. Une version signée localement peut demander l’accès au trousseau après chaque compilation. Le texte indique la piste source et l’horodatage de chaque passage. Un M4A importé est traité comme un fichier unique.
+3. Cliquez sur **Transcrire** pour envoyer les pistes micro et appel séparément. Si la session a expiré ou si vous n’êtes pas connecté, l’app ouvre le formulaire et reprend après la connexion. Le texte indique la piste source et l’horodatage de chaque passage. Un M4A importé est traité comme une seule piste.
 4. Dans l’onglet **Agent**, insère et ajuste l’extrait de transcription ou saisis une demande. Clique sur **Préparer la tâche**, réponds à la question éventuelle, puis relis l’action et sa destination avant de confirmer. Le lien de session s’affiche quand Devin ou H Computer Use accepte le lancement.
 
-Pour activer l’agent, ouvre **Intégrations → Connecter l’agent** ou clique sur **Ouvrir les intégrations sur Mac** depuis la page **Premiers pas** du site de l’équipe. Le site préremplit l’adresse. En local, l’adresse par défaut est `http://localhost:3000`. Le code correspond à `MEETIN_DEMO_TOKEN` côté serveur et reste en mémoire pendant la session. Le catalogue indique la configuration de Trello et Devin et présente Google Calendar comme à venir. Les clés de Devin et H Company restent sur le serveur. [Guide Next.js](../web/README.md) **Compte** rappelle l’adresse et ouvre ce formulaire. **Facturation et abonnement** ouvre `/onboarding#subscription` sur cette adresse.
+Pour activer l’agent, ouvre **Intégrations → Connecter l’agent** ou clique sur **Ouvrir les intégrations sur Mac** depuis la page **Premiers pas** du site de l’équipe. Le site préremplit l’adresse. En local, l’adresse par défaut est `http://localhost:3000`. Le code correspond à `MEETIN_DEMO_TOKEN` côté serveur et reste en mémoire pendant la session. Le catalogue indique la configuration de Trello et Devin et présente Google Calendar comme à venir. Les clés de Devin et H Company restent sur le serveur. [Guide Next.js](../web/README.md)
 
-L’historique est conservé sur ce Mac dans `~/Library/Application Support/Meetin-OS` : `meetings.json` (titre, date, durée, chemin audio, transcription, notes) et un dossier audio par réunion dans `recordings/`. Il se remplit à l’arrêt de l’enregistrement et après la transcription. Pour reprendre un essai, rouvre la réunion depuis **Réunions**. Pour un fichier externe, utilise **Ouvrir un enregistrement** sur cette page et choisis un M4A. Si Gladia refuse la clé, le formulaire Gladia se rouvre et le fichier reste prêt pour une nouvelle tentative.
+L’historique est conservé sur ce Mac dans `~/Library/Application Support/Meetin-OS` : `meetings.json` (titre, date, durée, chemin audio, transcription, notes) et un dossier audio par réunion dans `recordings/`. Il se remplit à l’arrêt de l’enregistrement et après la transcription. Pour reprendre un essai, rouvre la réunion depuis **Réunions**. Pour un fichier externe, utilise **Ouvrir un enregistrement** sur cette page et choisis un M4A.
 
-**Transcription en direct** : avec une clé Gladia et l’option activée dans **Paramètres**, le texte s’écrit pendant l’appel dans la fenêtre de réunion. L’audio est alors envoyé en continu à Gladia, une session par piste. Sans casque, une phrase de l’appel captée par le micro est retirée de la piste « Micro » si elle reprend au moins 70 % des mots de la piste de l’appel à 10 s près ; une vraie reprise à l’identique peut donc être masquée, et l’audio reste complet. À l’arrêt, ce texte devient la transcription de la réunion, et **Transcrire** le remplace par la version différée. Si le direct échoue, l’enregistrement continue : une notification macOS prévient si la clé est refusée, si le direct ne démarre pas ou s’il reste coupé 30 s, et la réunion affiche alors « Incomplète ».
+**Transcription en direct** : connecte-toi avant de lancer l’enregistrement et active l’option dans **Paramètres**. Le texte s’écrit pendant l’appel, pendant que le serveur Meetin-OS transmet les pistes à Gladia et compte l’audio envoyé. Sans casque, une phrase de l’appel captée par le micro est retirée de la piste « Micro » si elle reprend au moins 70 % des mots de la piste de l’appel à 10 s près ; une reprise à l’identique peut donc être masquée, et l’audio reste complet. À l’arrêt, le texte du direct reste dans la réunion. **Transcrire** le remplace par la version différée et compte cet envoi dans le quota. Si le direct est coupé durablement ou si le quota s’épuise, l’enregistrement continue.
 
 **Tâches proposées** : si le direct tourne et que l’agent est connecté, le texte définitif part chez Holo (H Company) toutes les 15 s quand il a changé. Les tâches détectées apparaissent en cartes dans l’onglet **Agent** et restent enregistrées dans la réunion, affichée « N à valider ». Rien ne part sans clic sur **Confirmer et lancer** ou sur l’action de sa notification. Un plan expire après 15 minutes : **Modifier** le reprend dans le formulaire pour en préparer un nouveau.
 
@@ -45,7 +45,7 @@ Le test audio local utilise des pistes synthétiques et simule les réponses de 
 ```sh
 mkdir -p mac/.build
 swiftc -parse-as-library -target "$(uname -m)-apple-macos15.0" \
-  mac/Capture.swift mac/Gladia.swift mac/tests/GladiaSmoke.swift -o mac/.build/gladia-smoke
+  mac/Capture.swift mac/HostedAccount.swift mac/Gladia.swift mac/LiveTranscription.swift mac/tests/GladiaSmoke.swift -o mac/.build/gladia-smoke
 mac/.build/gladia-smoke
 ```
 
@@ -71,7 +71,7 @@ Le test du direct utilise une connexion simulée :
 
 ```sh
 swiftc -parse-as-library -target "$(uname -m)-apple-macos15.0" \
-  mac/Capture.swift mac/Gladia.swift mac/LiveTranscription.swift mac/tests/LiveTranscriptionSmoke.swift -o mac/.build/live-smoke
+  mac/Capture.swift mac/HostedAccount.swift mac/Gladia.swift mac/LiveTranscription.swift mac/tests/LiveTranscriptionSmoke.swift -o mac/.build/live-smoke
 mac/.build/live-smoke
 ```
 
@@ -80,7 +80,7 @@ mac/.build/live-smoke
 Depuis la racine du dépôt, sur un Mac équipé de Xcode :
 
 ```sh
-./mac/package.sh --beta web/public/downloads/Meetin-OS.pkg
+MEETIN_WEB_URL=https://ton-site-meetin.example ./mac/package.sh --beta web/public/downloads/Meetin-OS.pkg
 ```
 
-Pour distribuer une version notariée, configure `MEETIN_APP_SIGN_IDENTITY` et `MEETIN_INSTALLER_SIGN_IDENTITY` avec les identités Developer ID installées dans le trousseau. Configure `MEETIN_NOTARY_PROFILE` avec le nom d’un profil `notarytool`, puis exécute la même commande sans `--beta`. Mets à jour la mention sur la page en même temps que le paquet. [Distribution macOS avec Developer ID](https://developer.apple.com/macos/distribution/)
+Remplace `MEETIN_WEB_URL` par l’adresse du serveur configuré : l’app installée l’utilise dès son premier lancement. Pour distribuer une version notariée, configure `MEETIN_APP_SIGN_IDENTITY` et `MEETIN_INSTALLER_SIGN_IDENTITY` avec les identités Developer ID installées dans le trousseau. Configure `MEETIN_NOTARY_PROFILE` avec le nom d’un profil `notarytool`, puis exécute la même commande sans `--beta`. Mets à jour la mention sur la page en même temps que le paquet. [Distribution macOS avec Developer ID](https://developer.apple.com/macos/distribution/)

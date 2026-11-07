@@ -175,7 +175,7 @@ struct LiveTranscriptionSmoke {
         precondition(Date().timeIntervalSince(started) < 3, "finish() borné par le délai")
 
         // Clé refusée et panne d'ouverture : état signalé, aucun blocage
-        let refused = LiveTranscription(createSession: { throw Gladia.RequestError.unauthorized }, connect: { _ in FakeSocket() })
+        let refused = LiveTranscription(createSession: { throw AccountClient.Failure(message: "Non connecté", status: 401) }, connect: { _ in FakeSocket() })
         var refusedAlerts: [String] = []
         refused.onProblem = { refusedAlerts.append($0) }
         refused.start()

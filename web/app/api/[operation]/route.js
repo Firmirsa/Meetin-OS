@@ -1,44 +1,29 @@
 import { ApiError, execute } from '../../../lib/integrations.mjs';
 import { agentAccess, prepareTask, detectTasks, executeTask, trelloExecutionStatus } from '../../../lib/agent.mjs';
+import { accountAuth, accountStatus, agentEnvironment, bearer } from '../../../lib/hosted-account.mjs';
+import { boundedBody } from '../../../lib/hosted-response.mjs';
+import { accountBilling } from '../../../lib/hosted-stripe.mjs';
 
 export async function POST(request, { params }) {
   try {
     if (!request.headers.get('content-type')?.startsWith('application/json')) {
       throw new ApiError(415, 'Format de requête invalide.');
     }
-    const auth = request.headers.get('authorization');
-    const token = auth?.startsWith('Bearer ') ? auth.slice(7) : undefined;
-    const reader = request.body?.getReader();
-    const decoder = new TextDecoder();
-    let raw = '';
-    let bytes = 0;
-    if (reader) {
-      try {
-        while (true) {
-          const {done, value} = await reader.read();
-          if (done) break;
-          bytes += value.byteLength;
-          if (bytes > 24_000) {
-            void reader.cancel().catch(() => {});
-            throw new ApiError(413, 'Requête trop longue.');
-          }
-          raw += decoder.decode(value, {stream: true});
-        }
-        raw += decoder.decode();
-      } finally {
-        reader.releaseLock();
-      }
-    }
+    const token = bearer(request.headers);
+    const raw = await boundedBody(request, 24_000);
     let body;
     try { body = JSON.parse(raw); }
     catch { throw new ApiError(400, 'Requête invalide.'); }
     const { operation } = await params;
     let result;
-    if (operation === 'agent-access') result = agentAccess(token);
-    else if (operation === 'agent-prepare') result = await prepareTask(body, token);
-    else if (operation === 'agent-detect') result = await detectTasks(body, token);
-    else if (operation === 'agent-execute') result = await executeTask(body, token);
-    else if (operation === 'agent-trello-status') result = await trelloExecutionStatus(body, token);
+    if (operation === 'account-auth') result = await accountAuth(body, token);
+    else if (operation === 'account-status') result = await accountStatus(token);
+    else if (operation === 'account-billing') result = await accountBilling(body, token);
+    else if (operation === 'agent-access') result = agentAccess(token, await agentEnvironment(operation, token));
+    else if (operation === 'agent-prepare') result = await prepareTask(body, token, await agentEnvironment(operation, token));
+    else if (operation === 'agent-detect') result = await detectTasks(body, token, await agentEnvironment(operation, token));
+    else if (operation === 'agent-execute') result = await executeTask(body, token, await agentEnvironment(operation, token));
+    else if (operation === 'agent-trello-status') result = await trelloExecutionStatus(body, token, await agentEnvironment(operation, token));
     else result = await execute(operation, body, token);
     return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {

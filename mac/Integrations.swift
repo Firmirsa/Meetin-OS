@@ -11,12 +11,12 @@ struct IntegrationsRequest: Identifiable {
 
     static func fromLink(_ url: URL) -> Self? {
         guard let link = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              link.scheme == "meetinos", link.host == "connect", link.user == nil, link.password == nil,
+              link.scheme == "meetinos", ["connect", "account"].contains(link.host ?? ""), link.user == nil, link.password == nil,
               link.port == nil, link.fragment == nil, link.path.isEmpty || link.path == "/",
               let items = link.queryItems, items.count == 1, items[0].name == "server",
               let address = items[0].value, let server = AgentClient.serverURL(address)
         else { return nil }
-        return Self(page: .agent, suggestedServer: server)
+        return Self(page: link.host == "account" ? .gladia : .agent, suggestedServer: server)
     }
 }
 
@@ -27,8 +27,8 @@ struct IntegrationsView: View {
     let transcribe: () -> Void
     @State private var page: IntegrationsPage
     @State private var server: String
+    @State private var accountAddress: String
     @State private var code = ""
-    @State private var gladiaKey: String
     @State private var checking = false
     @State private var issue = ""
     @FocusState private var credentialFocused: Bool
@@ -38,8 +38,9 @@ struct IntegrationsView: View {
         self._workspaceURL = workspaceURL
         self.transcribe = transcribe
         self._page = State(initialValue: request.page)
-        self._server = State(initialValue: request.suggestedServer?.absoluteString ?? workspaceURL.wrappedValue)
-        self._gladiaKey = State(initialValue: session.key)
+        let address = request.suggestedServer?.absoluteString ?? workspaceURL.wrappedValue
+        self._server = State(initialValue: address)
+        self._accountAddress = State(initialValue: address)
     }
 
     var body: some View {
@@ -73,9 +74,8 @@ struct IntegrationsView: View {
                 Text("Votre équipe doit activer l’agent sur son serveur. Vous pouvez continuer à utiliser le carnet.")
                     .font(.callout).foregroundStyle(Color.mtInk2)
             }
-            toolRow("Gladia", purpose: "Transcrire un enregistrement", status: session.key.isEmpty ? "Facultatif" : "Clé renseignée") {
-                Button(session.key.isEmpty ? "Configurer" : "Modifier") { show(.gladia) }
-                    .accessibilityLabel("Configurer Gladia")
+            toolRow("Gladia", purpose: "Transcrire un enregistrement", status: session.accountConnected ? "Compte connecté" : "Compte requis") {
+                Button(session.accountConnected ? "Voir le compte" : "Se connecter") { show(.gladia) }
             }
             toolRow("Trello", purpose: "Créer une fiche après votre confirmation", status: toolStatus(trello)) { EmptyView() }
             toolRow("Google Calendar", purpose: "Retrouver les réunions prévues", status: "À venir") { EmptyView() }
@@ -121,27 +121,18 @@ struct IntegrationsView: View {
 
     private var gladiaForm: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Activer la transcription").font(.title2.bold()).accessibilityAddTraits(.isHeader)
-            Text("Meetin-OS envoie l’audio à Gladia quand vous cliquez sur Transcrire, et en continu pendant l’enregistrement si le direct est activé. La clé reste dans le trousseau de ce Mac.")
-                .foregroundStyle(Color.mtInk2)
-            Link("Ouvrir les clés Gladia", destination: URL(string: "https://app.gladia.io/apikeys")!)
-            SecureField("Clé API Gladia", text: $gladiaKey).textFieldStyle(.roundedBorder).focused($credentialFocused)
-            HStack {
-                Button(page == .transcribe ? "Revenir au carnet" : "Retour") {
-                    if page == .transcribe { dismiss() } else { show(.catalog) }
+            Text("Compte Meetin-OS").font(.title2.bold()).accessibilityAddTraits(.isHeader)
+            HostedAccountView(session: session, address: $accountAddress) {
+                if workspaceURL != accountAddress {
+                    disconnect()
+                    workspaceURL = accountAddress
                 }
-                .keyboardShortcut(.cancelAction)
-                Spacer()
-                Button(page == .transcribe ? "Transcrire" : "Enregistrer") {
-                    session.key = gladiaKey.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if session.key.isEmpty { GladiaKeyStore.delete() } else { GladiaKeyStore.save(session.key) }
-                    if page == .transcribe { dismiss(); transcribe() } else { show(.catalog) }
-                }
-                .buttonStyle(.mtPrimary)
-                .disabled(page == .transcribe && gladiaKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if page == .transcribe { dismiss(); transcribe() }
             }
+            Button(page == .transcribe ? "Revenir au carnet" : "Retour") {
+                if page == .transcribe { dismiss() } else { show(.catalog) }
+            }.keyboardShortcut(.cancelAction)
         }
-        .onAppear { credentialFocused = true }
     }
 
     private func toolRow<Action: View>(_ name: String, purpose: String, status: String, @ViewBuilder action: () -> Action) -> some View {

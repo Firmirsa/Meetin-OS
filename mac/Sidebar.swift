@@ -3,7 +3,6 @@ import SwiftUI
 
 struct Sidebar: View {
     @Bindable var session: MeetingSession
-    @AppStorage("webWorkspaceURL") private var webWorkspaceURL = "http://localhost:3000"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -34,9 +33,8 @@ struct Sidebar: View {
                 session.integrationsRequest = IntegrationsRequest(page: .catalog)
             }
             row("Paramètres", icon: "gearshape", selected: session.route == .settings) { session.route = .settings }
-            row("Compte", icon: "person", selected: session.route == .account) { session.route = .account }
-            row("Facturation et abonnement", icon: "creditcard", selected: false, action: openBilling)
-                .accessibilityHint("Ouvre la page d’abonnement dans le navigateur")
+            row(session.accountConnected ? "Compte" : "Se connecter", icon: "person", selected: session.route == .account) { session.route = .account }
+            row("Facturation et abonnement", icon: "creditcard", selected: false) { session.route = .account }
         }
         .padding(.horizontal, 12)
         .padding(.top, 10)
@@ -68,13 +66,5 @@ struct Sidebar: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
-    private func openBilling() {
-        guard let url = MeetinSite.subscriptionURL(webWorkspaceURL) else {
-            session.route = .account
-            return
-        }
-        NSWorkspace.shared.open(url)
     }
 }
