@@ -1,6 +1,9 @@
+import HeroPreviewLoop from './hero-preview-loop';
+
 export default function Landing() {
 return <>
 
+  <HeroPreviewLoop />
   <header className="shell site-header">
     <a className="brand" href="./" aria-label="Meetin-OS, accueil">
       <img src="/meetinos.svg" alt="" width="32" height="32" />
@@ -41,7 +44,7 @@ return <>
             </div>
             <div className="segment">
               <span className="timestamp">00:18</span>
-              <p>« Finalement, Karim s’en charge mardi. »</p>
+              <p>« Finalement, <mark>Karim s’en charge mardi.</mark> »</p>
             </div>
             <div className="task">
               <div>
@@ -49,7 +52,7 @@ return <>
                 <strong>Relire le guide</strong>
                 <p className="task-meta">Karim · Mardi</p>
               </div>
-              <span className="task-state">À valider</span>
+              <span className="task-state" id="etat-apercu">À valider</span>
             </div>
           </div>
         </div>

@@ -65,7 +65,57 @@ body {
 .note { background: rgba(15, 22, 19, 0.6); }
 .workflow { background: transparent; border-color: var(--mt-line); }
 .steps li { border-color: var(--mt-line-strong); }
-h1 em { color: var(--mt-accent-text); }
+
+/* Le surligneur qui se pose : au chargement, le citron balaie "tâche validée." comme un coup de
+   feutre, une fois, puis s'arrête. C'est notre geste de marque (le moment où l'accord se fait),
+   pas un effet générique. */
+h1 em {
+  font-style: italic;
+  color: var(--mt-ink);
+  background-image: linear-gradient(var(--mt-accent), var(--mt-accent));
+  background-repeat: no-repeat;
+  background-size: 0% 100%;
+  background-position: 0 58%;
+  border-radius: 3px 9px 4px 10px / 8px 4px 9px 5px;
+  padding: 0 .06em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  animation: mtHeroSweep .68s .55s cubic-bezier(.65, 0, .35, 1) forwards;
+}
+@keyframes mtHeroSweep {
+  0%   { background-size: 0% 100%; color: var(--mt-ink); }
+  55%  { color: var(--mt-on-accent); }
+  100% { background-size: 100% 100%; color: var(--mt-on-accent); }
+}
+
+/* L'aperçu qui vit : dans la fenêtre de la landing, la réplique se surligne puis la tâche passe
+   "À valider" -> "Fiche à jour", en boucle lente (6 s). Le texte est basculé par un petit script
+   (web/app/hero-preview-loop.jsx) ; cette partie ne gère que l'apparence. */
+.segment mark {
+  background: var(--mt-accent);
+  color: var(--mt-on-accent);
+  padding: .02em .28em;
+  border-radius: 3px 9px 4px 10px / 8px 4px 9px 5px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  background-image: linear-gradient(var(--mt-accent), var(--mt-accent));
+  background-repeat: no-repeat;
+  background-position: 0 50%;
+  background-size: 0% 100%;
+  animation: mtLoopSweep 6s 1.3s ease-in-out infinite;
+}
+@keyframes mtLoopSweep {
+  0%   { background-size: 0% 100%; }
+  12%  { background-size: 100% 100%; }
+  88%  { background-size: 100% 100%; }
+  100% { background-size: 100% 100%; }
+}
+.task-state.is-done { background: var(--mt-accent); color: var(--mt-on-accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  h1 em { animation: none; background-size: 100% 100%; color: var(--mt-on-accent); }
+  .segment mark { animation: none; background-size: 100% 100%; }
+}
 
 /* Un seul citron par écran : sur la landing, « Windows » passe en contour */
 .install-actions .button + .button {
