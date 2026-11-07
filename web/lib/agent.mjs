@@ -21,17 +21,41 @@ function optionalText(value, limit) {
   return value == null || (typeof value === 'string' && !value.trim()) ? '' : input(value, limit);
 }
 
+function codeRepository(env) {
+  const repo = env.DEVIN_REPO?.trim();
+  return repo && /^[\w.-]+\/[\w.-]+$/.test(repo) ? repo : null;
+}
+
+function testBoard(env) {
+  const url = safeURL(env.HAI_COMPUTER_USE_URL?.trim());
+  if (!url) return null;
+  const board = new URL(url);
+  return board.search || board.hash ? null : url;
+}
+
+function isTrello(board) {
+  return board && ['trello.com', 'www.trello.com'].includes(new URL(board).hostname);
+}
+
+export function agentAccess(token, env = process.env) {
+  requireAccess(token, env);
+  const planning = Boolean(env.HAI_API_KEY?.trim());
+  return {
+    planning,
+    trello: Boolean(planning && isTrello(testBoard(env)) && env.HAI_BROWSER_PROFILE_ID?.trim()),
+    devin: Boolean(planning && codeRepository(env) && env.DEVIN_ORG_ID?.trim() && env.DEVIN_API_KEY?.trim()),
+  };
+}
+
 function destination(executor, env) {
   if (executor === 'devin') {
-    const repo = setting(env, 'DEVIN_REPO');
-    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) throw new ApiError(503, 'Le dépôt Devin doit être configuré côté serveur.');
+    const repo = codeRepository(env);
+    if (!repo) throw new ApiError(503, 'L’équipe doit configurer le dépôt Devin.');
     return repo;
   }
   if (executor === 'computer_use') {
-    const url = safeURL(env.HAI_COMPUTER_USE_URL?.trim());
-    if (!url || new URL(url).search || new URL(url).hash) {
-      throw new ApiError(503, 'Configure une URL HTTPS pour le tableau de test Computer Use.');
-    }
+    const url = testBoard(env);
+    if (!url) throw new ApiError(503, 'L’équipe doit configurer le tableau de test.');
     return url;
   }
   throw new ApiError(422, 'La proposition ne désigne aucun outil pris en charge.');
@@ -133,6 +157,11 @@ export async function executeTask(body, token, env = process.env, fetcher = fetc
     return result;
   }
 
+  const profile = env.HAI_BROWSER_PROFILE_ID?.trim();
+  if (isTrello(plan.destination) && !profile) {
+    throw new ApiError(503, 'L’équipe doit relier Trello avant de lancer cette tâche.', 'trello_setup');
+  }
+
   const messages = [
     `Navigue uniquement dans le tableau de test ${plan.destination}. Exécute une seule création ou modification de fiche, exactement celle confirmée dans task.`,
     'Avant toute écriture, vérifie que la cible et les champs attendus sont sans ambiguïté. Si un élément manque, si l’accès manque ou si une autre action est nécessaire, pose une question et arrête-toi.',
@@ -141,8 +170,8 @@ export async function executeTask(body, token, env = process.env, fetcher = fetc
     context,
   ].join('\n\n');
   const overrides = { 'agent.environments[kind=web].start_url': plan.destination };
-  if (env.HAI_BROWSER_PROFILE_ID?.trim()) {
-    overrides['agent.environments[kind=web].browser_profile_id'] = env.HAI_BROWSER_PROFILE_ID.trim();
+  if (profile) {
+    overrides['agent.environments[kind=web].browser_profile_id'] = profile;
   }
   const session = await provider(fetcher, 'https://agp.eu.hcompany.ai/api/v2/sessions', setting(env, 'HAI_API_KEY'), {
     agent: 'h/web-surfer-pro', messages, overrides, max_steps: 25, max_time_s: 120,

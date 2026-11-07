@@ -30,6 +30,9 @@ struct Sidebar: View {
                 .padding(.horizontal, 10)
                 .padding(.bottom, 4)
                 .accessibilityAddTraits(.isHeader)
+            row("Intégrations", icon: "puzzlepiece.extension", selected: false) {
+                session.integrationsRequest = IntegrationsRequest(page: .catalog)
+            }
             row("Paramètres", icon: "gearshape", selected: session.route == .settings) { session.route = .settings }
             row("Compte", icon: "person", selected: session.route == .account) { session.route = .account }
             row("Facturation et abonnement", icon: "creditcard", selected: false, action: openBilling)

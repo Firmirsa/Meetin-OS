@@ -75,7 +75,7 @@ struct SettingsPage: View {
                     if !session.trimmedKey.isEmpty {
                         Button("Retirer", action: removeKey).buttonStyle(.mtGhost)
                     }
-                    Link("Obtenir une clé", destination: URL(string: "https://app.gladia.io")!)
+                    Link("Obtenir une clé", destination: URL(string: "https://app.gladia.io/apikeys")!)
                         .font(.mtSans(13))
                 }
                 if !keyMessage.isEmpty {
@@ -135,27 +135,24 @@ struct AccountPage: View {
     @Bindable var session: MeetingSession
     @AppStorage("webWorkspaceURL") private var webWorkspaceURL = "http://localhost:3000"
 
-    private var addressIsValid: Bool { MeetinSite.baseURL(webWorkspaceURL) != nil }
-
     var body: some View {
         SettingsScaffold(title: "Compte", session: session) {
             SettingsSection(title: "Accès de l’équipe") {
-                Text("Meetin-OS n’a pas de compte utilisateur. L’onglet Agent et l’abonnement passent par le site de l’équipe.")
+                Text("Meetin-OS n’a pas de compte utilisateur. Le carnet et l’enregistrement restent disponibles sans accès. L’onglet Agent et l’abonnement passent par le site de l’équipe.")
                     .foregroundStyle(Color.mtInk2)
-                TextField("Adresse du site Meetin-OS", text: $webWorkspaceURL)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(session.agent.busy)
-                if !addressIsValid {
+                LabeledContent("Adresse du site", value: webWorkspaceURL).font(.mtSans(14))
+                LabeledContent("Code d’accès", value: session.agentAccess == nil ? "Non connecté" : "Validé pour cette session")
+                    .font(.mtSans(14))
+                if MeetinSite.baseURL(webWorkspaceURL) == nil {
                     Text("Utilise une adresse https, ou http sur localhost, sans chemin.")
                         .font(.mtSans(13))
                         .foregroundStyle(Color.mtWarn)
                 }
-                SecureField("Code d’accès de l’équipe", text: $session.agentAccessCode)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(session.agent.busy)
-                Text("Le code reste en mémoire pendant cette session.")
-                    .font(.mtSans(13))
-                    .foregroundStyle(Color.mtInk2)
+                Button(session.agentAccess == nil ? "Connecter l’agent" : "Gérer l’accès") {
+                    session.integrationsRequest = IntegrationsRequest(page: session.agentAccess == nil ? .agent : .catalog)
+                }
+                .buttonStyle(.mtPrimary)
+                .disabled(session.agent.busy)
             }
         }
     }

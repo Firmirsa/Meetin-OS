@@ -37,6 +37,8 @@ final class MeetingSession {
     var statusBelongsToMeeting = false
     var transcriptIncomplete = false { didSet { syncMeeting() } }
     var agentAccessCode = ""
+    var agentAccess: AgentAccess?
+    var integrationsRequest: IntegrationsRequest?
     let agent = AgentWorkspaceState()
     var status = "Prêt à enregistrer"
     var permissionHelp: AudioPermissionHelp? { didSet { noteSystemAudioPermission() } }
@@ -79,6 +81,7 @@ struct CaptureView: View {
     @Environment(\.openWindow) private var openWindow
     @Bindable var session: MeetingSession
     var isMeetingWindow = false
+    @State private var integrationsRequest: IntegrationsRequest?
     @AppStorage("webWorkspaceURL") private var webWorkspaceURL = "http://localhost:3000"
     @State private var tab: MeetingTab = .transcription
 
@@ -94,6 +97,9 @@ struct CaptureView: View {
                     Text("Meetin-OS").font(.mtSans(16, weight: .semibold))
                     Text("Réunion").font(.mtSans(12)).foregroundStyle(Color.mtInk2)
                     Spacer()
+                    Button("Intégrations", systemImage: "puzzlepiece.extension") { showIntegrations(.catalog) }
+                        .buttonStyle(.borderless)
+                        .disabled(session.agent.busy)
                     Button {
                         session.showMain(.settings, openWindow: openWindow)
                     } label: {
@@ -248,6 +254,9 @@ struct CaptureView: View {
         }
         .foregroundStyle(Color.mtInk)
         .frame(minWidth: 560, minHeight: 420)
+        .sheet(item: $integrationsRequest) { request in
+            IntegrationsView(session: session, workspaceURL: $webWorkspaceURL, request: request, transcribe: transcribe)
+        }
         .toolbar {
             if isMeetingWindow, session.recording != nil, session.capture == nil {
                 Button("Nouvel enregistrement", systemImage: "plus", action: toggleRecording)
@@ -257,15 +266,17 @@ struct CaptureView: View {
     }
 
     private var agentClient: AgentClient? {
-        let code = session.agentAccessCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let base = MeetinSite.baseURL(webWorkspaceURL), !code.isEmpty else { return nil }
-        return AgentClient(baseURL: base, accessCode: code)
+        guard session.agentAccess != nil, let base = AgentClient.serverURL(webWorkspaceURL) else { return nil }
+        return AgentClient(baseURL: base, accessCode: session.agentAccessCode)
     }
 
     private var agentPanel: some View {
-        AgentWorkspace(state: session.agent, transcript: session.transcript, client: agentClient) {
-            session.showMain(.account, openWindow: openWindow)
-        }
+        AgentWorkspace(state: session.agent, transcript: session.transcript, client: agentClient,
+                       access: session.agentAccess, showIntegrations: showIntegrations)
+    }
+
+    private func showIntegrations(_ page: IntegrationsPage) {
+        integrationsRequest = IntegrationsRequest(page: page)
     }
 
     private func toggleRecording() {
@@ -326,7 +337,7 @@ struct CaptureView: View {
     private func transcribe() {
         guard !session.busy, let recording = session.recording else { return }
         guard hasKey else {
-            session.showMain(.settings, openWindow: openWindow)
+            showIntegrations(.transcribe)
             return
         }
         session.busy = true
@@ -345,7 +356,7 @@ struct CaptureView: View {
                 session.status = "Transcription prête"
             } catch Gladia.RequestError.unauthorized {
                 session.status = Gladia.RequestError.unauthorized.localizedDescription
-                session.showMain(.settings, openWindow: openWindow)
+                showIntegrations(.transcribe)
             } catch { session.status = error.localizedDescription }
         }
     }

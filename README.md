@@ -27,7 +27,7 @@ Le script compile et signe l’application localement. À la première capture, 
 
 1. Clique sur **Enregistrer**, puis prends tes notes dans le carnet pendant l’appel.
 2. Clique sur **Arrêter**, puis sur **Écouter** pour vérifier l’enregistrement. **Voir les pistes** permet d’inspecter séparément le micro et le son du Mac.
-3. Saisis ta clé Gladia dans **Réglages**, puis clique sur **Transcrire**. L’app affiche les passages horodatés et permet de copier le texte.
+3. Clique sur **Transcrire**. Si une clé Gladia est nécessaire, l’app te la demande à ce moment. Elle affiche ensuite les passages horodatés et permet de copier le texte.
 
 Le [guide macOS](mac/README.md) détaille les permissions, les fichiers audio et la configuration de Gladia.
 
@@ -54,7 +54,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Le téléchargement est disponible sur [localhost:3000](http://localhost:3000/) et les premiers pas sur [localhost:3000/onboarding](http://localhost:3000/onboarding). Pour tester l’agent Mac, configure les intégrations côté serveur, puis saisis l’adresse du site et le code d’accès de l’équipe dans les réglages de l’app.
+Le téléchargement est disponible sur [localhost:3000/telecharger](http://localhost:3000/telecharger) et les premiers pas sur [localhost:3000/onboarding](http://localhost:3000/onboarding). Le carnet et l’enregistrement sont accessibles sans compte. Pour utiliser l’agent sur Mac, configure les intégrations côté serveur puis saisis le code de l’équipe dans **Intégrations → Connecter l’agent**.
 
 | Brique | Recette |
 |---|---|

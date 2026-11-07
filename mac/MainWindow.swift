@@ -32,8 +32,13 @@ struct MainWindow: View {
         .meetinNight()
         .onAppear { session.notebookCount += 1 }
         .onDisappear { session.notebookCount -= 1 }
-        .onChange(of: webWorkspaceURL) { session.agent.invalidateReview() }
-        .onChange(of: session.agentAccessCode) { session.agent.invalidateReview() }
+        .onOpenURL { url in
+            guard session.integrationsRequest == nil, let request = IntegrationsRequest.fromLink(url) else { return }
+            session.integrationsRequest = request
+        }
+        .sheet(item: $session.integrationsRequest) { request in
+            IntegrationsView(session: session, workspaceURL: $webWorkspaceURL, request: request, transcribe: {})
+        }
         .task(id: detectZoomMeetings) {
             session.zoomDetector = ZoomMeetingDetector()
             guard detectZoomMeetings else { return }

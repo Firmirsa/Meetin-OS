@@ -21,6 +21,10 @@ struct AgentReview: Decodable {
     let quote: String
     let clarifications: [AgentClarification]
     let approval: String
+
+    var usesTrello: Bool {
+        executor == .computerUse && ["trello.com", "www.trello.com"].contains(URL(string: destination)?.host ?? "")
+    }
 }
 
 enum AgentPreparation: Decodable {
@@ -44,10 +48,24 @@ struct AgentExecution: Decodable {
     let url: URL
 }
 
+struct AgentAccess: Decodable {
+    let planning: Bool
+    let trello: Bool
+    let devin: Bool
+}
+
 struct AgentClient {
     struct Failure: LocalizedError {
         let message: String
-        init(_ message: String) { self.message = message }
+        let status: Int?
+        let code: String?
+
+        init(_ message: String, status: Int? = nil, code: String? = nil) {
+            self.message = message
+            self.status = status
+            self.code = code
+        }
+
         var errorDescription: String? { message }
     }
 
@@ -62,7 +80,10 @@ struct AgentClient {
         let confirmed = true
     }
 
-    private struct ErrorResponse: Decodable { let error: String }
+    private struct ErrorResponse: Decodable {
+        let error: String
+        let code: String?
+    }
 
     private final class NoRedirects: NSObject, URLSessionTaskDelegate {
         func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
@@ -75,6 +96,19 @@ struct AgentClient {
     let baseURL: URL
     let accessCode: String
     var session: URLSession = Self.session
+
+    static func serverURL(_ address: String) -> URL? {
+        guard let base = URL(string: address.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let host = base.host, !host.isEmpty, base.user == nil, base.password == nil,
+              base.query == nil, base.fragment == nil, base.path.isEmpty || base.path == "/",
+              base.scheme == "https" || (base.scheme == "http" && ["localhost", "127.0.0.1"].contains(host))
+        else { return nil }
+        return base
+    }
+
+    func access() async throws -> AgentAccess {
+        try await post("agent-access", [String: String]())
+    }
 
     func prepare(task: String, transcript: String, clarifications: [AgentClarification]) async throws -> AgentPreparation {
         try await post("agent-prepare", Preparation(task: task, transcript: transcript, clarifications: clarifications))
@@ -98,8 +132,9 @@ struct AgentClient {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw Failure("Réponse de l’agent indisponible.") }
         guard (200..<300).contains(http.statusCode) else {
-            let message = (try? JSONDecoder().decode(ErrorResponse.self, from: data))?.error
-            throw Failure(message ?? "L’agent n’a pas confirmé la requête (HTTP \(http.statusCode)).")
+            let problem = try? JSONDecoder().decode(ErrorResponse.self, from: data)
+            throw Failure(problem?.error ?? "L’agent n’a pas confirmé la requête (HTTP \(http.statusCode)).",
+                          status: http.statusCode, code: problem?.code)
         }
         do { return try JSONDecoder().decode(Result.self, from: data) }
         catch { throw Failure("Réponse de l’agent illisible.") }

@@ -117,6 +117,12 @@ h1, h2 { font-family: var(--mt-font-serif); }
 .onboarding { padding-block: 32px 64px; }
 .onboarding nav { margin-bottom: 35px; }
 .onboarding h1 { font-size: clamp(3rem, 7vw, 5.4rem); }
+.onboarding-options { margin-top: 36px; padding: 24px; max-width: 560px; }
+.onboarding-options h2 { font-size: 2rem; }
+.onboarding-options p, .onboarding-tools span { color: var(--mt-ink-2); }
+.onboarding-options .onboarding-help { margin-bottom: 0; font-size: .875rem; }
+.onboarding-tools { display: grid; gap: 8px; list-style: none; padding: 0; margin: 18px 0; }
+.onboarding-tools li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; }
 .checkout { margin-top: 36px; padding: 24px; max-width: 560px; }
 .checkout h2 { font-size: 2rem; margin: 8px 0 16px; }
 .checkout form { display: grid; gap: 16px; justify-items: start; }
