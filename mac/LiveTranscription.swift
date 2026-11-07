@@ -272,11 +272,13 @@ actor GladiaLiveSession {
             serverClosed = false
             let receiver = Task { try await self.receiveAll(from: current) }
             do {
+                var announced = false
                 if let chunk = unsent {
                     try await current.send(chunk)
                     unsent = nil
+                    announced = true
+                    await events(.connected)
                 }
-                var announced = false
                 while let chunk = await iterator.next() {
                     unsent = chunk
                     try await current.send(chunk)
@@ -385,11 +387,19 @@ final class LiveTranscription {
     let transcript = LiveTranscript()
     private(set) var state: State = .connecting
     private(set) var lostAudio = false
+    // Vrai si le texte peut manquer une partie de l'appel : panne, audio perdu ou derniers textes non reçus.
+    private(set) var isIncomplete = false
+    // Appelé une fois par panne durable.
+    @ObservationIgnored var onProblem: ((String) -> Void)?
 
     @ObservationIgnored private let createSession: @Sendable () async throws -> URL
     @ObservationIgnored private let connect: @Sendable (URL) -> LiveSocket
     @ObservationIgnored private let retryDelay: Double
     @ObservationIgnored private let finishTimeout: Double
+    @ObservationIgnored private let outageAlertDelay: Double
+    @ObservationIgnored private var outageAlert: Task<Void, Never>?
+    @ObservationIgnored private var alerted = false
+    @ObservationIgnored private var finishing = false
     @ObservationIgnored private var trackStates: [AudioTrack: State] = [:]
     @ObservationIgnored private var sessions: [GladiaLiveSession] = []
     @ObservationIgnored private var finishedCount = 0
@@ -405,11 +415,13 @@ final class LiveTranscription {
     init(
         retryDelay: Double = 1,
         finishTimeout: Double = 8,
+        outageAlertDelay: Double = 30,
         createSession: @escaping @Sendable () async throws -> URL,
         connect: @escaping @Sendable (URL) -> LiveSocket
     ) {
         self.retryDelay = retryDelay
         self.finishTimeout = finishTimeout
+        self.outageAlertDelay = outageAlertDelay
         self.createSession = createSession
         self.connect = connect
         for track in AudioTrack.allCases {
@@ -418,7 +430,10 @@ final class LiveTranscription {
                     Task { @MainActor in self?.transcript.noteFirstAudio(track, at: seconds) }
                 },
                 onDrop: { [weak self] in
-                    Task { @MainActor in self?.lostAudio = true }
+                    Task { @MainActor in
+                        self?.lostAudio = true
+                        self?.isIncomplete = true
+                    }
                 }
             )
         }
@@ -445,11 +460,14 @@ final class LiveTranscription {
 
     // Envoie la fin de l'audio et attend les derniers textes, sans jamais dépasser le délai.
     func finish() async {
+        finishing = true
+        outageAlert?.cancel()
         for pipe in pipes.values { pipe.finish() }
         let deadline = Date().addingTimeInterval(finishTimeout)
         while finishedCount < sessions.count, Date() < deadline {
             try? await Task.sleep(for: .milliseconds(100))
         }
+        if finishedCount < sessions.count { isIncomplete = true }
         for session in sessions { await session.abort() }
     }
 
@@ -475,6 +493,7 @@ final class LiveTranscription {
     private func update(_ value: State, track: AudioTrack) {
         trackStates[track] = value
         let states = Array(trackStates.values)
+        reportProblems(states)
         if states.contains(.unauthorized) {
             state = .unauthorized
         } else if states.contains(.reconnecting) {
@@ -486,5 +505,40 @@ final class LiveTranscription {
         } else if let failure = states.first(where: { if case .failed = $0 { true } else { false } }) {
             state = failure
         }
+    }
+
+    private func reportProblems(_ states: [State]) {
+        guard !finishing else { return }
+        // Une piste définitivement perdue compte même si l'autre continue.
+        if states.contains(.unauthorized) {
+            isIncomplete = true
+            alert("Gladia a refusé la clé. L’enregistrement continue.")
+        } else if states.contains(where: { if case .failed = $0 { true } else { false } }) {
+            isIncomplete = true
+            alert("Le direct n’a pas pu démarrer. L’enregistrement continue.")
+        } else if states.contains(.ended) {
+            isIncomplete = true
+            alert("Le direct s’est arrêté. L’enregistrement continue.")
+        } else if states.contains(.reconnecting) {
+            guard outageAlert == nil else { return }
+            let delay = outageAlertDelay
+            outageAlert = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(delay))
+                guard !Task.isCancelled, let self, !self.finishing else { return }
+                self.isIncomplete = true
+                self.alert("Le direct est coupé depuis \(Int(delay)) s. L’enregistrement continue.")
+            }
+        } else {
+            // Tout est reparti : une prochaine panne pourra de nouveau prévenir.
+            outageAlert?.cancel()
+            outageAlert = nil
+            alerted = false
+        }
+    }
+
+    private func alert(_ message: String) {
+        guard !alerted else { return }
+        alerted = true
+        onProblem?(message)
     }
 }

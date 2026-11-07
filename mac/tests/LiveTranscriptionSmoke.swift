@@ -160,8 +160,11 @@ struct LiveTranscriptionSmoke {
 
         // Clé refusée et panne d'ouverture : état signalé, aucun blocage
         let refused = LiveTranscription(createSession: { throw Gladia.RequestError.unauthorized }, connect: { _ in FakeSocket() })
+        var refusedAlerts: [String] = []
+        refused.onProblem = { refusedAlerts.append($0) }
         refused.start()
         await waitUntil("clé refusée") { refused.state == .unauthorized }
+        await waitUntil("une alerte par panne") { refusedAlerts.count == 1 && refused.isIncomplete }
         await refused.finish()
 
         let down = LiveTranscription(createSession: { throw URLError(.notConnectedToInternet) }, connect: { _ in FakeSocket() })
@@ -169,6 +172,39 @@ struct LiveTranscriptionSmoke {
         await waitUntil("panne") { if case .failed = down.state { true } else { false } }
         await down.finish()
         precondition(down.transcript.finalText.isEmpty, "rien à écrire si le direct n'a rien reçu")
+
+        // Coupure courte : ni alerte ni texte incomplet. Coupure durable : une seule alerte.
+        func outage(healsAfter failures: Int, delay: Double) -> LiveTranscription {
+            let count = Mutex(0)
+            return LiveTranscription(retryDelay: 0.05, outageAlertDelay: delay, createSession: { url }, connect: { _ in
+                let attempt = count.withLock { value -> Int in value += 1; return value }
+                return FakeSocket(failSends: attempt <= failures)
+            })
+        }
+        func pump(_ live: LiveTranscription) {
+            for track in AudioTrack.allCases {
+                live.feed(track, tone(rate: 48_000, channels: 1, frames: 9_600), hostTime: mach_absolute_time())
+            }
+        }
+        var alerts: [String] = []
+        let brief = outage(healsAfter: 1, delay: 5)
+        brief.onProblem = { alerts.append($0) }
+        brief.start()
+        pump(brief)
+        await waitUntil("reprise rapide") { brief.state == .live }
+        try? await Task.sleep(for: .milliseconds(200))
+        pump(brief)
+        await brief.finish()
+        precondition(alerts.isEmpty && !brief.isIncomplete, "coupure courte silencieuse")
+
+        let lasting = outage(healsAfter: 10_000, delay: 0.1)
+        lasting.onProblem = { alerts.append($0) }
+        lasting.start()
+        pump(lasting)
+        await waitUntil("alerte de coupure") { alerts.count == 1 }
+        try? await Task.sleep(for: .milliseconds(300))
+        precondition(alerts.count == 1 && lasting.isIncomplete, "une seule alerte par panne")
+        await lasting.finish()
 
         print("Transcription en direct : tests réussis")
     }

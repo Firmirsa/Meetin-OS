@@ -35,6 +35,7 @@ final class MeetingSession {
     var key = ProcessInfo.processInfo.environment["GLADIA_API_KEY"] ?? GladiaKeyStore.load() ?? ""
     var live: LiveTranscription?
     var statusBelongsToMeeting = false
+    var transcriptIncomplete = false { didSet { syncMeeting() } }
     var agentAccessCode = ""
     let agent = AgentWorkspaceState()
     var status = "Prêt à enregistrer"
@@ -340,6 +341,7 @@ struct CaptureView: View {
                 } else {
                     session.transcript = try await gladia.transcribe(recording)
                 }
+                session.transcriptIncomplete = false
                 session.status = "Transcription prête"
             } catch Gladia.RequestError.unauthorized {
                 session.status = Gladia.RequestError.unauthorized.localizedDescription

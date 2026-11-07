@@ -18,6 +18,7 @@ struct MeetingRecord: Codable, Identifiable, Hashable {
     var notes: String
     var tracks: StoredTracks?
     var source: String?
+    var transcriptIncomplete: Bool?
 }
 
 // Historique local : Application Support/Meetin-OS/meetings.json et un dossier audio par réunion.

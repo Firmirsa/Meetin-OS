@@ -34,7 +34,10 @@ extension MeetingSession {
 
     func makeLive() -> LiveTranscription? {
         guard liveTranscriptionEnabled, !trimmedKey.isEmpty else { return nil }
-        return LiveTranscription(key: trimmedKey)
+        LiveAlerts.requestPermission()
+        let live = LiveTranscription(key: trimmedKey)
+        live.onProblem = { LiveAlerts.post($0) }
+        return live
     }
 
     // Le texte du direct devient la transcription, avant l'ajout de la réunion à l'historique.
@@ -43,7 +46,10 @@ extension MeetingSession {
         status = "Finalisation de la transcription…"
         await live.finish()
         let text = live.transcript.finalText
-        if !text.isEmpty { transcript = text }
+        if !text.isEmpty {
+            transcript = text
+            transcriptIncomplete = live.isIncomplete
+        }
         self.live = nil
     }
 
@@ -54,6 +60,7 @@ extension MeetingSession {
         }
         startedAt = Date()
         startedInZoom = zoomDetector.inMeeting
+        transcriptIncomplete = false
         route = .home
     }
 
@@ -96,7 +103,8 @@ extension MeetingSession {
                     microphoneOffset: $0.microphoneOffset, systemOffset: $0.systemOffset
                 )
             },
-            source: startedInZoom ? "Zoom" : nil
+            source: startedInZoom ? "Zoom" : nil,
+            transcriptIncomplete: transcriptIncomplete ? true : nil
         ))
         meetingID = id
         startedAt = nil
@@ -111,6 +119,7 @@ extension MeetingSession {
         store.update(meetingID) {
             if !transcript.isEmpty { $0.transcript = transcript }
             $0.notes = notes
+            $0.transcriptIncomplete = transcriptIncomplete ? true : nil
         }
     }
 
@@ -136,6 +145,7 @@ extension MeetingSession {
         }
         transcript = record.transcript
         notes = record.notes
+        transcriptIncomplete = record.transcriptIncomplete == true
         agent.newRecording()
         permissionHelp = nil
         status = FileManager.default.fileExists(atPath: record.audioPath)
@@ -170,7 +180,8 @@ extension MeetingSession {
             transcript: "",
             notes: "",
             tracks: nil,
-            source: nil
+            source: nil,
+            transcriptIncomplete: nil
         )
         store.add(record)
         open(record)

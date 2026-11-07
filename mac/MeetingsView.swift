@@ -28,6 +28,11 @@ private struct MeetingRow: View {
             .joined(separator: " · ")
     }
 
+    private var statusText: String {
+        if record.transcript.isEmpty { return "À transcrire" }
+        return record.transcriptIncomplete == true ? "Incomplète" : "Transcrite"
+    }
+
     var body: some View {
         Button(action: open) {
             HStack(spacing: 16) {
@@ -36,10 +41,7 @@ private struct MeetingRow: View {
                     Text(meta).font(.mtSans(12)).foregroundStyle(Color.mtInk2).lineLimit(1)
                 }
                 Spacer(minLength: 12)
-                MTPill(
-                    text: record.transcript.isEmpty ? "À transcrire" : "Transcrite",
-                    kind: record.transcript.isEmpty ? .run : .wait
-                )
+                MTPill(text: statusText, kind: record.transcript.isEmpty || record.transcriptIncomplete == true ? .run : .wait)
                 Text(MeetingFormat.duration(record.duration))
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundStyle(Color.mtInk2)
@@ -172,6 +174,11 @@ struct MeetingDetailView: View {
                     ].compactMap { $0 }.joined(separator: " · "))
                     .font(.mtSans(13))
                     .foregroundStyle(Color.mtInk2)
+                    if meeting.transcriptIncomplete == true {
+                        Text("Transcription incomplète : le direct a été interrompu. « Transcrire » reprend tout l’appel depuis le fichier.")
+                            .font(.mtSans(13))
+                            .foregroundStyle(Color.mtWarn)
+                    }
                 }
             }
             .frame(maxWidth: 620, alignment: .leading)

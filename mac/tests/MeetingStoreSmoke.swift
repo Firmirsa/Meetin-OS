@@ -10,7 +10,7 @@ struct MeetingStoreSmoke {
         func record(_ title: String, secondsAgo: TimeInterval) -> MeetingRecord {
             MeetingRecord(
                 id: UUID(), title: title, date: Date(timeIntervalSinceNow: -secondsAgo), duration: 60,
-                audioPath: "/tmp/\(title).m4a", transcript: "", notes: "", tracks: nil, source: nil
+                audioPath: "/tmp/\(title).m4a", transcript: "", notes: "", tracks: nil, source: nil, transcriptIncomplete: nil
             )
         }
 
