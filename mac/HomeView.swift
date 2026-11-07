@@ -100,7 +100,19 @@ struct HomeView: View {
         HStack(spacing: 18) {
             statusDot(microphoneText, microphoneColor)
             statusDot(systemAudioText, systemAudioColor)
-            statusDot(hasKey ? "Clé Gladia renseignée" : "Clé Gladia manquante", hasKey ? .mtAccent : .mtWarn)
+            if hasKey {
+                statusDot("Clé Gladia enregistrée", .mtAccent)
+            } else {
+                Button { session.route = .settings } label: {
+                    HStack(spacing: 7) {
+                        Circle().fill(Color.mtWarn).frame(width: 7, height: 7).accessibilityHidden(true)
+                        Text("Ajouter la clé Gladia").font(.mtSans(13)).underline().foregroundStyle(Color.mtInk)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Ouvre les paramètres")
+            }
         }
     }
 
@@ -161,7 +173,7 @@ struct HomeView: View {
 
     private var actionBar: some View {
         VStack(spacing: 10) {
-            if session.status != "Prêt à enregistrer" {
+            if session.status != "Prêt à enregistrer", !session.statusBelongsToMeeting {
                 HStack(spacing: 7) {
                     if session.busy { ProgressView().controlSize(.small) }
                     Text(session.status)

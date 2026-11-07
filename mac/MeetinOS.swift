@@ -32,7 +32,9 @@ final class MeetingSession {
     var recording: URL?
     var recordedTracks: AudioCapture.Tracks?
     var busy = false
-    var key = ProcessInfo.processInfo.environment["GLADIA_API_KEY"] ?? ""
+    var key = ProcessInfo.processInfo.environment["GLADIA_API_KEY"] ?? GladiaKeyStore.load() ?? ""
+    var live: LiveTranscription?
+    var statusBelongsToMeeting = false
     var agentAccessCode = ""
     let agent = AgentWorkspaceState()
     var status = "Prêt à enregistrer"
@@ -154,8 +156,14 @@ struct CaptureView: View {
                         .padding(10)
                         .background(Color.mtSurface, in: RoundedRectangle(cornerRadius: MTRadius.card))
 
-                        if isMeetingWindow && session.transcript.isEmpty {
-                            Text("La transcription sera disponible après l’arrêt de l’enregistrement et l’envoi à Gladia.")
+                        if let live = session.live {
+                            Rectangle().fill(Color.mtLine).frame(height: 1)
+                            Text("Transcription").font(.headline).accessibilityAddTraits(.isHeader)
+                            LiveTranscriptPanel(live: live) {
+                                session.showMain(.settings, openWindow: openWindow)
+                            }
+                        } else if isMeetingWindow && session.transcript.isEmpty {
+                            Text(session.liveWaitingMessage)
                                 .foregroundStyle(Color.mtInk2)
                         }
                         if !session.transcript.isEmpty {
@@ -272,7 +280,14 @@ struct CaptureView: View {
                 if let current = session.capture {
                     defer { session.capture = nil }
                     session.status = "Préparation du fichier audio…"
-                    let result = try await current.stop()
+                    let result: (mix: URL, tracks: AudioCapture.Tracks?, help: AudioPermissionHelp?)
+                    do {
+                        result = try await current.stop()
+                    } catch {
+                        await session.finishLive()
+                        throw error
+                    }
+                    await session.finishLive()
                     session.recording = result.mix
                     session.recordedTracks = result.tracks
                     session.permissionHelp = result.help
@@ -281,6 +296,11 @@ struct CaptureView: View {
                     await session.meetingDidStop()
                 } else {
                     let next = AudioCapture()
+                    let live = session.makeLive()
+                    if let live {
+                        next.onAudio = { track, buffer, hostTime in live.feed(track, buffer, hostTime: hostTime) }
+                    }
+                    session.statusBelongsToMeeting = false
                     session.permissionHelp = nil
                     session.status = "Vérification des autorisations…"
                     try await next.start()
@@ -290,6 +310,8 @@ struct CaptureView: View {
                     session.transcript = ""
                     session.agent.newRecording()
                     session.capture = next
+                    session.live = live
+                    live?.start()
                     session.status = "Enregistrement en cours"
                     openWindow(id: "meeting")
                 }

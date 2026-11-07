@@ -19,12 +19,14 @@ Le script construit et signe localement l’application. Au premier enregistreme
 
 1. Lancez un appel de test avec un autre participant. Sur l’**Accueil**, cliquez sur **Commencer à enregistrer** (⌘R), faites parler chaque personne à tour de rôle, puis cliquez sur **Arrêter**.
 2. Cliquez sur **Écouter** pour vérifier les deux voix. **Voir les pistes** révèle le dossier de la réunion contenant le mix et les deux pistes séparées.
-3. Ouvrez **Paramètres** pour saisir une clé Gladia, puis cliquez sur **Transcrire** pour envoyer les pistes micro et appel séparément. Le texte indique la piste source et l’horodatage de chaque passage. Un M4A importé est traité comme un fichier unique. Si aucune clé n’est configurée, le bouton ouvre les paramètres. La clé reste en mémoire pour cette session et peut aussi être fournie par la variable d’environnement `GLADIA_API_KEY` si le binaire est lancé depuis le terminal.
+3. Ouvrez **Paramètres** pour saisir une clé Gladia, puis cliquez sur **Transcrire** pour envoyer les pistes micro et appel séparément. Le texte indique la piste source et l’horodatage de chaque passage. Un M4A importé est traité comme un fichier unique. Si aucune clé n’est configurée, le bouton ouvre les paramètres. La clé s’ajoute avec **Enregistrer la clé** et reste dans le trousseau de ce Mac. La variable d’environnement `GLADIA_API_KEY` a la priorité si le binaire est lancé depuis le terminal. Une version signée localement peut demander l’accès au trousseau après chaque compilation.
 4. Dans l’onglet **Agent**, insère et ajuste l’extrait de transcription ou saisis une demande. Clique sur **Préparer la tâche**, réponds à la question éventuelle, puis relis l’action et sa destination avant de confirmer. Le lien de session s’affiche quand Devin ou H Computer Use accepte le lancement.
 
 Pour activer l’agent, renseigne l’**Adresse du site Meetin-OS** et le **Code d’accès de l’équipe** dans **Compte**. **Facturation et abonnement** ouvre `/onboarding#subscription` sur cette adresse. En local, l’adresse par défaut est `http://localhost:3000`. Pour la démo, utilise l’adresse HTTPS de l’équipe. Le code correspond à `MEETIN_DEMO_TOKEN` côté serveur et reste en mémoire pendant la session. Les clés de Devin et H Company restent sur le serveur, comme décrit dans le [guide Next.js](../web/README.md).
 
 L’historique est conservé sur ce Mac dans `~/Library/Application Support/Meetin-OS` : `meetings.json` (titre, date, durée, chemin audio, transcription, notes) et un dossier audio par réunion dans `recordings/`. Il se remplit à l’arrêt de l’enregistrement et après la transcription. Pour reprendre un essai, rouvre la réunion depuis **Réunions**. Pour un fichier externe, utilise **Ouvrir un enregistrement** sur cette page et choisis un M4A. Si Gladia refuse la clé, les paramètres se rouvrent et le fichier reste prêt pour une nouvelle tentative.
+
+**Transcription en direct** : avec une clé Gladia et l’option activée dans **Paramètres**, le texte s’écrit pendant l’appel dans la fenêtre de réunion. L’audio est alors envoyé en continu à Gladia, une session par piste. À l’arrêt, ce texte devient la transcription de la réunion, et **Transcrire** le remplace par la version différée. Si le direct échoue, l’enregistrement continue.
 
 Au démarrage de la capture, Meetin-OS ouvre une fenêtre dédiée avec les onglets **Transcription** et **Agent**. Le bouton **Afficher la réunion** permet de rouvrir la fenêtre pendant un appel détecté ou un enregistrement. À la fin de la réunion, la fenêtre principale ouvre sa fiche. Tu peux y transcrire le fichier, relire le texte et préparer la tâche. Un fichier importé s’ouvre de la même façon.
 
@@ -47,6 +49,14 @@ Le test de l’historique local s’exécute sans audio :
 swiftc -parse-as-library -target "$(uname -m)-apple-macos15.0" \
   mac/MeetingStore.swift mac/MeetinSite.swift mac/tests/MeetingStoreSmoke.swift -o mac/.build/store-smoke
 mac/.build/store-smoke
+```
+
+Le test du direct utilise une connexion simulée :
+
+```sh
+swiftc -parse-as-library -target "$(uname -m)-apple-macos15.0" \
+  mac/Capture.swift mac/Gladia.swift mac/LiveTranscription.swift mac/tests/LiveTranscriptionSmoke.swift -o mac/.build/live-smoke
+mac/.build/live-smoke
 ```
 
 ## Régénérer l’installateur du site

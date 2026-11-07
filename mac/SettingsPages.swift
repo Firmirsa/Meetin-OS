@@ -45,14 +45,48 @@ private struct SettingsSection<Content: View>: View {
 struct SettingsPage: View {
     @Bindable var session: MeetingSession
     @AppStorage("detectZoomMeetings") private var detectZoomMeetings = false
+    @AppStorage(MeetingSession.liveTranscriptionKey) private var liveTranscription = true
+    @State private var draftKey = ""
+    @State private var keyMessage = ""
+
+    private var trimmedDraft: String { draftKey.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
         SettingsScaffold(title: "Paramètres", session: session) {
             SettingsSection(title: "Transcription") {
-                Text("Meetin-OS utilise Gladia pour transcrire l’audio. La clé sert uniquement pendant cette session.")
+                HStack {
+                    Text("Clé API Gladia").font(.mtSans(14, weight: .medium))
+                    Spacer()
+                    MTPill(
+                        text: session.trimmedKey.isEmpty ? "Aucune clé" : "Clé enregistrée",
+                        kind: session.trimmedKey.isEmpty ? .wait : .ok
+                    )
+                }
+                Text("Meetin-OS utilise Gladia pour transcrire l’audio. La clé est gardée dans le trousseau de ce Mac.")
                     .foregroundStyle(Color.mtInk2)
-                SecureField("Clé API Gladia", text: $session.key)
+                SecureField(session.trimmedKey.isEmpty ? "Colle ta clé ici" : "Colle une nouvelle clé pour la remplacer", text: $draftKey)
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Clé API Gladia")
+                    .onSubmit(saveKey)
+                HStack(spacing: 10) {
+                    Button("Enregistrer la clé", action: saveKey)
+                        .buttonStyle(.mtPrimary)
+                        .disabled(trimmedDraft.isEmpty)
+                    if !session.trimmedKey.isEmpty {
+                        Button("Retirer", action: removeKey).buttonStyle(.mtGhost)
+                    }
+                    Link("Obtenir une clé", destination: URL(string: "https://app.gladia.io")!)
+                        .font(.mtSans(13))
+                }
+                if !keyMessage.isEmpty {
+                    Text(keyMessage).font(.mtSans(13)).foregroundStyle(Color.mtInk2)
+                }
+                Rectangle().fill(Color.mtLine).frame(height: 1)
+                Toggle("Transcription en direct pendant l’enregistrement", isOn: $liveTranscription)
+                    .tint(Color.mtControlTint)
+                Text("L’audio est envoyé en continu à Gladia pendant l’enregistrement.")
+                    .font(.mtSans(13))
+                    .foregroundStyle(Color.mtInk2)
             }
             SettingsSection(title: "Autorisations audio") {
                 Text("Au premier enregistrement, macOS peut demander l’accès au micro et à l’audio du système.")
@@ -78,6 +112,22 @@ struct SettingsPage: View {
                 }
             }
         }
+    }
+}
+
+private extension SettingsPage {
+    func saveKey() {
+        guard !trimmedDraft.isEmpty else { return }
+        session.key = trimmedDraft
+        keyMessage = GladiaKeyStore.save(trimmedDraft)
+            ? "Clé enregistrée. Gladia la vérifiera à la première transcription."
+            : "Trousseau indisponible : la clé servira uniquement jusqu’à la fermeture de l’app."
+        draftKey = ""
+    }
+
+    func removeKey() {
+        session.key = ""
+        keyMessage = GladiaKeyStore.delete() ? "Clé retirée de ce Mac." : "Impossible de retirer la clé du trousseau."
     }
 }
 

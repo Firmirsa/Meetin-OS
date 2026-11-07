@@ -17,6 +17,36 @@ extension MeetingSession {
         NSApp.windows.first { $0.identifier?.rawValue.hasPrefix("notebook") == true }?.makeKeyAndOrderFront(nil)
     }
 
+    static let liveTranscriptionKey = "liveTranscription"
+
+    var liveTranscriptionEnabled: Bool {
+        UserDefaults.standard.object(forKey: Self.liveTranscriptionKey) as? Bool ?? true
+    }
+
+    var trimmedKey: String { key.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    var liveWaitingMessage: String {
+        if liveTranscriptionEnabled, trimmedKey.isEmpty {
+            return "Ajoute une clé Gladia dans Paramètres pour le direct. L’enregistrement continue."
+        }
+        return "La transcription sera disponible après l’arrêt de l’enregistrement et l’envoi à Gladia."
+    }
+
+    func makeLive() -> LiveTranscription? {
+        guard liveTranscriptionEnabled, !trimmedKey.isEmpty else { return nil }
+        return LiveTranscription(key: trimmedKey)
+    }
+
+    // Le texte du direct devient la transcription, avant l'ajout de la réunion à l'historique.
+    func finishLive() async {
+        guard let live else { return }
+        status = "Finalisation de la transcription…"
+        await live.finish()
+        let text = live.transcript.finalText
+        if !text.isEmpty { transcript = text }
+        self.live = nil
+    }
+
     func meetingDidStart() {
         if meetingID != nil {
             meetingID = nil
@@ -70,6 +100,7 @@ extension MeetingSession {
         ))
         meetingID = id
         startedAt = nil
+        statusBelongsToMeeting = true
         route = .meetingDetail
         reportStoreError()
     }
@@ -111,6 +142,7 @@ extension MeetingSession {
             ? (record.transcript.isEmpty ? "Enregistrement prêt" : "Transcription prête")
             : "Fichier audio introuvable : \(record.audioPath)"
         meetingID = record.id
+        statusBelongsToMeeting = true
         route = .meetingDetail
     }
 
