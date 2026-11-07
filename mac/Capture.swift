@@ -33,7 +33,15 @@ enum AudioPermissionHelp: LocalizedError {
     }
 }
 
+enum AudioTrack: String, CaseIterable, Hashable, Sendable {
+    case microphone, system
+
+    var label: String { self == .microphone ? "Micro" : "Audio de l’appel" }
+}
+
 final class AudioCapture {
+    // Copie de l'audio pour le direct, à renseigner avant start(). Ne doit jamais bloquer.
+    var onAudio: ((AudioTrack, AVAudioPCMBuffer, UInt64) -> Void)?
     private let engine = AVAudioEngine()
     private var inputTapInstalled = false
     private var systemTap: SystemAudioTap?
@@ -68,9 +76,15 @@ final class AudioCapture {
         micWriter = mic
         systemWriter = call
         do {
-            try tap.start { buffer, time in call.append(buffer, hostTime: time) }
+            let listener = onAudio
+            try tap.start { buffer, time in
+                call.append(buffer, hostTime: time)
+                listener?(.system, buffer, time)
+            }
             input.installTap(onBus: 0, bufferSize: 2048, format: format) { buffer, time in
-                mic.append(buffer, hostTime: time.isHostTimeValid ? time.hostTime : mach_absolute_time())
+                let hostTime = time.isHostTimeValid ? time.hostTime : mach_absolute_time()
+                mic.append(buffer, hostTime: hostTime)
+                listener?(.microphone, buffer, hostTime)
             }
             inputTapInstalled = true
             try engine.start()

@@ -74,7 +74,7 @@ struct Gladia {
         return lines.joined(separator: "\n")
     }
 
-    private static func line(at start: Double, label: String, text: String) -> String {
+    static func line(at start: Double, label: String, text: String) -> String {
         let seconds = Int(start.isFinite ? min(max(0, start), 86_400) : 0)
         let time = String(format: "%02d:%02d", seconds / 60, seconds % 60)
         return "[\(time)] \(label) · \(text)"

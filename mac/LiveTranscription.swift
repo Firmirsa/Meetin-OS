@@ -1,0 +1,490 @@
+import AVFoundation
+import Foundation
+
+// Transcription en direct : flux parallèle à l'enregistrement.
+// Une panne ici ne touche jamais les fichiers audio, et « Transcrire » reste disponible.
+
+// MARK: - Conversion audio
+
+// PCM 16 kHz, mono, 16 bits, le format annoncé à Gladia.
+final class LiveAudioConverter {
+    static let output = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16_000, channels: 1, interleaved: true)!
+
+    private var converter: AVAudioConverter?
+    private var input: AVAudioFormat?
+
+    func convert(_ buffer: AVAudioPCMBuffer) -> Data? {
+        guard buffer.frameLength > 0 else { return nil }
+        if input != buffer.format {
+            converter = AVAudioConverter(from: buffer.format, to: Self.output)
+            converter?.downmix = true
+            input = buffer.format
+        }
+        guard let converter else { return nil }
+        let ratio = Self.output.sampleRate / buffer.format.sampleRate
+        let capacity = AVAudioFrameCount((Double(buffer.frameLength) * ratio).rounded(.up)) + 1_024
+        guard let result = AVAudioPCMBuffer(pcmFormat: Self.output, frameCapacity: capacity) else { return nil }
+        var supplied = false
+        var failure: NSError?
+        let status = converter.convert(to: result, error: &failure) { _, state in
+            if supplied {
+                state.pointee = .noDataNow
+                return nil
+            }
+            supplied = true
+            state.pointee = .haveData
+            return buffer
+        }
+        guard status != .error, failure == nil, result.frameLength > 0, let samples = result.int16ChannelData else { return nil }
+        return Data(bytes: samples[0], count: Int(result.frameLength) * MemoryLayout<Int16>.size)
+    }
+
+    // Le tampon de l'audio système n'est valable que pendant l'appel : on le copie avant de changer de file.
+    static func copy(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
+        guard let copy = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: buffer.frameLength) else { return nil }
+        copy.frameLength = buffer.frameLength
+        let source = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
+        let target = UnsafeMutableAudioBufferListPointer(copy.mutableAudioBufferList)
+        guard source.count == target.count else { return nil }
+        for index in source.indices {
+            guard let from = source[index].mData, let to = target[index].mData else { return nil }
+            let size = min(source[index].mDataByteSize, target[index].mDataByteSize)
+            memcpy(to, from, Int(size))
+            target[index].mDataByteSize = size
+        }
+        return copy
+    }
+}
+
+// Reçoit l'audio d'une piste, le convertit sur sa propre file et le regroupe par tranches de 100 ms.
+final class LiveAudioPipe: @unchecked Sendable {
+    // 600 tranches de 100 ms : au-delà de 60 s de coupure, le plus ancien est abandonné.
+    static let maxChunks = 600
+    private static let chunkBytes = 3_200
+
+    let stream: AsyncStream<Data>
+    private let continuation: AsyncStream<Data>.Continuation
+    private let queue = DispatchQueue(label: "MeetinOS.live.audio")
+    private let converter = LiveAudioConverter()
+    private var pending = Data()
+    private var sawFirstBuffer = false
+    private let onFirstBuffer: @Sendable (Double) -> Void
+    private let onDrop: @Sendable () -> Void
+
+    init(onFirstBuffer: @escaping @Sendable (Double) -> Void, onDrop: @escaping @Sendable () -> Void) {
+        (stream, continuation) = AsyncStream.makeStream(of: Data.self, bufferingPolicy: .bufferingNewest(Self.maxChunks))
+        self.onFirstBuffer = onFirstBuffer
+        self.onDrop = onDrop
+    }
+
+    func feed(_ buffer: AVAudioPCMBuffer, hostTime: UInt64) {
+        guard let copy = LiveAudioConverter.copy(buffer) else { return }
+        let seconds = AVAudioTime.seconds(forHostTime: hostTime)
+        queue.async { [self] in
+            if !sawFirstBuffer {
+                sawFirstBuffer = true
+                onFirstBuffer(seconds)
+            }
+            guard let data = converter.convert(copy) else { return }
+            pending.append(data)
+            guard pending.count >= Self.chunkBytes else { return }
+            yield(pending)
+            pending = Data()
+        }
+    }
+
+    func finish() {
+        queue.sync {
+            if !pending.isEmpty { yield(pending) }
+            pending = Data()
+            continuation.finish()
+        }
+    }
+
+    private func yield(_ data: Data) {
+        if case .dropped = continuation.yield(data) { onDrop() }
+    }
+}
+
+// MARK: - Connexion
+
+protocol LiveSocket: AnyObject, Sendable {
+    func send(_ data: Data) async throws
+    func send(text: String) async throws
+    // nil : fermeture normale par le serveur.
+    func receive() async throws -> String?
+    func close()
+}
+
+final class URLSessionLiveSocket: LiveSocket, @unchecked Sendable {
+    private let task: URLSessionWebSocketTask
+
+    init(url: URL, session: URLSession = .shared) {
+        task = session.webSocketTask(with: url)
+        task.resume()
+    }
+
+    func send(_ data: Data) async throws { try await task.send(.data(data)) }
+    func send(text: String) async throws { try await task.send(.string(text)) }
+
+    func receive() async throws -> String? {
+        do {
+            switch try await task.receive() {
+            case .string(let text): return text
+            case .data(let data): return String(data: data, encoding: .utf8) ?? ""
+            @unknown default: return ""
+            }
+        } catch {
+            if task.closeCode == .normalClosure { return nil }
+            throw error
+        }
+    }
+
+    func close() { task.cancel(with: .goingAway, reason: nil) }
+}
+
+enum GladiaLive {
+    private struct Created: Decodable { let url: URL }
+
+    static func createSession(key: String, session: URLSession = .shared) async throws -> URL {
+        var request = URLRequest(url: URL(string: "https://api.gladia.io/v2/live")!, timeoutInterval: 15)
+        request.httpMethod = "POST"
+        request.setValue(key, forHTTPHeaderField: "x-gladia-key")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "encoding": "wav/pcm",
+            "sample_rate": 16_000,
+            "bit_depth": 16,
+            "channels": 1,
+            "language_config": ["languages": [String](), "code_switching": true],
+            "messages_config": ["receive_partial_transcripts": true]
+        ] as [String: Any])
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw Gladia.RequestError.invalidResponse(stage: "ouverture du direct")
+        }
+        if http.statusCode == 401 { throw Gladia.RequestError.unauthorized }
+        guard (200..<300).contains(http.statusCode) else {
+            throw Gladia.RequestError.http(stage: "ouverture du direct", status: http.statusCode)
+        }
+        guard let created = try? JSONDecoder().decode(Created.self, from: data),
+              created.url.scheme == "wss", created.url.host == "api.gladia.io" else {
+            throw Gladia.RequestError.invalidResponse(stage: "ouverture du direct")
+        }
+        return created.url
+    }
+
+    struct Transcript: Equatable {
+        let id: String
+        let text: String
+        let start: Double
+        let isFinal: Bool
+    }
+
+    private struct Envelope: Decodable { let type: String }
+    private struct Message: Decodable {
+        struct Details: Decodable {
+            struct Utterance: Decodable {
+                let text: String
+                let start: Double
+            }
+            let id: String
+            let is_final: Bool
+            let utterance: Utterance
+        }
+        let data: Details
+    }
+
+    static func parse(_ text: String) -> Transcript? {
+        let data = Data(text.utf8)
+        guard (try? JSONDecoder().decode(Envelope.self, from: data))?.type == "transcript",
+              let message = try? JSONDecoder().decode(Message.self, from: data) else { return nil }
+        return Transcript(
+            id: message.data.id, text: message.data.utterance.text,
+            start: message.data.utterance.start, isFinal: message.data.is_final
+        )
+    }
+}
+
+// Une session Gladia par piste : une piste en panne n'arrête pas l'autre.
+actor GladiaLiveSession {
+    enum Event {
+        case connected
+        case reconnecting
+        case unauthorized
+        case failed(String)
+        case ended
+        case transcript(GladiaLive.Transcript)
+        case finished
+    }
+
+    private let createSession: @Sendable () async throws -> URL
+    private let connect: @Sendable (URL) -> LiveSocket
+    private let audio: AsyncStream<Data>
+    private let events: @MainActor @Sendable (Event) -> Void
+    private let retryDelay: Double
+    private var socket: LiveSocket?
+    private var aborted = false
+    private var serverClosed = false
+
+    init(
+        audio: AsyncStream<Data>,
+        retryDelay: Double = 1,
+        createSession: @escaping @Sendable () async throws -> URL,
+        connect: @escaping @Sendable (URL) -> LiveSocket,
+        events: @escaping @MainActor @Sendable (Event) -> Void
+    ) {
+        self.audio = audio
+        self.retryDelay = retryDelay
+        self.createSession = createSession
+        self.connect = connect
+        self.events = events
+    }
+
+    func abort() {
+        aborted = true
+        socket?.close()
+    }
+
+    func run() async {
+        await stream()
+        await events(.finished)
+    }
+
+    private func stream() async {
+        let url: URL
+        do {
+            url = try await createSession()
+        } catch Gladia.RequestError.unauthorized {
+            await events(.unauthorized)
+            return
+        } catch {
+            await events(.failed(error.localizedDescription))
+            return
+        }
+
+        var iterator = audio.makeAsyncIterator()
+        var unsent: Data?
+        var delay = retryDelay
+        while !aborted, !Task.isCancelled {
+            let current = connect(url)
+            socket = current
+            serverClosed = false
+            let receiver = Task { try await self.receiveAll(from: current) }
+            do {
+                if let chunk = unsent {
+                    try await current.send(chunk)
+                    unsent = nil
+                }
+                var announced = false
+                while let chunk = await iterator.next() {
+                    unsent = chunk
+                    try await current.send(chunk)
+                    unsent = nil
+                    delay = retryDelay
+                    if !announced {
+                        announced = true
+                        await events(.connected)
+                    }
+                }
+                try await current.send(text: #"{"type":"stop_recording"}"#)
+                try await receiver.value
+                current.close()
+                return
+            } catch {
+                current.close()
+                _ = await receiver.result
+                if aborted || Task.isCancelled { return }
+                // Fermeture normale en plein appel, par exemple la limite de 3 h : pas de reprise possible.
+                if serverClosed {
+                    await events(.ended)
+                    return
+                }
+                await events(.reconnecting)
+                try? await Task.sleep(for: .seconds(delay))
+                delay = min(delay * 2, 15)
+            }
+        }
+    }
+
+    private func receiveAll(from socket: LiveSocket) async throws {
+        while let text = try await socket.receive() {
+            if let transcript = GladiaLive.parse(text) {
+                await events(.transcript(transcript))
+            }
+        }
+        serverClosed = true
+    }
+}
+
+// MARK: - Texte
+
+@MainActor
+@Observable
+final class LiveTranscript {
+    struct Line: Identifiable, Equatable {
+        let id: String
+        let time: Double
+        let track: AudioTrack
+        let text: String
+        let isFinal: Bool
+
+        var formatted: String { Gladia.line(at: time, label: track.label, text: text) }
+    }
+
+    private struct Key: Hashable {
+        let track: AudioTrack
+        let id: String
+    }
+
+    private var utterances: [Key: GladiaLive.Transcript] = [:]
+    private var firstAudio: [AudioTrack: Double] = [:]
+
+    func noteFirstAudio(_ track: AudioTrack, at seconds: Double) {
+        if firstAudio[track] == nil { firstAudio[track] = seconds }
+    }
+
+    func apply(_ transcript: GladiaLive.Transcript, track: AudioTrack) {
+        let key = Key(track: track, id: transcript.id)
+        if transcript.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            utterances[key] = nil
+        } else {
+            utterances[key] = transcript
+        }
+    }
+
+    private func offset(_ track: AudioTrack) -> Double {
+        guard let first = firstAudio[track], let origin = firstAudio.values.min() else { return 0 }
+        return first - origin
+    }
+
+    var lines: [Line] {
+        utterances.map { key, value in
+            Line(
+                id: "\(key.track.rawValue)-\(key.id)", time: value.start + offset(key.track),
+                track: key.track, text: value.text, isFinal: value.isFinal
+            )
+        }
+        .sorted { ($0.time, $0.id) < ($1.time, $1.id) }
+    }
+
+    // Un texte encore provisoire à l'arrêt est gardé : mieux vaut lui que rien.
+    var finalText: String { lines.map(\.formatted).joined(separator: "\n") }
+}
+
+// MARK: - Orchestration
+
+@MainActor
+@Observable
+final class LiveTranscription {
+    enum State: Equatable {
+        case connecting, live, reconnecting, unauthorized, ended
+        case failed(String)
+    }
+
+    let transcript = LiveTranscript()
+    private(set) var state: State = .connecting
+    private(set) var lostAudio = false
+
+    @ObservationIgnored private let createSession: @Sendable () async throws -> URL
+    @ObservationIgnored private let connect: @Sendable (URL) -> LiveSocket
+    @ObservationIgnored private let retryDelay: Double
+    @ObservationIgnored private let finishTimeout: Double
+    @ObservationIgnored private var trackStates: [AudioTrack: State] = [:]
+    @ObservationIgnored private var sessions: [GladiaLiveSession] = []
+    @ObservationIgnored private var finishedCount = 0
+    @ObservationIgnored nonisolated(unsafe) private var pipes: [AudioTrack: LiveAudioPipe] = [:]
+
+    convenience init(key: String) {
+        self.init(
+            createSession: { try await GladiaLive.createSession(key: key) },
+            connect: { URLSessionLiveSocket(url: $0) }
+        )
+    }
+
+    init(
+        retryDelay: Double = 1,
+        finishTimeout: Double = 8,
+        createSession: @escaping @Sendable () async throws -> URL,
+        connect: @escaping @Sendable (URL) -> LiveSocket
+    ) {
+        self.retryDelay = retryDelay
+        self.finishTimeout = finishTimeout
+        self.createSession = createSession
+        self.connect = connect
+        for track in AudioTrack.allCases {
+            pipes[track] = LiveAudioPipe(
+                onFirstBuffer: { [weak self] seconds in
+                    Task { @MainActor in self?.transcript.noteFirstAudio(track, at: seconds) }
+                },
+                onDrop: { [weak self] in
+                    Task { @MainActor in self?.lostAudio = true }
+                }
+            )
+        }
+    }
+
+    // Appelé depuis les fils audio : copie le tampon et rend la main tout de suite.
+    nonisolated func feed(_ track: AudioTrack, _ buffer: AVAudioPCMBuffer, hostTime: UInt64) {
+        pipes[track]?.feed(buffer, hostTime: hostTime)
+    }
+
+    func start() {
+        guard sessions.isEmpty else { return }
+        for track in AudioTrack.allCases {
+            guard let pipe = pipes[track] else { continue }
+            let session = GladiaLiveSession(
+                audio: pipe.stream, retryDelay: retryDelay, createSession: createSession, connect: connect
+            ) { [weak self] event in
+                self?.handle(event, track: track)
+            }
+            sessions.append(session)
+            Task { await session.run() }
+        }
+    }
+
+    // Envoie la fin de l'audio et attend les derniers textes, sans jamais dépasser le délai.
+    func finish() async {
+        for pipe in pipes.values { pipe.finish() }
+        let deadline = Date().addingTimeInterval(finishTimeout)
+        while finishedCount < sessions.count, Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        for session in sessions { await session.abort() }
+    }
+
+    private func handle(_ event: GladiaLiveSession.Event, track: AudioTrack) {
+        switch event {
+        case .transcript(let value):
+            transcript.apply(value, track: track)
+        case .connected:
+            update(.live, track: track)
+        case .reconnecting:
+            update(.reconnecting, track: track)
+        case .unauthorized:
+            update(.unauthorized, track: track)
+        case .failed(let message):
+            update(.failed(message), track: track)
+        case .ended:
+            update(.ended, track: track)
+        case .finished:
+            finishedCount += 1
+        }
+    }
+
+    private func update(_ value: State, track: AudioTrack) {
+        trackStates[track] = value
+        let states = Array(trackStates.values)
+        if states.contains(.unauthorized) {
+            state = .unauthorized
+        } else if states.contains(.reconnecting) {
+            state = .reconnecting
+        } else if states.contains(.live) {
+            state = .live
+        } else if states.contains(.ended) {
+            state = .ended
+        } else if let failure = states.first(where: { if case .failed = $0 { true } else { false } }) {
+            state = failure
+        }
+    }
+}
