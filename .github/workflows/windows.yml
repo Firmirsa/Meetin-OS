@@ -1,0 +1,58 @@
+name: Meetin-OS Windows
+
+on:
+  push:
+    paths: ["windows/**", "web/public/downloads/Meetin-OS-Windows.exe", ".github/workflows/windows.yml"]
+  pull_request:
+    paths: ["windows/**", "web/public/downloads/Meetin-OS-Windows.exe", ".github/workflows/windows.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Compile the Windows client
+        run: |
+          dotnet restore windows/Meetin-OS.csproj --locked-mode
+          dotnet build windows/Meetin-OS.csproj -c Release --no-restore
+          dotnet run --project windows/tests/GladiaSmoke.csproj -c Release
+      - name: Install and launch the package served by the site
+        shell: pwsh
+        run: |
+          $installer = Resolve-Path 'web/public/downloads/Meetin-OS-Windows.exe'
+          $setup = Start-Process -FilePath $installer -ArgumentList '/S' -Wait -PassThru
+          if ($setup.ExitCode -ne 0) { throw "Setup failed with exit code $($setup.ExitCode)" }
+
+          $folder = Join-Path $env:LOCALAPPDATA 'Programs/Meetin-OS'
+          $exe = Join-Path $folder 'Meetin-OS.exe'
+          $shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'Meetin-OS.lnk'
+          if (!(Test-Path $exe) -or !(Test-Path $shortcut)) { throw 'Application or Start menu shortcut missing' }
+          $link = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
+          if ($link.TargetPath -ne $exe) { throw "Start menu points to $($link.TargetPath)" }
+
+          $app = Start-Process -FilePath $exe -PassThru
+          try {
+            for ($i = 0; $i -lt 20; $i++) {
+              $app.Refresh()
+              if ($app.HasExited) { throw "Meetin-OS exited with code $($app.ExitCode)" }
+              if ($app.MainWindowTitle -eq 'Meetin-OS') { break }
+              Start-Sleep -Milliseconds 500
+            }
+            if ($app.MainWindowTitle -ne 'Meetin-OS') { throw 'The notebook window did not open' }
+            Write-Host 'Meetin-OS opened from its installed path.'
+          } finally {
+            if (!$app.HasExited) { Stop-Process -Id $app.Id }
+          }
+
+          $uninstall = Start-Process -FilePath (Join-Path $folder 'Uninstall.exe') -ArgumentList '/S' -Wait -PassThru
+          if ($uninstall.ExitCode -ne 0 -or (Test-Path $exe) -or (Test-Path $shortcut)) {
+            throw 'Uninstall did not remove the installed app and shortcut'
+          }
