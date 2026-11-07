@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Meetin-OS, le carnet de réunion pour Mac qui réunit notes et transcription.">
+  <title>Meetin-OS · Le carnet de réunion pour Mac</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="shell site-header">
+    <a class="brand" href="./" aria-label="Meetin-OS, accueil">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="currentColor"/><path d="M8 14v4m4-7v10m4-13v16m4-13v10m4-7v4" stroke="white" stroke-width="1.6" stroke-linecap="round"/></svg>
+      Meetin-OS
+    </a>
+    <nav aria-label="Navigation principale">
+      <a href="#fonctionnement">Le parcours</a>
+      <a class="nav-link" href="https://github.com/Firmirsa/Meetin-OS">GitHub <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+  <main>
+    <section class="shell hero" aria-labelledby="titre">
+      <div class="hero-copy">
+        <p class="eyebrow"><span></span> Prototype pour macOS</p>
+        <h1 id="titre">De l’appel à la <em>tâche validée.</em></h1>
+        <p class="intro">Prends tes notes pendant l’appel. Retrouve ensuite ce qui a été dit et garde le contexte des décisions.</p>
+        <a class="button" href="https://github.com/Firmirsa/Meetin-OS/tree/main/mac#meetin-os-pour-macos">Essayer le prototype Mac <span aria-hidden="true">↗</span></a>
+        <p class="requirements">macOS 15 ou ultérieur · Installation depuis le code source</p>
+      </div>
+      <figure class="preview">
+        <div class="window">
+          <div class="window-bar">
+            <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+            <span>Carnet de réunion</span>
+            <span class="window-badge">APERÇU</span>
+          </div>
+          <div class="window-body">
+            <p class="meeting-label">RÉUNION PRODUIT</p>
+            <p class="meeting-title">Point de lancement</p>
+            <div class="note">
+              <strong>Notes</strong>
+              <p>Relire le guide avant le prochain point.</p>
+            </div>
+            <div class="segment">
+              <span class="timestamp">00:18</span>
+              <p>« Finalement, Karim s’en charge mardi. »</p>
+            </div>
+            <div class="task">
+              <div>
+                <p class="task-label">ENGAGEMENT PROPOSÉ</p>
+                <strong>Relire le guide</strong>
+                <p class="task-meta">Karim · Mardi</p>
+              </div>
+              <span class="task-state">À valider</span>
+            </div>
+          </div>
+        </div>
+        <figcaption>Exemple illustratif du parcours cible</figcaption>
+      </figure>
+    </section>
+    <section class="workflow" id="fonctionnement" aria-labelledby="parcours">
+      <div class="shell">
+        <p class="eyebrow"><span></span> Le parcours</p>
+        <h2 id="parcours">Garder le fil après l’appel.</h2>
+        <ol class="steps">
+          <li><span class="step-index">01</span><h3>Capturer</h3><p>Enregistre le micro et le son du Mac. Note les points clés dans le même carnet.</p></li>
+          <li><span class="step-index">02</span><h3>Relire</h3><p>Lance la transcription avec Gladia et retrouve les passages grâce à leurs repères temporels.</p></li>
+          <li><span class="step-index">03 <span class="planned">À venir</span></span><h3>Valider</h3><p>Confirme l’engagement, son responsable et son échéance avant la mise à jour de la tâche.</p></li>
+        </ol>
+      </div>
+    </section>
+  </main>
+  <footer class="shell site-footer">
+    <span>Meetin-OS · Projet du hackathon H Company × 42AI</span>
+    <a href="https://github.com/Firmirsa/Meetin-OS#readme">Documentation <span aria-hidden="true">↗</span></a>
+  </footer>
+</body>
+</html>

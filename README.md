@@ -44,3 +44,7 @@ Le scénario de démo part d’une décision qui change en cours d’appel. « L
 - [Guide macOS](mac/README.md) · Installation et recette de capture.
 - [Plan d’exécution](docs/plan-hackathon.md) · Répartition, scénario et tâches à faire.
 - [Fiche du hackathon](docs/hackathon.md) · Règles, barème, programme et ressources partenaires.
+
+## Landing page
+
+La page statique est dans [web/](web/). Pour la prévisualiser depuis la racine du dépôt, lance `python3 -m http.server 8000 --bind 127.0.0.1 --directory web`, puis ouvre [localhost:8000](http://127.0.0.1:8000/).
