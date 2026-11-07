@@ -33,6 +33,7 @@ Contrastes (WCAG) : encre/canvas 15,8 · encre/citron 12,3 · secondaire/canvas 
 ## Fichiers
 
 - `tokens.css` · variables clair/sombre + classes de base. Pour Samy.
+- `web/theme-nuit.css` · thème du site : fond encre, brume citron et olive, cartes en verre fumé. Chargé en dernier dans `web/app/layout.jsx`, il ne change que les couleurs. Pour revenir au clair : retirer l'import.
 - `components/components.css` · carte de revue, suivi de l'agent (avant → après), barre REC, notification. Dépend de `tokens.css`.
 - `components/preview.html` · page de démo à ouvrir dans un navigateur. `?theme=dark`, `?state=done`.
 - `MeetinTheme.swift` · couleurs dynamiques, polices, boutons, carte. Pour Wael.

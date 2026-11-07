@@ -1,0 +1,80 @@
+/* Meetin-OS · thème « nuit » (essai B)
+   Fond encre, brume citron et olive, cartes en verre fumé.
+   À charger APRÈS brand-tokens.css, brand-components.css et styles.css.
+   Règles inchangées : citron = fond, un seul bouton citron par écran, pas d'ombre portée. */
+
+:root,
+:root[data-theme="light"] {
+  color-scheme: dark;
+  --mt-canvas: #0F1613;
+  --mt-surface: rgba(24, 33, 29, 0.62);      /* verre fumé : laisse passer la brume */
+  --mt-surface-solid: #18211D;
+  --mt-ink: #F3F1E6;
+  --mt-ink-2: #A3ADA5;
+  --mt-line: rgba(243, 241, 230, 0.12);
+  --mt-line-strong: rgba(243, 241, 230, 0.28);
+  --mt-accent-hover: #DDF083;
+  --mt-accent-tint: rgba(207, 232, 107, 0.14);
+  --mt-accent-text: #CFE86B;
+  --mt-rec: #FF6A4D;
+  --mt-rec-tint: rgba(255, 106, 77, 0.16);
+  --mt-warn: #F0B94F;
+  --mt-warn-tint: rgba(240, 185, 79, 0.16);
+  --mt-glass-blur: 22px;
+}
+
+/* ---------- Brume ----------
+   Trois lueurs fixes derrière tout le contenu. Dégradés radiaux (pas de flou GPU coûteux). */
+html { background: #0F1613; }
+body {
+  background:
+    radial-gradient(42% 38% at 18% 78%, rgba(207, 232, 107, 0.20), transparent 70%),
+    radial-gradient(46% 42% at 82% 88%, rgba(92, 107, 15, 0.42), transparent 72%),
+    radial-gradient(38% 36% at 92% 8%, rgba(207, 232, 107, 0.08), transparent 70%),
+    radial-gradient(40% 40% at 0% 0%, rgba(42, 51, 32, 0.85), transparent 70%),
+    #0F1613;
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* ---------- Verre ---------- */
+.mt-card, .mt-review, .mt-agent, .meeting-card, .notes__brief,
+.window, .mt-toast, .engagement, .demo-menu ul {
+  -webkit-backdrop-filter: blur(var(--mt-glass-blur)) saturate(1.15);
+  backdrop-filter: blur(var(--mt-glass-blur)) saturate(1.15);
+  border: 1px solid var(--mt-line);
+}
+.meeting-card:hover, .engagement:hover { border-color: var(--mt-line-strong); }
+
+/* Zones « creusées » dans une carte (extrait source, preuve, champs) : plus sombres que le verre */
+.mt-source, .mt-proof, .mt-input,
+.workspace input:not([type=checkbox]), .workspace textarea {
+  background: rgba(15, 22, 19, 0.72);
+}
+.mt-review .mt-pill--wait, .mt-agent .mt-pill--wait,
+.meeting-card .mt-pill--wait { background: rgba(15, 22, 19, 0.72); }
+
+/* Pastilles d'initiales et éléments clairs codés en dur côté Samy */
+.initials, .meeting-meta .initials { --chip-bg: var(--mt-surface-solid); }
+
+/* ---------- Landing (couleurs encore codées en dur dans styles.css) ---------- */
+.site-header { border-color: var(--mt-line); }
+.window { background: rgba(24, 33, 29, 0.55); }
+.window-bar { background: transparent; border-color: var(--mt-line); }
+.lights i { background: var(--mt-line-strong); }
+.note { background: rgba(15, 22, 19, 0.6); }
+.workflow { background: transparent; border-color: var(--mt-line); }
+.steps li { border-color: var(--mt-line-strong); }
+h1 em { color: var(--mt-accent-text); }
+
+/* Un seul citron par écran : sur la landing, « Windows » passe en contour */
+.install-actions .button + .button {
+  background: transparent;
+  color: var(--mt-ink);
+  box-shadow: inset 0 0 0 1px var(--mt-line-strong);
+}
+.install-actions .button + .button:hover { background: rgba(243, 241, 230, 0.06); }
+
+/* ---------- Focus visible sur fond sombre ---------- */
+:focus-visible, a:focus-visible { outline: 2px solid var(--mt-ink); outline-offset: 2px; }
+.initials__chip, .meeting-meta .initials__chip { border-color: #0F1613; }
