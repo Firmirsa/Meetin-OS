@@ -1,7 +1,6 @@
 import AppKit
 import ApplicationServices
 import SwiftUI
-import UniformTypeIdentifiers
 
 @main
 struct MeetinOS: App {
@@ -9,12 +8,16 @@ struct MeetinOS: App {
 
     var body: some Scene {
         WindowGroup("Meetin-OS", id: "notebook") {
-            CaptureView(session: meeting)
+            MainWindow(session: meeting)
         }
-        .defaultSize(width: 660, height: 540)
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 1100, height: 760)
+        .defaultWindowPlacement { _, context in MainWindow.placement(in: context) }
         .restorationBehavior(.disabled)
+        .commands { CommandGroup(replacing: .newItem) {} }
         Window("Réunion Meetin-OS", id: "meeting") {
             MeetingWindow(session: meeting)
+                .meetinNight()
         }
         .defaultSize(width: 720, height: 520)
         .restorationBehavior(.disabled)
@@ -33,9 +36,14 @@ final class MeetingSession {
     var agentAccessCode = ""
     let agent = AgentWorkspaceState()
     var status = "Prêt à enregistrer"
-    var permissionHelp: AudioPermissionHelp?
-    var transcript = ""
-    var notes = ""
+    var permissionHelp: AudioPermissionHelp? { didSet { noteSystemAudioPermission() } }
+    var transcript = "" { didSet { syncMeeting() } }
+    var notes = "" { didSet { syncMeeting() } }
+    let store = MeetingStore()
+    var route: MainRoute = .home
+    var meetingID: UUID?
+    var startedAt: Date?
+    var startedInZoom = false
     var zoomDetector = ZoomMeetingDetector()
     var notebookCount = 0
     var meetingIsActive: Bool { capture != nil || zoomDetector.inMeeting }
@@ -68,8 +76,6 @@ struct CaptureView: View {
     @Environment(\.openWindow) private var openWindow
     @Bindable var session: MeetingSession
     var isMeetingWindow = false
-    @AppStorage("detectZoomMeetings") private var detectZoomMeetings = false
-    @State private var showingSettings = false
     @AppStorage("webWorkspaceURL") private var webWorkspaceURL = "http://localhost:3000"
     @State private var tab: MeetingTab = .transcription
 
@@ -79,36 +85,27 @@ struct CaptureView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Group {
-                    if let url = Bundle.main.url(forResource: "MeetinOS", withExtension: "png"),
-                       let logo = NSImage(contentsOf: url) {
-                        Image(nsImage: logo).resizable().scaledToFit()
-                    } else {
-                        Image(systemName: "waveform").foregroundStyle(Color.mtAccentText)
-                    }
-                }
-                .frame(width: 32, height: 32)
-                .accessibilityHidden(true)
-                Text("Meetin-OS").font(.mtSans(16, weight: .semibold))
-                if isMeetingWindow {
+            if isMeetingWindow {
+                HStack(spacing: 10) {
+                    MTLogo()
+                    Text("Meetin-OS").font(.mtSans(16, weight: .semibold))
                     Text("Réunion").font(.mtSans(12)).foregroundStyle(Color.mtInk2)
+                    Spacer()
+                    Button {
+                        session.showMain(.settings, openWindow: openWindow)
+                    } label: {
+                        Image(systemName: "gearshape").frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Réglages")
+                    .accessibilityLabel("Réglages")
+                    .disabled(session.agent.busy)
                 }
-                Spacer()
-                Button {
-                    showingSettings = true
-                } label: {
-                    Image(systemName: "gearshape").frame(width: 24, height: 24)
-                }
-                .buttonStyle(.borderless)
-                .help("Réglages")
-                .accessibilityLabel("Réglages")
-                .disabled(session.agent.busy)
-            }
-            .padding(.horizontal, 22)
-            .padding(.vertical, 10)
+                .padding(.horizontal, 22)
+                .padding(.vertical, 10)
 
-            Rectangle().fill(Color.mtLine).frame(height: 1)
+                Rectangle().fill(Color.mtLine).frame(height: 1)
+            }
 
             if isMeetingWindow || session.recording != nil {
                 Picker("Vue de la réunion", selection: $tab) {
@@ -116,6 +113,8 @@ struct CaptureView: View {
                     Text("Agent").tag(MeetingTab.agent)
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
+                .tint(Color.mtControlTint)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
             }
@@ -125,15 +124,17 @@ struct CaptureView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
-                        Text(isMeetingWindow ? "PENDANT ET APRÈS L’APPEL" : "CARNET DE RÉUNION POUR MAC")
-                            .font(.mtSans(11, weight: .semibold))
-                            .tracking(2)
-                            .foregroundStyle(Color.mtAccentText)
-                        Text(isMeetingWindow ? "Le fil de la réunion." : "Chaque décision compte.")
-                            .font(.mtSerif(42))
-                            .accessibilityAddTraits(.isHeader)
-                        Text("Prenez des notes pendant l’appel, puis retrouvez la transcription ici.")
-                            .foregroundStyle(Color.mtInk2)
+                        if isMeetingWindow {
+                            Text("PENDANT ET APRÈS L’APPEL")
+                                .font(.mtSans(11, weight: .semibold))
+                                .tracking(2)
+                                .foregroundStyle(Color.mtAccentText)
+                            Text("Le fil de la réunion.")
+                                .font(.mtSerif(42))
+                                .accessibilityAddTraits(.isHeader)
+                            Text("Prenez des notes pendant l’appel, puis retrouvez la transcription ici.")
+                                .foregroundStyle(Color.mtInk2)
+                        }
                         Text("Notes").font(.headline).accessibilityAddTraits(.isHeader)
                         ZStack(alignment: .topLeading) {
                             TextEditor(text: $session.notes)
@@ -181,7 +182,6 @@ struct CaptureView: View {
                     .padding(.vertical, 24)
                     .frame(maxWidth: .infinity)
                 }
-                .background(Color.mtCanvas)
             }
 
             Rectangle().fill(Color.mtLine).frame(height: 1)
@@ -214,8 +214,13 @@ struct CaptureView: View {
                     }
                     Spacer()
                     if session.recording != nil {
-                        Button("Transcrire", systemImage: "text.alignleft", action: transcribe)
-                            .buttonStyle(.mtPrimary)
+                        if tab == .agent {
+                            Button("Transcrire", systemImage: "text.alignleft", action: transcribe)
+                                .buttonStyle(.mtGhost)
+                        } else {
+                            Button("Transcrire", systemImage: "text.alignleft", action: transcribe)
+                                .buttonStyle(.mtPrimary)
+                        }
                     } else {
                         if session.capture == nil {
                             Button("Enregistrer", systemImage: "mic", action: toggleRecording)
@@ -232,81 +237,10 @@ struct CaptureView: View {
             .padding(.horizontal, 22)
             .padding(.vertical, 14)
         }
-        .background(Color.mtCanvas)
         .foregroundStyle(Color.mtInk)
         .frame(minWidth: 560, minHeight: 420)
-        .onAppear {
-            if !isMeetingWindow { session.notebookCount += 1 }
-        }
-        .onDisappear {
-            if !isMeetingWindow { session.notebookCount -= 1 }
-        }
-        .onChange(of: webWorkspaceURL) { session.agent.invalidateReview() }
-        .onChange(of: session.agentAccessCode) { session.agent.invalidateReview() }
-        .task(id: detectZoomMeetings) {
-            guard !isMeetingWindow else { return }
-            session.zoomDetector = ZoomMeetingDetector()
-            guard detectZoomMeetings else { return }
-            while !Task.isCancelled {
-                if session.zoomDetector.observe(ZoomMeetingDetector.windowTitles()) {
-                    openWindow(id: "meeting")
-                }
-                do { try await Task.sleep(for: .seconds(2)) }
-                catch { return }
-            }
-        }
-        .sheet(isPresented: $showingSettings) {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Réglages").font(.title2.bold())
-                Text("Meetin-OS utilise Gladia pour transcrire l’audio. La clé sert uniquement pendant cette session.")
-                    .foregroundStyle(Color.mtInk2)
-                SecureField("Clé API Gladia", text: $session.key)
-                    .textFieldStyle(.roundedBorder)
-                Rectangle().fill(Color.mtLine).frame(height: 1)
-                Text("Autorisations audio").font(.headline)
-                Text("Au premier enregistrement, macOS peut demander l’accès au micro et à l’audio du système.")
-                    .foregroundStyle(Color.mtInk2)
-                HStack {
-                    Button("Microphone") { NSWorkspace.shared.open(AudioPermissionHelp.microphone.settingsURL) }
-                    Button("Audio du système") { NSWorkspace.shared.open(AudioPermissionHelp.systemAudio.settingsURL) }
-                }
-                Rectangle().fill(Color.mtLine).frame(height: 1)
-                TextField("Adresse du site Meetin-OS", text: $webWorkspaceURL)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(session.agent.busy)
-                SecureField("Code d’accès agent", text: $session.agentAccessCode)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(session.agent.busy)
-                Toggle("Ouvrir la fenêtre quand je rejoins une réunion Zoom", isOn: $detectZoomMeetings)
-                if detectZoomMeetings {
-                    Text("L’accès à l’accessibilité sert à détecter les fenêtres Zoom. L’enregistrement se lance manuellement.")
-                        .foregroundStyle(Color.mtInk2)
-                    Button("Ouvrir les réglages d’accessibilité") {
-                        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-                        NSWorkspace.shared.open(url)
-                    }
-                }
-                HStack {
-                    Spacer()
-                    Button("Fermer") { showingSettings = false }
-                        .keyboardShortcut(.cancelAction)
-                }
-            }
-            .padding(24)
-            .frame(width: 420)
-            .background(Color.mtCanvas)
-        }
         .toolbar {
-            if !isMeetingWindow && session.meetingIsActive {
-                Button("Afficher la réunion", systemImage: "rectangle.on.rectangle") {
-                    openWindow(id: "meeting")
-                }
-            }
-            if !isMeetingWindow && session.capture == nil {
-                Button("Ouvrir un enregistrement", systemImage: "folder", action: openRecording)
-                    .disabled(session.busy || session.agent.busy)
-            }
-            if session.recording != nil, session.capture == nil {
+            if isMeetingWindow, session.recording != nil, session.capture == nil {
                 Button("Nouvel enregistrement", systemImage: "plus", action: toggleRecording)
                     .disabled(session.busy || session.agent.busy)
             }
@@ -315,38 +249,21 @@ struct CaptureView: View {
 
     private var agentClient: AgentClient? {
         let code = session.agentAccessCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let base = URL(string: webWorkspaceURL.trimmingCharacters(in: .whitespacesAndNewlines)),
-              let host = base.host, base.user == nil, base.password == nil,
-              base.query == nil, base.fragment == nil, base.path.isEmpty || base.path == "/", !code.isEmpty,
-              base.scheme == "https" || (base.scheme == "http" && ["localhost", "127.0.0.1"].contains(host))
-        else { return nil }
+        guard let base = MeetinSite.baseURL(webWorkspaceURL), !code.isEmpty else { return nil }
         return AgentClient(baseURL: base, accessCode: code)
     }
 
     private var agentPanel: some View {
-        AgentWorkspace(state: session.agent, transcript: session.transcript, client: agentClient) { showingSettings = true }
-    }
-
-    private func openRecording() {
-        guard !session.busy, !session.agent.busy, session.capture == nil else { return }
-        session.busy = true
-        let picker = NSOpenPanel()
-        picker.allowedContentTypes = [.mpeg4Audio]
-        picker.message = "Choisissez un fichier M4A à écouter ou à transcrire."
-        picker.begin { response in
-            session.busy = false
-            guard response == .OK, let file = picker.url else { return }
-            session.recordedTracks = nil
-            session.recording = file
-            session.transcript = ""
-            session.agent.newRecording()
-            session.permissionHelp = nil
-            session.status = "Fichier audio prêt"
-            tab = .transcription
+        AgentWorkspace(state: session.agent, transcript: session.transcript, client: agentClient) {
+            session.showMain(.account, openWindow: openWindow)
         }
     }
 
     private func toggleRecording() {
+        Self.toggleRecording(session: session, openWindow: openWindow)
+    }
+
+    static func toggleRecording(session: MeetingSession, openWindow: OpenWindowAction) {
         guard !session.busy, session.capture != nil || !session.agent.busy else { return }
         session.busy = true
         Task {
@@ -361,11 +278,13 @@ struct CaptureView: View {
                     session.permissionHelp = result.help
                     session.status = result.help.map { "Une piste a été conservée. \($0.localizedDescription)" }
                         ?? "Enregistrement prêt · micro et audio système"
+                    await session.meetingDidStop()
                 } else {
                     let next = AudioCapture()
                     session.permissionHelp = nil
                     session.status = "Vérification des autorisations…"
                     try await next.start()
+                    session.meetingDidStart()
                     session.recordedTracks = nil
                     session.recording = nil
                     session.transcript = ""
@@ -384,7 +303,7 @@ struct CaptureView: View {
     private func transcribe() {
         guard !session.busy, let recording = session.recording else { return }
         guard hasKey else {
-            showingSettings = true
+            session.showMain(.settings, openWindow: openWindow)
             return
         }
         session.busy = true
@@ -402,7 +321,7 @@ struct CaptureView: View {
                 session.status = "Transcription prête"
             } catch Gladia.RequestError.unauthorized {
                 session.status = Gladia.RequestError.unauthorized.localizedDescription
-                showingSettings = true
+                session.showMain(.settings, openWindow: openWindow)
             } catch { session.status = error.localizedDescription }
         }
     }

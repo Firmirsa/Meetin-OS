@@ -15,20 +15,20 @@ Depuis la racine du dépôt :
 open mac/.build/Meetin-OS.app
 ```
 
-Le script construit et signe localement l’application. Au premier enregistrement, macOS peut demander l’accès au **Microphone** et à **Audio du système uniquement**. Si une piste manque, le carnet propose un lien vers les réglages concernés et conserve la piste disponible. Les deux raccourcis sont aussi dans **Réglages → Autorisations audio**. Une nouvelle version signée localement peut demander à nouveau les autorisations.
+Le script construit et signe localement l’application. Au premier enregistrement, macOS peut demander l’accès au **Microphone** et à **Audio du système uniquement**. Si une piste manque, le carnet propose un lien vers les réglages concernés et conserve la piste disponible. Les deux raccourcis sont aussi dans **Paramètres → Autorisations audio**. Une nouvelle version signée localement peut demander à nouveau les autorisations.
 
-1. Lancez un appel de test avec un autre participant. Cliquez sur **Enregistrer**, faites parler chaque personne à tour de rôle, puis cliquez sur **Arrêter**.
-2. Cliquez sur **Écouter** pour vérifier les deux voix. **Voir les pistes** révèle le dossier temporaire contenant le mix et les deux pistes séparées.
-3. Ouvrez **Réglages** (roue dentée) pour saisir une clé Gladia, puis cliquez sur **Transcrire** pour envoyer les pistes micro et appel séparément. Le texte indique la piste source et l’horodatage de chaque passage. Un M4A importé est traité comme un fichier unique. Si aucune clé n’est configurée, le bouton ouvre les réglages. La clé reste en mémoire pour cette session et peut aussi être fournie par la variable d’environnement `GLADIA_API_KEY` si le binaire est lancé depuis le terminal.
+1. Lancez un appel de test avec un autre participant. Sur l’**Accueil**, cliquez sur **Commencer à enregistrer** (⌘R), faites parler chaque personne à tour de rôle, puis cliquez sur **Arrêter**.
+2. Cliquez sur **Écouter** pour vérifier les deux voix. **Voir les pistes** révèle le dossier de la réunion contenant le mix et les deux pistes séparées.
+3. Ouvrez **Paramètres** pour saisir une clé Gladia, puis cliquez sur **Transcrire** pour envoyer les pistes micro et appel séparément. Le texte indique la piste source et l’horodatage de chaque passage. Un M4A importé est traité comme un fichier unique. Si aucune clé n’est configurée, le bouton ouvre les paramètres. La clé reste en mémoire pour cette session et peut aussi être fournie par la variable d’environnement `GLADIA_API_KEY` si le binaire est lancé depuis le terminal.
 4. Dans l’onglet **Agent**, insère et ajuste l’extrait de transcription ou saisis une demande. Clique sur **Préparer la tâche**, réponds à la question éventuelle, puis relis l’action et sa destination avant de confirmer. Le lien de session s’affiche quand Devin ou H Computer Use accepte le lancement.
 
-Pour activer l’agent, renseigne l’**Adresse du site Meetin-OS** et le **Code d’accès agent** dans la roue dentée. En local, l’adresse par défaut est `http://localhost:3000`. Pour la démo, utilise l’adresse HTTPS de l’équipe. Le code correspond à `MEETIN_DEMO_TOKEN` côté serveur et reste en mémoire pendant la session. Les clés de Devin et H Company restent sur le serveur, comme décrit dans le [guide Next.js](../web/README.md).
+Pour activer l’agent, renseigne l’**Adresse du site Meetin-OS** et le **Code d’accès de l’équipe** dans **Compte**. **Facturation et abonnement** ouvre `/onboarding#subscription` sur cette adresse. En local, l’adresse par défaut est `http://localhost:3000`. Pour la démo, utilise l’adresse HTTPS de l’équipe. Le code correspond à `MEETIN_DEMO_TOKEN` côté serveur et reste en mémoire pendant la session. Les clés de Devin et H Company restent sur le serveur, comme décrit dans le [guide Next.js](../web/README.md).
 
-Pour reprendre un essai après avoir relancé l’app, utilise **Ouvrir un enregistrement** et choisis le fichier M4A. Avant de quitter l’app, **Voir les pistes** permet de retrouver et copier ce fichier hors du dossier temporaire. Si Gladia refuse la clé, les réglages se rouvrent et le fichier reste prêt pour une nouvelle tentative.
+L’historique est conservé sur ce Mac dans `~/Library/Application Support/Meetin-OS` : `meetings.json` (titre, date, durée, chemin audio, transcription, notes) et un dossier audio par réunion dans `recordings/`. Il se remplit à l’arrêt de l’enregistrement et après la transcription. Pour reprendre un essai, rouvre la réunion depuis **Réunions**. Pour un fichier externe, utilise **Ouvrir un enregistrement** sur cette page et choisis un M4A. Si Gladia refuse la clé, les paramètres se rouvrent et le fichier reste prêt pour une nouvelle tentative.
 
-Au démarrage de la capture, Meetin-OS ouvre une fenêtre dédiée avec les onglets **Transcription** et **Agent**. Le bouton **Afficher la réunion** permet de rouvrir la fenêtre pendant un appel détecté ou un enregistrement. À la fin de la réunion, le carnet principal reprend la main. Tu peux y transcrire le fichier, relire le texte et préparer la tâche. Un fichier importé s’ouvre directement dans le carnet.
+Au démarrage de la capture, Meetin-OS ouvre une fenêtre dédiée avec les onglets **Transcription** et **Agent**. Le bouton **Afficher la réunion** permet de rouvrir la fenêtre pendant un appel détecté ou un enregistrement. À la fin de la réunion, la fenêtre principale ouvre sa fiche. Tu peux y transcrire le fichier, relire le texte et préparer la tâche. Un fichier importé s’ouvre de la même façon.
 
-Pour ouvrir la fenêtre en rejoignant un appel, active **Ouvrir la fenêtre quand je rejoins une réunion Zoom** dans les réglages de Meetin-OS et autorise l’app dans **Confidentialité et sécurité → Accessibilité**. Garde le carnet principal ouvert. La détection repose sur les titres de fenêtres de Zoom Workplace en français ou en anglais. Clique ensuite sur **Enregistrer** dans la fenêtre de réunion.
+Pour ouvrir la fenêtre en rejoignant un appel, active **Ouvrir la fenêtre quand je rejoins une réunion Zoom** dans les **Paramètres** de Meetin-OS et autorise l’app dans **Confidentialité et sécurité → Accessibilité**. Garde la fenêtre principale ouverte. La détection repose sur les titres de fenêtres de Zoom Workplace en français ou en anglais. Clique ensuite sur **Enregistrer** dans la fenêtre de réunion.
 
 [Capture audio Core Audio](https://developer.apple.com/documentation/coreaudio/capturing-system-audio-with-core-audio-taps) · [API asynchrone Gladia](https://www.gladia.io/blog/gladia-async-api-for-meeting-transcription-integration-guide-and-best-practices)
 
@@ -39,6 +39,14 @@ mkdir -p mac/.build
 swiftc -parse-as-library -target "$(uname -m)-apple-macos15.0" \
   mac/Capture.swift mac/Gladia.swift mac/tests/GladiaSmoke.swift -o mac/.build/gladia-smoke
 mac/.build/gladia-smoke
+```
+
+Le test de l’historique local s’exécute sans audio :
+
+```sh
+swiftc -parse-as-library -target "$(uname -m)-apple-macos15.0" \
+  mac/MeetingStore.swift mac/MeetinSite.swift mac/tests/MeetingStoreSmoke.swift -o mac/.build/store-smoke
+mac/.build/store-smoke
 ```
 
 ## Régénérer l’installateur du site
