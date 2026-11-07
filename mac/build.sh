@@ -20,7 +20,8 @@ cp Info.plist "$app/Contents/Info.plist"
 
 compile() {
   swiftc -parse-as-library -target "$1-apple-macos$minimum_macos" \
-    MeetinOS.swift Capture.swift Gladia.swift ZoomMeetingDetector.swift ../brand/MeetinTheme.swift -o "$2"
+    MeetinOS.swift Capture.swift Gladia.swift ZoomMeetingDetector.swift Review.swift \
+    ../brand/MeetinTheme.swift ../brand/MeetinComponents.swift -o "$2"
 }
 
 executable="$app/Contents/MacOS/MeetinOS"

@@ -71,6 +71,7 @@ struct CaptureView: View {
     @AppStorage("webWorkspaceURL") private var webWorkspaceURL = "http://localhost:3000"
     @State private var copiedForAgent = false
     @State private var tab: MeetingTab = .transcription
+    @State private var engagements = EngagementsModel()
 
     private var hasKey: Bool {
         !session.key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -317,15 +318,16 @@ struct CaptureView: View {
     private var agentPanel: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("ESPACE AGENT")
+                Text("APRÈS LA RÉUNION")
                     .font(.mtSans(11, weight: .semibold))
                     .tracking(2)
                     .foregroundStyle(Color.mtAccentText)
                 Text("De la décision à la tâche.")
                     .font(.mtSerif(42))
                     .accessibilityAddTraits(.isHeader)
-                Text("Choisissez un extrait de la réunion, ajoutez le contexte utile et relisez la tâche avant de la confier à Devin.")
+                Text("Relis tes notes et ce qui a été dit, puis valide chaque engagement avant que l’agent mette la fiche à jour.")
                     .foregroundStyle(Color.mtInk2)
+                AfterMeetingView(notes: session.notes, transcript: session.transcript, model: engagements)
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Contexte de réunion").font(.mtSans(16, weight: .semibold))
                     Text(session.transcript.isEmpty
@@ -344,16 +346,17 @@ struct CaptureView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .mtCard()
                 if let agentURL {
+                    // Un seul bouton citron vert par écran : « Valider », dans la carte de revue.
                     Button("Ouvrir l’espace agent", systemImage: "arrow.up.right") {
                         NSWorkspace.shared.open(agentURL)
                     }
-                    .buttonStyle(.mtPrimary)
+                    .buttonStyle(.mtGhost)
                 } else {
                     Button("Configurer l’adresse du site") { showingSettings = true }
                         .buttonStyle(.mtGhost)
                 }
             }
-            .frame(maxWidth: 620, alignment: .leading)
+            .frame(maxWidth: 1080, alignment: .leading)
             .padding(28)
             .frame(maxWidth: .infinity)
         }

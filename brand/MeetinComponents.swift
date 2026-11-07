@@ -305,11 +305,18 @@ struct MTStepDot: View {
             }
         }
         .frame(width: 20, height: 20)
-        .onAppear {
-            guard status == .running, !reduceMotion else { return }
+        // La pulsation démarre aussi quand une étape existante passe à « en cours ».
+        .onAppear { startPulse(status) }
+        .onChange(of: status) { _, newStatus in startPulse(newStatus) }
+        .accessibilityLabel(label)
+    }
+
+    private func startPulse(_ newStatus: MTStepStatus) {
+        pulse = false
+        guard newStatus == .running, !reduceMotion else { return }
+        DispatchQueue.main.async {
             withAnimation(.easeOut(duration: 1.4).repeatForever(autoreverses: false)) { pulse = true }
         }
-        .accessibilityLabel(label)
     }
 
     private var label: String {
@@ -431,7 +438,9 @@ struct MTMeetingToast: View {
 }
 
 // MARK: - Aperçu Xcode
+// Réservé aux builds Debug d'Xcode : mac/build.sh compile avec swiftc, sans le plugin du macro #Preview.
 
+#if DEBUG
 #Preview("Composants Meetin-OS") {
     struct Demo: View {
         @State var item = MTCommitment(
@@ -463,3 +472,4 @@ struct MTMeetingToast: View {
     }
     return Demo()
 }
+#endif
