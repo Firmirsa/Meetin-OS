@@ -31,6 +31,7 @@ final class MeetingSession {
     var busy = false
     var key = ProcessInfo.processInfo.environment["GLADIA_API_KEY"] ?? ""
     var status = "Prêt à enregistrer"
+    var permissionHelp: AudioPermissionHelp?
     var transcript = ""
     var notes = ""
     var zoomDetector = ZoomMeetingDetector()
@@ -99,8 +100,8 @@ struct CaptureView: View {
                     Image(systemName: "gearshape").frame(width: 24, height: 24)
                 }
                 .buttonStyle(.borderless)
-                .help("Réglages de transcription")
-                .accessibilityLabel("Réglages de transcription")
+                .help("Réglages")
+                .accessibilityLabel("Réglages")
             }
             .padding(.horizontal, 22)
             .padding(.vertical, 10)
@@ -198,6 +199,12 @@ struct CaptureView: View {
                         .foregroundStyle(Color.mtInk2)
                         .accessibilityAddTraits(.updatesFrequently)
                 }
+                if let help = session.permissionHelp, !session.busy {
+                    Button(help.settingsLabel, systemImage: "arrow.up.right.square") {
+                        NSWorkspace.shared.open(help.settingsURL)
+                    }
+                    .buttonStyle(.link)
+                }
                 HStack {
                     if let recording = session.recording, session.capture == nil {
                         Button("Écouter", systemImage: "play.circle") { NSWorkspace.shared.open(recording) }
@@ -246,18 +253,26 @@ struct CaptureView: View {
         }
         .sheet(isPresented: $showingSettings) {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Réglages de transcription").font(.title2.bold())
+                Text("Réglages").font(.title2.bold())
                 Text("Meetin-OS utilise Gladia pour transcrire l’audio. La clé sert uniquement pendant cette session.")
                     .foregroundStyle(Color.mtInk2)
                 SecureField("Clé API Gladia", text: $session.key)
                     .textFieldStyle(.roundedBorder)
                 Rectangle().fill(Color.mtLine).frame(height: 1)
+                Text("Autorisations audio").font(.headline)
+                Text("Au premier enregistrement, macOS peut demander l’accès au micro et à l’audio du système.")
+                    .foregroundStyle(Color.mtInk2)
+                HStack {
+                    Button("Microphone") { NSWorkspace.shared.open(AudioPermissionHelp.microphone.settingsURL) }
+                    Button("Audio du système") { NSWorkspace.shared.open(AudioPermissionHelp.systemAudio.settingsURL) }
+                }
+                Rectangle().fill(Color.mtLine).frame(height: 1)
                 TextField("Adresse du site Meetin-OS", text: $webWorkspaceURL)
                     .textFieldStyle(.roundedBorder)
                 Toggle("Ouvrir la fenêtre quand je rejoins une réunion Zoom", isOn: $detectZoomMeetings)
-                Text("Activez Meetin-OS dans Réglages Système → Confidentialité et sécurité → Accessibilité. Vous lancez l’enregistrement depuis la fenêtre de réunion.")
-                    .foregroundStyle(Color.mtInk2)
                 if detectZoomMeetings {
+                    Text("L’accès à l’accessibilité sert à détecter les fenêtres Zoom. L’enregistrement se lance manuellement.")
+                        .foregroundStyle(Color.mtInk2)
                     Button("Ouvrir les réglages d’accessibilité") {
                         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
                         NSWorkspace.shared.open(url)
@@ -356,6 +371,7 @@ struct CaptureView: View {
             session.recordedTracks = nil
             session.recording = file
             session.transcript = ""
+            session.permissionHelp = nil
             session.status = "Fichier audio prêt"
             tab = .transcription
         }
@@ -373,18 +389,24 @@ struct CaptureView: View {
                     let result = try await current.stop()
                     session.recording = result.mix
                     session.recordedTracks = result.tracks
-                    session.status = "Enregistrement prêt · micro et audio système"
+                    session.permissionHelp = result.help
+                    session.status = result.help.map { "Une piste a été conservée. \($0.localizedDescription)" }
+                        ?? "Enregistrement prêt · micro et audio système"
                 } else {
+                    let next = AudioCapture()
+                    session.permissionHelp = nil
+                    session.status = "Vérification des autorisations…"
+                    try await next.start()
                     session.recordedTracks = nil
                     session.recording = nil
                     session.transcript = ""
-                    let next = AudioCapture()
-                    session.status = "Vérification des autorisations…"
-                    try await next.start()
                     session.capture = next
                     session.status = "Enregistrement en cours"
                     openWindow(id: "meeting")
                 }
+            } catch let help as AudioPermissionHelp {
+                session.permissionHelp = help
+                session.status = help.localizedDescription
             } catch { session.status = error.localizedDescription }
         }
     }

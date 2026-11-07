@@ -6,7 +6,7 @@ Consulter la [fiche du hackathon](hackathon.md) pour les règles, le barème et 
 
 | Responsable | Livrable | Outils |
 |---|---|---|
-| Wael | App Mac et intégration de bout en bout. Valider la capture sur un vrai appel, vérifier Gladia, puis relier la transcription, la revue et l’exécution. | SwiftUI, ScreenCaptureKit et Gladia. |
+| Wael | App Mac et intégration de bout en bout. Valider la capture sur un vrai appel, vérifier Gladia, puis relier la transcription, la revue et l’exécution. | SwiftUI, Core Audio et Gladia. |
 | Lenny | Branding de Meetin-OS. Définir l’identité visuelle et fournir les éléments de marque pour l’interface et la démo. | Logo, palette, typographie et éléments de présentation. |
 | Samy | Front-end de revue. Afficher la tâche proposée et son extrait source, permettre de corriger le responsable et l’échéance, puis afficher le résultat après validation. | Next.js et TypeScript selon le plan du projet. |
 

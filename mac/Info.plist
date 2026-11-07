@@ -6,9 +6,9 @@
 <key>CFBundleIconFile</key><string>MeetinOS.icns</string>
 <key>CFBundleName</key><string>Meetin-OS</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.1.0</string>
-<key>CFBundleVersion</key><string>1</string>
+<key>CFBundleShortVersionString</key><string>0.1.1</string>
+<key>CFBundleVersion</key><string>2</string>
 <key>LSMinimumSystemVersion</key><string>15.0</string>
 <key>NSMicrophoneUsageDescription</key><string>Meetin-OS capture votre voix pendant un enregistrement.</string>
-<key>NSScreenCaptureUsageDescription</key><string>Meetin-OS utilise la capture système pour enregistrer l’audio de votre appel. Aucune image n’est enregistrée.</string>
+<key>NSAudioCaptureUsageDescription</key><string>Meetin-OS enregistre le son de votre appel lorsque vous cliquez sur Enregistrer.</string>
 </dict></plist>

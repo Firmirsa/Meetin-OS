@@ -1,6 +1,5 @@
 import AVFoundation
-import CoreGraphics
-import ScreenCaptureKit
+import CoreAudio
 
 struct CaptureError: LocalizedError {
     let message: String
@@ -8,17 +7,43 @@ struct CaptureError: LocalizedError {
     init(_ message: String) { self.message = message }
 }
 
-final class AudioCapture: NSObject, SCStreamOutput {
-    private let queue = DispatchQueue(label: "MeetinOS.audio")
-    private var files: [SCStreamOutputType: AVAudioFile] = [:]
-    private var failure: Error?
-    private var firstSamples: [SCStreamOutputType: CMTime] = [:]
-    private var stream: SCStream?
+enum AudioPermissionHelp: LocalizedError {
+    case microphone
+    case systemAudio
+    case systemAudioSilent
+
+    var settingsLabel: String {
+        self == .microphone ? "Ouvrir les réglages du micro" : "Ouvrir les réglages de l’audio système"
+    }
+
+    var settingsURL: URL {
+        let pane = self == .microphone ? "Privacy_Microphone" : "Privacy_ScreenCapture"
+        return URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")!
+    }
+
+    var errorDescription: String? {
+        switch self {
+        case .microphone:
+            "Activez Meetin-OS dans les réglages du micro, puis réessayez."
+        case .systemAudio:
+            "Activez Meetin-OS dans « Audio du système uniquement », puis réessayez."
+        case .systemAudioSilent:
+            "Aucun son de l’appel détecté. Vérifiez le son et l’autorisation « Audio du système uniquement »."
+        }
+    }
+}
+
+final class AudioCapture {
+    private let engine = AVAudioEngine()
+    private var inputTapInstalled = false
+    private var systemTap: SystemAudioTap?
+    private var micWriter: TrackWriter?
+    private var systemWriter: TrackWriter?
     private let folder: URL
     let microphone: URL
     let system: URL
 
-    override init() {
+    init() {
         folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         microphone = folder.appendingPathComponent("microphone.caf")
         system = folder.appendingPathComponent("appel.caf")
@@ -26,27 +51,33 @@ final class AudioCapture: NSObject, SCStreamOutput {
 
     func start() async throws {
         guard await AVCaptureDevice.requestAccess(for: .audio) else {
-            throw CaptureError("Autorisez le microphone dans Réglages Système.")
+            throw AudioPermissionHelp.microphone
         }
-        guard CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() else {
-            throw CaptureError("Autorisez la capture d’écran et d’audio système dans Réglages Système, puis relancez l’app.")
+
+        let input = engine.inputNode
+        let format = input.outputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            throw CaptureError("Aucun micro disponible. Vérifiez votre périphérique d’entrée.")
         }
-        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-        guard let display = content.displays.first else { throw CaptureError("Aucun écran disponible.") }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let filter = SCContentFilter(display: display, excludingWindows: [])
-        let settings = SCStreamConfiguration()
-        settings.capturesAudio = true
-        settings.excludesCurrentProcessAudio = true
-        settings.captureMicrophone = true
-        settings.sampleRate = 48_000
-        settings.channelCount = 2
-        let capture = SCStream(filter: filter, configuration: settings, delegate: nil)
-        // Register only the two audio outputs. No video frames are written.
-        try capture.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue)
-        try capture.addStreamOutput(self, type: .microphone, sampleHandlerQueue: queue)
-        try await capture.startCapture()
-        stream = capture
+
+        let tap = try SystemAudioTap()
+        let mic = TrackWriter(url: microphone)
+        let call = TrackWriter(url: system, checkSignal: true)
+        systemTap = tap
+        micWriter = mic
+        systemWriter = call
+        do {
+            try tap.start { buffer, time in call.append(buffer, hostTime: time) }
+            input.installTap(onBus: 0, bufferSize: 2048, format: format) { buffer, time in
+                mic.append(buffer, hostTime: time.isHostTimeValid ? time.hostTime : mach_absolute_time())
+            }
+            inputTapInstalled = true
+            try engine.start()
+        } catch {
+            stopInputs()
+            throw error
+        }
     }
 
     struct Tracks {
@@ -56,31 +87,45 @@ final class AudioCapture: NSObject, SCStreamOutput {
         let systemOffset: Double
     }
 
-    func stop() async throws -> (mix: URL, tracks: Tracks) {
-        guard let stream else { throw CaptureError("Aucun enregistrement en cours.") }
-        self.stream = nil
-        try await stream.stopCapture()
-        let tracks: Tracks = try queue.sync {
-            defer { files.removeAll() }
-            if let failure { throw failure }
-            guard files[.microphone]?.length ?? 0 > 0, files[.audio]?.length ?? 0 > 0 else {
-                throw CaptureError("Une piste audio manque. Vérifiez le micro et le son de l’appel.")
-            }
-            let micStart = firstSamples[.microphone]?.seconds ?? 0
-            let systemStart = firstSamples[.audio]?.seconds ?? 0
-            let origin = min(micStart, systemStart)
-            return Tracks(
-                microphone: microphone, system: system,
-                microphoneOffset: micStart - origin, systemOffset: systemStart - origin
-            )
-        }
+    func stop() async throws -> (mix: URL, tracks: Tracks?, help: AudioPermissionHelp?) {
+        guard systemTap != nil else { throw CaptureError("Aucun enregistrement en cours.") }
+        stopInputs()
+        let mic = try micWriter?.finish()
+        let call = try systemWriter?.finish()
         let output = folder.appendingPathComponent("reunion.m4a")
+
+        guard let mic else {
+            guard let call, call.hasSignal else { throw AudioPermissionHelp.microphone }
+            try await Self.exportAudio([(system, 0)], to: output)
+            return (output, nil, .microphone)
+        }
+        guard let call, call.hasSignal else {
+            try await Self.exportAudio([(microphone, 0)], to: output)
+            return (output, nil, .systemAudioSilent)
+        }
+        let origin = min(mic.start, call.start)
+        let tracks = Tracks(
+            microphone: microphone, system: system,
+            microphoneOffset: mic.start - origin, systemOffset: call.start - origin
+        )
         try await Self.mix(
             microphone: microphone, system: system, to: output,
             microphoneOffset: tracks.microphoneOffset, systemOffset: tracks.systemOffset
         )
-        return (output, tracks)
+        return (output, tracks, nil)
     }
+
+    private func stopInputs() {
+        if inputTapInstalled {
+            engine.stop()
+            engine.inputNode.removeTap(onBus: 0)
+            inputTapInstalled = false
+        }
+        systemTap?.stop()
+        systemTap = nil
+    }
+
+    deinit { stopInputs() }
 
     static func mix(
         microphone: URL, system: URL, to output: URL,
@@ -106,29 +151,154 @@ final class AudioCapture: NSObject, SCStreamOutput {
         try await exporter.export(to: output, as: .m4a)
     }
 
-    func stream(_ stream: SCStream, didOutputSampleBuffer sample: CMSampleBuffer, of type: SCStreamOutputType) {
-        guard failure == nil, sample.isValid, sample.numSamples > 0,
-              let description = sample.formatDescription else { return }
-        let format = AVAudioFormat(cmAudioFormatDescription: description)
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(sample.numSamples)) else { return }
-        buffer.frameLength = buffer.frameCapacity
-        let status = CMSampleBufferCopyPCMDataIntoAudioBufferList(
-            sample, at: 0, frameCount: Int32(sample.numSamples), into: buffer.mutableAudioBufferList
-        )
-        guard status == noErr else {
-            failure = CaptureError("Impossible de lire les données audio (\(status)).")
-            return
+    private final class TrackWriter {
+        private let url: URL
+        private let queue = DispatchQueue(label: "MeetinOS.audio.file")
+        private var file: AVAudioFile?
+        private var firstSample: Double?
+        private var hasSignal: Bool
+        private var failure: Error?
+
+        init(url: URL, checkSignal: Bool = false) {
+            self.url = url
+            hasSignal = !checkSignal
         }
-        do {
-            if files[type] == nil {
-                let timestamp = sample.presentationTimeStamp
-                if timestamp.seconds.isFinite { firstSamples[type] = timestamp }
-                files[type] = try AVAudioFile(
-                    forWriting: type == .microphone ? microphone : system,
-                    settings: format.settings, commonFormat: format.commonFormat, interleaved: format.isInterleaved
-                )
+
+        func append(_ buffer: AVAudioPCMBuffer, hostTime: UInt64) {
+            guard buffer.frameLength > 0 else { return }
+            queue.sync {
+                guard failure == nil else { return }
+                do {
+                    if file == nil {
+                        let format = buffer.format
+                        file = try AVAudioFile(
+                            forWriting: url, settings: format.settings,
+                            commonFormat: format.commonFormat, interleaved: format.isInterleaved
+                        )
+                        firstSample = AVAudioTime.seconds(forHostTime: hostTime)
+                    }
+                    if !hasSignal { hasSignal = Self.containsSignal(buffer) }
+                    try file?.write(from: buffer)
+                } catch { failure = error }
             }
-            try files[type]?.write(from: buffer)
-        } catch { failure = error }
+        }
+
+        func finish() throws -> (start: Double, hasSignal: Bool)? {
+            try queue.sync {
+                defer { file = nil }
+                if let failure { throw failure }
+                guard let firstSample, let file, file.length > 0 else { return nil }
+                return (firstSample, hasSignal)
+            }
+        }
+
+        private static func containsSignal(_ buffer: AVAudioPCMBuffer) -> Bool {
+            guard let samples = buffer.floatChannelData else {
+                return UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList).contains { channel in
+                    UnsafeRawBufferPointer(start: channel.mData, count: Int(channel.mDataByteSize)).contains { $0 != 0 }
+                }
+            }
+            for channel in 0..<Int(buffer.format.channelCount) {
+                for frame in 0..<Int(buffer.frameLength) where abs(samples[channel][frame * buffer.stride]) > 0.00001 {
+                    return true
+                }
+            }
+            return false
+        }
+    }
+}
+
+private final class SystemAudioTap {
+    private var tapID = AudioObjectID(kAudioObjectUnknown)
+    private var deviceID = AudioObjectID(kAudioObjectUnknown)
+    private var ioProc: AudioDeviceIOProcID?
+    private var running = false
+    private let queue = DispatchQueue(label: "MeetinOS.audio.system")
+    private let format: AVAudioFormat
+
+    init() throws {
+        let description = CATapDescription(stereoGlobalTapButExcludeProcesses: Self.processToExclude())
+        description.name = "Meetin-OS"
+        description.isPrivate = true
+        description.muteBehavior = .unmuted
+        var tap = AudioObjectID(kAudioObjectUnknown)
+        try Self.check(AudioHardwareCreateProcessTap(description, &tap))
+        do {
+            var address = AudioObjectPropertyAddress(
+                mSelector: kAudioTapPropertyFormat, mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            var streamFormat = AudioStreamBasicDescription()
+            var size = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+            try Self.check(AudioObjectGetPropertyData(tap, &address, 0, nil, &size, &streamFormat))
+            guard let format = AVAudioFormat(streamDescription: &streamFormat) else {
+                throw CaptureError("Format audio du système indisponible.")
+            }
+            let properties: [String: Any] = [
+                kAudioAggregateDeviceNameKey: "Meetin-OS Audio",
+                kAudioAggregateDeviceUIDKey: UUID().uuidString,
+                kAudioAggregateDeviceIsPrivateKey: true,
+                kAudioAggregateDeviceTapListKey: [[kAudioSubTapUIDKey: description.uuid.uuidString]]
+            ]
+            var device = AudioObjectID(kAudioObjectUnknown)
+            try Self.check(AudioHardwareCreateAggregateDevice(properties as CFDictionary, &device))
+            self.format = format
+            tapID = tap
+            deviceID = device
+        } catch {
+            AudioHardwareDestroyProcessTap(tap)
+            throw error
+        }
+    }
+
+    func start(_ receive: @escaping (AVAudioPCMBuffer, UInt64) -> Void) throws {
+        try Self.check(AudioDeviceCreateIOProcIDWithBlock(&ioProc, deviceID, queue) { [format] _, input, time, _, _ in
+            guard let buffer = AVAudioPCMBuffer(pcmFormat: format, bufferListNoCopy: input, deallocator: nil) else { return }
+            buffer.frameLength = buffer.frameCapacity
+            let timestamp = time.pointee
+            let hostTime = timestamp.mFlags.contains(.hostTimeValid) ? timestamp.mHostTime : mach_absolute_time()
+            receive(buffer, hostTime)
+        })
+        guard let ioProc else { throw CaptureError("Impossible de préparer l’audio du système.") }
+        try Self.check(AudioDeviceStart(deviceID, ioProc))
+        running = true
+    }
+
+    func stop() {
+        if let ioProc {
+            if running { AudioDeviceStop(deviceID, ioProc) }
+            AudioDeviceDestroyIOProcID(deviceID, ioProc)
+            self.ioProc = nil
+            running = false
+        }
+        if deviceID != kAudioObjectUnknown {
+            AudioHardwareDestroyAggregateDevice(deviceID)
+            deviceID = kAudioObjectUnknown
+        }
+        if tapID != kAudioObjectUnknown {
+            AudioHardwareDestroyProcessTap(tapID)
+            tapID = kAudioObjectUnknown
+        }
+    }
+
+    deinit { stop() }
+
+    private static func check(_ status: OSStatus) throws {
+        if status == kAudioDevicePermissionsError { throw AudioPermissionHelp.systemAudio }
+        guard status == noErr else { throw CaptureError("Impossible de démarrer l’audio du système (\(status)).") }
+    }
+
+    private static func processToExclude() -> [AudioObjectID] {
+        var pid = getpid()
+        var process = AudioObjectID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioObjectID>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyTranslatePIDToProcessObject, mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let result = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &address, UInt32(MemoryLayout<pid_t>.size), &pid, &size, &process
+        )
+        return result == noErr && process != kAudioObjectUnknown ? [process] : []
     }
 }

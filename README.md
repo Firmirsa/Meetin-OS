@@ -23,11 +23,11 @@ cd Meetin-OS
 open mac/.build/Meetin-OS.app
 ```
 
-Le script compile et signe l’application localement. À la première capture, macOS demande l’accès au micro et à l’enregistrement de l’écran et de l’audio système.
+Le script compile et signe l’application localement. À la première capture, macOS peut demander l’accès au micro et à l’audio du système. Les **Réglages** de Meetin-OS ouvrent directement les panneaux concernés.
 
 1. Clique sur **Enregistrer**, puis prends tes notes dans le carnet pendant l’appel.
 2. Clique sur **Arrêter**, puis sur **Écouter** pour vérifier l’enregistrement. **Voir les pistes** permet d’inspecter séparément le micro et le son du Mac.
-3. Saisis ta clé Gladia dans **Réglages de transcription**, puis clique sur **Transcrire**. L’app affiche les passages horodatés et permet de copier le texte.
+3. Saisis ta clé Gladia dans **Réglages**, puis clique sur **Transcrire**. L’app affiche les passages horodatés et permet de copier le texte.
 
 Le [guide macOS](mac/README.md) détaille les permissions, les fichiers audio et la configuration de Gladia.
 
@@ -58,7 +58,7 @@ La landing est disponible sur [localhost:3000](http://localhost:3000/) et l’es
 
 | Brique | Recette |
 |---|---|
-| **Mac** | Interface vérifiée sur Mac. Export et ordre des deux pistes testés avec des signaux de test. |
+| **Mac** | Accès au micro et à l’audio du système, deux pistes et export vérifiés avec un son de test sur macOS 26.5.2. |
 | **Gladia** | Un extrait mixé a été transcrit lors d’un essai antérieur. Le nouveau traitement séparé a été vérifié avec des réponses simulées et reste à rejouer sur un vrai appel. |
 | **Holo, Linkup, Devin, Stripe** | Routes serveur et parcours de démo implémentés. Les appels prestataires restent à vérifier avec les clés de l’équipe. |
 
