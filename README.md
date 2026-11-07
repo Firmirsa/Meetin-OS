@@ -2,7 +2,7 @@
 
 **De l’appel à la tâche validée.**
 
-Meetin-OS est un carnet de réunion pour Mac. Il enregistre le micro et l’audio système pendant l’appel, permet de prendre des notes et affiche ensuite une transcription horodatée. Le projet vise à relier chaque engagement à l’extrait qui le justifie, puis à mettre à jour la fiche correspondante après validation humaine.
+Meetin-OS est un carnet de réunion pour Mac et Windows. Il enregistre le micro et l’audio système pendant l’appel, permet de prendre des notes et affiche ensuite une transcription horodatée. Le projet vise à relier chaque engagement à l’extrait qui le justifie, puis à mettre à jour la fiche correspondante après validation humaine.
 
 Développé par **Wael, Lenny et Samy** pour le **H Company × 42AI Computer Use Agents Hackathon**, les 7 et 8 novembre 2026 à Paris.
 
@@ -30,6 +30,12 @@ Le script compile et signe l’application localement. À la première capture, 
 3. Saisis ta clé Gladia dans **Réglages de transcription**, puis clique sur **Transcrire**. L’app affiche les passages horodatés et permet de copier le texte.
 
 Le [guide macOS](mac/README.md) détaille les permissions, les fichiers audio et la configuration de Gladia.
+
+## Lancer le prototype Windows
+
+Sur Windows 10 ou 11 (x64), clique sur **Installer sur Windows** depuis le site, puis ouvre `Meetin-OS-Windows.exe`. L’assistant installe le carnet pour ton compte et crée le raccourci **Meetin-OS** dans Démarrer. La version de test n’est pas signée.
+
+Le [guide Windows](windows/README.md) décrit la capture des deux pistes et le test à faire sur un appel.
 
 ## De la réunion à la tâche
 
@@ -59,6 +65,7 @@ La landing est disponible sur [localhost:3000](http://localhost:3000/) et l’es
 ## Documentation
 
 - [Guide macOS](mac/README.md) · Installation, capture et transcription.
+- [Guide Windows](windows/README.md) · Installation, capture et compilation.
 - [Guide Next.js](web/README.md) · Configuration des clés serveur, tests et espace agent.
 - [Plan d’exécution](docs/plan-hackathon.md) · Répartition et scénario.
 - [Fiche du hackathon](docs/hackathon.md) · Règles, barème et ressources partenaires.
