@@ -1,7 +1,7 @@
 import SwiftUI
 
 // Meetin-OS · composants SwiftUI (dépend de MeetinTheme.swift)
-// Miroir de brand/components/components.css. Non compilé ici : à tester dans Xcode (macOS 15).
+// Miroir de brand/components/components.css. Compilé avec l'app Mac par mac/build.sh.
 //
 // Règles : citron vert = fond, un seul bouton .mtPrimary par écran, pas d'ombres.
 // Granola : ce que l'utilisateur écrit est en encre, ce que l'IA ajoute est en encre secondaire,

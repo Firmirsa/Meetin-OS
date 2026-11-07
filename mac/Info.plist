@@ -12,6 +12,7 @@
     <key>CFBundleURLName</key><string>com.meetin-os.integration</string>
     <key>CFBundleURLSchemes</key><array><string>meetinos</string></array>
 </dict></array>
+<key>ATSApplicationFontsPath</key><string>Fonts</string>
 <key>LSMinimumSystemVersion</key><string>15.0</string>
 <key>NSMicrophoneUsageDescription</key><string>Meetin-OS capture votre voix pendant un enregistrement.</string>
 <key>NSAudioCaptureUsageDescription</key><string>Meetin-OS enregistre le son de votre appel lorsque vous cliquez sur Enregistrer.</string>

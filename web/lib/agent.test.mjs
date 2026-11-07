@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { agentAccess, prepareTask, executeTask } from './agent.mjs';
+import { agentAccess, prepareTask, detectTasks, executeTask } from './agent.mjs';
 
 const token = 'test-only-team-access-token';
 const env = {
@@ -100,4 +100,62 @@ test('a private Trello task waits for the team browser profile and keeps its app
     return Response.json({id: '45463597-20b7-4af7-b3b3-f5fb778203ab'});
   });
   assert.equal(result.status, 'pending');
+});
+
+test('task detection proposes reviewable plans without executing anything', async () => {
+  const transcript = '[00:10] Micro · Karim corrige l’export des notes avant mardi.\n[00:20] Audio de l’appel · D’accord.';
+  await assert.rejects(detectTasks({transcript}, 'incorrect', env, denied), {status: 401});
+  await assert.rejects(detectTasks({}, token, env, denied), {status: 400});
+  const result = await detectTasks({transcript}, token, env, holo({tasks: [{
+    ref: null, executor: 'devin', title: 'Corriger l’export', task: 'Corriger l’export des notes.',
+    quote: 'Karim corrige l’export des notes avant mardi.',
+  }]}, payload => {
+    assert.equal(payload.transcript, transcript);
+    assert.deepEqual(payload.known, []);
+    assert.equal(payload.destinations.devin, 'Firmirsa/Meetin-OS');
+  }));
+  assert.equal(result.tasks.length, 1);
+  assert.equal(result.tasks[0].replaces, null);
+  await assert.rejects(executeTask({approval: result.tasks[0].approval}, token, env, denied), {status: 400});
+  let launches = 0;
+  await executeTask({confirmed: true, approval: result.tasks[0].approval}, token, env, async () => {
+    launches++;
+    return Response.json({url: 'https://app.devin.ai/sessions/detected', session_id: 'detected'});
+  });
+  assert.equal(launches, 1, 'only an explicit confirmation launches a detected task');
+});
+
+test('task detection drops invented quotes and unsupported tools, and keeps valid tasks', async () => {
+  const transcript = 'Karim corrige l’export. Léa crée la fiche Relire le guide.';
+  const good = {ref: null, executor: 'computer_use', title: 'Relire le guide', task: 'Créer la fiche Relire le guide.', quote: 'Léa crée la fiche Relire le guide.'};
+  const result = await detectTasks({transcript}, token, env, holo({tasks: [
+    {...good, quote: 'Citation inventée'},
+    {...good, executor: 'constructor'},
+    {...good, executor: 'shell'},
+    {...good, title: ''},
+    good,
+  ]}));
+  assert.equal(result.tasks.length, 0, 'only the first 3 entries are read, all invalid');
+  const kept = await detectTasks({transcript}, token, env, holo({tasks: [{...good, quote: 'Citation inventée'}, good]}));
+  assert.deepEqual(kept.tasks.map(task => task.title), ['Relire le guide']);
+  assert.equal(kept.tasks[0].destination, 'https://board.example/test');
+  await assert.rejects(detectTasks({transcript}, token, env, async () => Response.json({choices: [{message: {content: 'pas du json'}}]})), {status: 502});
+});
+
+test('a corrected commitment updates the known task instead of adding one', async () => {
+  const transcript = 'Léa s’en charge… finalement, Karim le fait mardi.';
+  const known = [{ref: 'k1', title: 'Envoyer le devis', task: 'Léa envoie le devis à Atlas.'}];
+  const update = {executor: 'devin', title: 'Envoyer le devis', task: 'Karim envoie le devis mardi.', quote: 'finalement, Karim le fait mardi.'};
+  const result = await detectTasks({transcript, known}, token, env, holo({tasks: [{...update, ref: 'k1'}]}, payload => {
+    assert.deepEqual(payload.known, known);
+  }));
+  assert.equal(result.tasks[0].replaces, 'k1');
+  const unknown = await detectTasks({transcript, known}, token, env, holo({tasks: [{...update, ref: 'autre'}]}));
+  assert.equal(unknown.tasks[0].replaces, null);
+  await assert.rejects(detectTasks({transcript, known: Array(11).fill(known[0])}, token, env, denied), {status: 400});
+});
+
+test('task detection skips Holo when no destination is configured', async () => {
+  const bare = {MEETIN_DEMO_TOKEN: token, HAI_API_KEY: 'holo-fixture'};
+  assert.deepEqual(await detectTasks({transcript: 'Karim corrige l’export.'}, token, bare, denied), {tasks: []});
 });

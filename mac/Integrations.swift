@@ -122,7 +122,7 @@ struct IntegrationsView: View {
     private var gladiaForm: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Activer la transcription").font(.title2.bold()).accessibilityAddTraits(.isHeader)
-            Text("Meetin-OS envoie l’audio à Gladia quand vous cliquez sur Transcrire. Saisissez une clé Gladia pour cette session.")
+            Text("Meetin-OS envoie l’audio à Gladia quand vous cliquez sur Transcrire, et en continu pendant l’enregistrement si le direct est activé. La clé reste dans le trousseau de ce Mac.")
                 .foregroundStyle(Color.mtInk2)
             Link("Ouvrir les clés Gladia", destination: URL(string: "https://app.gladia.io/apikeys")!)
             SecureField("Clé API Gladia", text: $gladiaKey).textFieldStyle(.roundedBorder).focused($credentialFocused)
@@ -134,6 +134,7 @@ struct IntegrationsView: View {
                 Spacer()
                 Button(page == .transcribe ? "Transcrire" : "Enregistrer") {
                     session.key = gladiaKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if session.key.isEmpty { GladiaKeyStore.delete() } else { GladiaKeyStore.save(session.key) }
                     if page == .transcribe { dismiss(); transcribe() } else { show(.catalog) }
                 }
                 .buttonStyle(.mtPrimary)

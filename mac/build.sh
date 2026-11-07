@@ -16,11 +16,14 @@ for size in 16 32 128 256 512; do
 done
 iconutil -c icns "$work/MeetinOS.iconset" -o "$app/Contents/Resources/MeetinOS.icns"
 cp ../brand/logo/app-icon-1024.png "$app/Contents/Resources/MeetinOS.png"
+mkdir -p "$app/Contents/Resources/Fonts"
+cp ../brand/fonts/*.ttf ../brand/fonts/OFL-*.txt "$app/Contents/Resources/Fonts/"
 cp Info.plist "$app/Contents/Info.plist"
 
 compile() {
   swiftc -parse-as-library -target "$1-apple-macos$minimum_macos" \
-    MeetinOS.swift Capture.swift Gladia.swift AgentClient.swift AgentWorkspace.swift Integrations.swift ZoomMeetingDetector.swift ../brand/MeetinTheme.swift -o "$2"
+    MeetinOS.swift Capture.swift Gladia.swift AgentClient.swift AgentWorkspace.swift Integrations.swift ZoomMeetingDetector.swift MainWindow.swift Sidebar.swift HomeView.swift MeetingsView.swift SettingsPages.swift MeetingStore.swift MeetingFlow.swift MeetinSite.swift NightTheme.swift GladiaKeyStore.swift LiveTranscription.swift LiveTranscriptPanel.swift LiveAlerts.swift TaskDetection.swift ProposalCards.swift TaskActions.swift TaskNotifications.swift \
+    ../brand/MeetinTheme.swift ../brand/MeetinComponents.swift -o "$2"
 }
 
 executable="$app/Contents/MacOS/MeetinOS"

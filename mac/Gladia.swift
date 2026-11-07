@@ -74,7 +74,7 @@ struct Gladia {
         return lines.joined(separator: "\n")
     }
 
-    private static func line(at start: Double, label: String, text: String) -> String {
+    static func line(at start: Double, label: String, text: String) -> String {
         let seconds = Int(start.isFinite ? min(max(0, start), 86_400) : 0)
         let time = String(format: "%02d:%02d", seconds / 60, seconds % 60)
         return "[\(time)] \(label) · \(text)"
@@ -97,7 +97,11 @@ struct Gladia {
             URL(string: "https://api.gladia.io/v2/upload")!, stage: "envoi de l’audio", body: body,
             type: "multipart/form-data; boundary=\(boundary)"
         )
-        let payload = try JSONSerialization.data(withJSONObject: ["audio_url": upload.audio_url, "diarization": true])
+        let payload = try JSONSerialization.data(withJSONObject: [
+            "audio_url": upload.audio_url,
+            "diarization": true,
+            "language_config": ["languages": ["fr", "en"], "code_switching": true]
+        ] as [String: Any])
         let job: Job = try await request(URL(string: "https://api.gladia.io/v2/pre-recorded")!, stage: "lancement de la transcription", body: payload)
         guard job.result_url.scheme == "https", job.result_url.host == "api.gladia.io" else {
             throw CaptureError("URL de résultat Gladia inattendue.")

@@ -11,6 +11,7 @@ enum AudioPermissionHelp: LocalizedError {
     case microphone
     case systemAudio
     case systemAudioSilent
+    case systemAudioTimeout
 
     var settingsLabel: String {
         self == .microphone ? "Ouvrir les réglages du micro" : "Ouvrir les réglages de l’audio système"
@@ -29,11 +30,21 @@ enum AudioPermissionHelp: LocalizedError {
             "Activez Meetin-OS dans « Audio du système uniquement », puis réessayez."
         case .systemAudioSilent:
             "Aucun son de l’appel détecté. Vérifiez le son et l’autorisation « Audio du système uniquement »."
+        case .systemAudioTimeout:
+            "macOS n’a pas répondu pour l’audio du système. Répondez à la demande d’autorisation si elle est affichée, puis réessayez."
         }
     }
 }
 
+enum AudioTrack: String, CaseIterable, Hashable, Sendable {
+    case microphone, system
+
+    var label: String { self == .microphone ? "Micro" : "Audio de l’appel" }
+}
+
 final class AudioCapture {
+    // Copie de l'audio pour le direct, à renseigner avant start(). Ne doit jamais bloquer.
+    var onAudio: ((AudioTrack, AVAudioPCMBuffer, UInt64) -> Void)?
     private let engine = AVAudioEngine()
     private var inputTapInstalled = false
     private var systemTap: SystemAudioTap?
@@ -68,9 +79,15 @@ final class AudioCapture {
         micWriter = mic
         systemWriter = call
         do {
-            try tap.start { buffer, time in call.append(buffer, hostTime: time) }
+            let listener = onAudio
+            try tap.start { buffer, time in
+                call.append(buffer, hostTime: time)
+                listener?(.system, buffer, time)
+            }
             input.installTap(onBus: 0, bufferSize: 2048, format: format) { buffer, time in
-                mic.append(buffer, hostTime: time.isHostTimeValid ? time.hostTime : mach_absolute_time())
+                let hostTime = time.isHostTimeValid ? time.hostTime : mach_absolute_time()
+                mic.append(buffer, hostTime: hostTime)
+                listener?(.microphone, buffer, hostTime)
             }
             inputTapInstalled = true
             try engine.start()
@@ -285,6 +302,8 @@ private final class SystemAudioTap {
 
     private static func check(_ status: OSStatus) throws {
         if status == kAudioDevicePermissionsError { throw AudioPermissionHelp.systemAudio }
+        // MACH_RCV_TIMED_OUT : le service audio n'a pas répondu, par exemple pendant une demande d'autorisation.
+        if status == OSStatus(bitPattern: 0x1000_4003) { throw AudioPermissionHelp.systemAudioTimeout }
         guard status == noErr else { throw CaptureError("Impossible de démarrer l’audio du système (\(status)).") }
     }
 
