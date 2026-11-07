@@ -32,7 +32,7 @@ extension Color {
     static let mtAccentText = Color(mtLight: "#5C6B0F", mtDark: "#CFE86B")
 
     static let mtRec = Color(mtLight: "#C8341C", mtDark: "#FF6A4D")
-    static let mtRecTint = Color(mtLight: "#F6DDD7", mtDark: "#3A1F1A")
+    static let mtRecTint = Color(mtLight: "#FBEAE6", mtDark: "#3A1F1A")
     static let mtWarn = Color(mtLight: "#8A5A0B", mtDark: "#F0B94F")
     static let mtWarnTint = Color(mtLight: "#F6E7C8", mtDark: "#33281A")
 }
