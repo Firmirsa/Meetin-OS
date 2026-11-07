@@ -16,37 +16,142 @@ struct CaptureView: View {
     @State private var status = "Prêt à enregistrer"
     @State private var transcript = ""
 
+    @State private var notes = ""
+    @State private var showingSettings = false
+
+    private var hasKey: Bool {
+        !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Meetin-OS").font(.largeTitle.bold())
-            Text("Capture de réunion · Micro et audio du Mac")
-            Text(status).accessibilityAddTraits(.updatesFrequently)
-            HStack {
-                Button(capture == nil ? "Enregistrer" : "Arrêter", action: toggleRecording)
-                    .keyboardShortcut(.defaultAction)
-                if let recording, capture == nil {
-                    Button("Écouter") { NSWorkspace.shared.open(recording) }
-                    Button("Voir les pistes") { NSWorkspace.shared.activateFileViewerSelecting([recording]) }
+        VStack(spacing: 0) {
+            HStack(spacing: 9) {
+                Image(systemName: "waveform").foregroundStyle(Color.accentColor)
+                Text("Meetin-OS").font(.headline)
+                Spacer()
+                Button {
+                    showingSettings = true
+                } label: {
+                    Image(systemName: "gearshape").frame(width: 24, height: 24)
                 }
-            }.disabled(busy)
+                .buttonStyle(.borderless)
+                .help("Réglages de transcription")
+                .accessibilityLabel("Réglages de transcription")
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 10)
+
             Divider()
-            SecureField("Clé API Gladia", text: $key)
-                .textFieldStyle(.roundedBorder)
-                .disabled(busy)
-            Button("Transcrire avec Gladia", action: transcribe)
-                .disabled(recording == nil || capture != nil || busy || key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            if !transcript.isEmpty {
-                ScrollView {
-                    Text(transcript).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Carnet de réunion")
+                        .font(.system(size: 32, weight: .semibold, design: .serif))
+                        .accessibilityAddTraits(.isHeader)
+                    Text("Prenez des notes pendant l’appel, puis retrouvez la transcription ici.")
+                        .foregroundStyle(.secondary)
+                    Text("Notes").font(.headline).accessibilityAddTraits(.isHeader)
+                    ZStack(alignment: .topLeading) {
+                        TextEditor(text: $notes)
+                            .font(.body)
+                            .scrollContentBackground(.hidden)
+                            .accessibilityLabel("Notes de réunion")
+                        if notes.isEmpty {
+                            Text("Points clés, décisions, questions…")
+                                .foregroundStyle(.secondary)
+                                .padding(.leading, 5)
+                                .padding(.top, 1)
+                                .allowsHitTesting(false)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .frame(minHeight: 116)
+                    .padding(10)
+                    .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 10))
+
+                    if !transcript.isEmpty {
+                        Divider()
+                        HStack {
+                            Text("Transcription").font(.headline).accessibilityAddTraits(.isHeader)
+                            Spacer()
+                            Button("Copier") {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(transcript, forType: .string)
+                            }
+                            .accessibilityLabel("Copier la transcription")
+                        }
+                        Text(transcript).textSelection(.enabled)
+                    }
                 }
-                Button("Copier la transcription") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(transcript, forType: .string)
+                .frame(maxWidth: 620, alignment: .leading)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 24)
+                .frame(maxWidth: .infinity)
+            }
+            .background(Color(nsColor: .textBackgroundColor))
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 7) {
+                    if busy {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Circle()
+                            .fill(capture == nil ? Color.secondary : Color.red)
+                            .frame(width: 7, height: 7)
+                            .accessibilityHidden(true)
+                    }
+                    Text(status)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .accessibilityAddTraits(.updatesFrequently)
+                }
+                HStack {
+                    if let recording, capture == nil {
+                        Button("Écouter", systemImage: "play.circle") { NSWorkspace.shared.open(recording) }
+                        Button("Voir les pistes") { NSWorkspace.shared.activateFileViewerSelecting([recording]) }
+                    }
+                    Spacer()
+                    if recording != nil {
+                        Button("Transcrire", systemImage: "text.alignleft", action: transcribe)
+                            .buttonStyle(.borderedProminent)
+                    } else {
+                        Button(capture == nil ? "Enregistrer" : "Arrêter",
+                               systemImage: capture == nil ? "mic" : "stop.fill",
+                               action: toggleRecording)
+                            .buttonStyle(.borderedProminent)
+                            .tint(capture == nil ? Color.accentColor : .red)
+                    }
+                }
+                .disabled(busy)
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 14)
+        }
+        .frame(minWidth: 560, minHeight: 400)
+        .sheet(isPresented: $showingSettings) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Réglages de transcription").font(.title2.bold())
+                Text("Meetin-OS utilise Gladia pour transcrire l’audio. La clé sert uniquement pendant cette session.")
+                    .foregroundStyle(.secondary)
+                SecureField("Clé API Gladia", text: $key)
+                    .textFieldStyle(.roundedBorder)
+                HStack {
+                    Spacer()
+                    Button("Fermer") { showingSettings = false }
+                        .keyboardShortcut(.cancelAction)
                 }
             }
+            .padding(24)
+            .frame(width: 400)
         }
-        .padding(24)
-        .frame(minWidth: 510, minHeight: 260)
+        .toolbar {
+            if recording != nil, capture == nil {
+                Button("Nouvel enregistrement", systemImage: "plus", action: toggleRecording)
+                    .disabled(busy)
+            }
+        }
     }
 
     private func toggleRecording() {
@@ -74,6 +179,10 @@ struct CaptureView: View {
 
     private func transcribe() {
         guard let recording else { return }
+        guard hasKey else {
+            showingSettings = true
+            return
+        }
         busy = true
         transcript = ""
         status = "Envoi et transcription en cours…"

@@ -13,7 +13,7 @@ Le script construit et signe localement l’application. Au premier lancement de
 
 1. Lancez un appel de test avec un autre participant. Cliquez sur **Enregistrer**, faites parler chaque personne à tour de rôle, puis cliquez sur **Arrêter**.
 2. Cliquez sur **Écouter** pour vérifier les deux voix. **Voir les pistes** révèle le dossier temporaire contenant le mix et les deux pistes séparées.
-3. Saisissez une clé Gladia dans l’app, puis cliquez sur **Transcrire avec Gladia** pour envoyer le mix. La clé reste en mémoire pour cette session et peut aussi être fournie par la variable d’environnement `GLADIA_API_KEY` si le binaire est lancé depuis le terminal.
+3. Ouvrez **Réglages de transcription** (roue dentée) pour saisir une clé Gladia, puis cliquez sur **Transcrire** pour envoyer le mix. Si aucune clé n’est configurée, le bouton ouvre les réglages. La clé reste en mémoire pour cette session et peut aussi être fournie par la variable d’environnement `GLADIA_API_KEY` si le binaire est lancé depuis le terminal.
 4. Copiez le transcript horodaté depuis l’app. Le prototype appelle Gladia directement. Le raccordement au parcours web de validation reste à faire.
 
 La notification d’arrivée en réunion figure dans le [plan d’exécution](../docs/plan-hackathon.md#à-faire).
