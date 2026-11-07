@@ -7,7 +7,7 @@ enum MainRoute: Hashable {
 struct MainWindow: View {
     @Environment(\.openWindow) private var openWindow
     @Bindable var session: MeetingSession
-    @AppStorage("detectZoomMeetings") private var detectCalls = false
+    @AppStorage("detectZoomMeetings") private var detectCalls = true
     @AppStorage("webWorkspaceURL") private var webWorkspaceURL = MeetinSite.defaultAddress
     private var client: AccountClient? { MeetinSite.baseURL(webWorkspaceURL).map { AccountClient(baseURL: $0) } }
     private var signedIn: Bool { session.account.connected(to: client?.baseURL) }

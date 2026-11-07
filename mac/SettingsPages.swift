@@ -44,7 +44,7 @@ private struct SettingsSection<Content: View>: View {
 
 struct SettingsPage: View {
     @Bindable var session: MeetingSession
-    @AppStorage("detectZoomMeetings") private var detectCalls = false
+    @AppStorage("detectZoomMeetings") private var detectCalls = true
     @AppStorage(MeetingSession.liveTranscriptionKey) private var liveTranscription = true
     var body: some View {
         SettingsScaffold(title: "Paramètres", session: session) {
