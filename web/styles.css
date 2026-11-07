@@ -101,3 +101,38 @@ h3 { margin: 8px 0 4px; font-size: 1.25rem; }
   .site-header { flex-wrap: wrap; }
   h1 { font-size: 3rem; }
 }
+
+/* Brand tokens are shared with the native client. */
+:root { color-scheme: light dark; background: var(--mt-canvas); color: var(--mt-ink); }
+body { color: var(--mt-ink); background: var(--mt-canvas); }
+:root { --paper: var(--mt-canvas); --ink: var(--mt-ink); --muted: var(--mt-ink-2); --green: var(--mt-accent-text); --line: var(--mt-line); }
+h1, h2 { font-family: var(--mt-font-serif); }
+.button, .button:hover { color: var(--mt-on-accent); background: var(--mt-accent); }
+.button:hover { background: var(--mt-accent-hover); }
+.window { background: var(--mt-canvas); border-color: var(--mt-line); box-shadow: none; }
+.window-bar, .note, .workflow { background: var(--mt-surface); }
+.meeting-title { font-family: var(--mt-font-serif); }
+.task, .task-state, .planned { background: var(--mt-accent-tint); color: var(--mt-accent-text); }
+.workspace { padding-block: 32px 64px; }
+.workspace nav { margin-bottom: 35px; }
+.workspace h1 { font-size: clamp(3rem, 7vw, 5.4rem); }
+.workspace h2 { font-size: 2rem; margin-bottom: 16px; }
+.workspace-grid { display: grid; gap: 20px; grid-template-columns: 1fr 1fr; }
+.workspace .mt-card { padding: 24px; min-width: 0; }
+.workspace form { display: grid; gap: 16px; justify-items: start; }
+.workspace label { display: grid; gap: 5px; width: 100%; color: var(--mt-ink); font-size: .875rem; font-weight: 600; }
+.workspace input:not([type=checkbox]), .workspace textarea {
+  width: 100%; border: 1px solid var(--mt-line-strong); border-radius: var(--mt-r-input);
+  background: var(--mt-canvas); color: var(--mt-ink); font: inherit; padding: 10px;
+}
+.workspace textarea { resize: vertical; }
+.workspace .confirm { display: flex; align-items: baseline; gap: 9px; }
+.workspace .access-field { max-width: 360px; margin-bottom: 24px; }
+.workspace-error { padding: 12px; background: var(--mt-warn-tint); color: var(--mt-warn); border-radius: var(--mt-r-input); }
+.workspace button:disabled { opacity: .55; cursor: default; }
+.workspace-result { white-space: pre-wrap; overflow-wrap: anywhere; }
+.workspace .mt-quote { margin: 0; }
+.checkout { margin-top: 20px; display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.checkout h2 { margin: 0; }
+@media (max-width: 760px) { .workspace-grid { grid-template-columns: 1fr; } }
+@media (max-width: 460px) { .site-header { align-items: start; flex-direction: column; } }

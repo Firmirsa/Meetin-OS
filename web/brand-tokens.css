@@ -1,0 +1,159 @@
+/* Meetin-OS · tokens de marque
+   Base B (crème) + accent citron vert.
+   Règle d'or : le citron vert est un FOND (bouton, pastille, surlignage), jamais un texte
+   ni une icône sur fond clair (contraste 1,28:1). Texte d'accent sur clair = --mt-accent-text.
+
+   Polices (Google Fonts) :
+   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Figtree:wght@400;500;600&display=swap">
+*/
+
+:root {
+  /* Surfaces et texte */
+  --mt-canvas: #FAF8F1;
+  --mt-surface: #EDE9DA;
+  --mt-ink: #14201C;
+  --mt-ink-2: #5E675F;
+  --mt-line: rgba(20, 32, 28, 0.14);
+  --mt-line-strong: rgba(20, 32, 28, 0.32);
+
+  /* Accent citron vert */
+  --mt-accent: #CFE86B;
+  --mt-accent-hover: #C3DE55;
+  --mt-accent-tint: #EEF3C7;
+  --mt-on-accent: #14201C;
+  --mt-accent-text: #5C6B0F;
+
+  /* États */
+  --mt-rec: #C8341C;
+  --mt-rec-tint: #F6DDD7;
+  --mt-warn: #8A5A0B;
+  --mt-warn-tint: #F6E7C8;
+
+  /* Typo */
+  --mt-font-serif: "EB Garamond", Georgia, "Iowan Old Style", serif;
+  --mt-font-sans: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mt-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Rayons */
+  --mt-r-input: 8px;
+  --mt-r-btn: 12px;
+  --mt-r-card: 16px;
+  --mt-r-pill: 9999px;
+
+  /* Espacements */
+  --mt-1: 4px;
+  --mt-2: 8px;
+  --mt-3: 12px;
+  --mt-4: 16px;
+  --mt-5: 24px;
+  --mt-6: 32px;
+  --mt-7: 48px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --mt-canvas: #0F1613;
+    --mt-surface: #18211D;
+    --mt-ink: #F3F1E6;
+    --mt-ink-2: #A3ADA5;
+    --mt-line: rgba(243, 241, 230, 0.14);
+    --mt-line-strong: rgba(243, 241, 230, 0.32);
+    --mt-accent-hover: #DDF083;
+    --mt-accent-tint: rgba(207, 232, 107, 0.14);
+    --mt-accent-text: #CFE86B;
+    --mt-rec: #FF6A4D;
+    --mt-rec-tint: rgba(255, 106, 77, 0.16);
+    --mt-warn: #F0B94F;
+    --mt-warn-tint: rgba(240, 185, 79, 0.16);
+  }
+}
+
+:root[data-theme="dark"] {
+  --mt-canvas: #0F1613;
+  --mt-surface: #18211D;
+  --mt-ink: #F3F1E6;
+  --mt-ink-2: #A3ADA5;
+  --mt-line: rgba(243, 241, 230, 0.14);
+  --mt-line-strong: rgba(243, 241, 230, 0.32);
+  --mt-accent-hover: #DDF083;
+  --mt-accent-tint: rgba(207, 232, 107, 0.14);
+  --mt-accent-text: #CFE86B;
+  --mt-rec: #FF6A4D;
+  --mt-rec-tint: rgba(255, 106, 77, 0.16);
+  --mt-warn: #F0B94F;
+  --mt-warn-tint: rgba(240, 185, 79, 0.16);
+}
+
+/* Base */
+body {
+  background: var(--mt-canvas);
+  color: var(--mt-ink);
+  font-family: var(--mt-font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+h1, h2, h3, .mt-serif {
+  font-family: var(--mt-font-serif);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+:focus-visible {
+  outline: 2px solid var(--mt-ink);
+  outline-offset: 2px;
+}
+
+/* Boutons : un seul .mt-btn--primary par écran */
+.mt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mt-2);
+  height: 40px;
+  padding: 0 var(--mt-4);
+  border-radius: var(--mt-r-btn);
+  border: 1px solid transparent;
+  font: 500 14px/1 var(--mt-font-sans);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.mt-btn--primary { background: var(--mt-accent); color: var(--mt-on-accent); }
+.mt-btn--primary:hover { background: var(--mt-accent-hover); }
+.mt-btn--ghost { background: transparent; color: var(--mt-ink); border-color: var(--mt-line-strong); }
+.mt-btn--ghost:hover { background: var(--mt-surface); }
+
+/* Carte : couches de crème et trait fin, pas d'ombre */
+.mt-card {
+  background: var(--mt-surface);
+  border-radius: var(--mt-r-card);
+  padding: var(--mt-4);
+}
+
+/* Extrait source d'une tâche proposée */
+.mt-quote {
+  background: var(--mt-accent-tint);
+  border-radius: var(--mt-r-input);
+  padding: var(--mt-2) var(--mt-3);
+  font-size: 14px;
+}
+.mt-quote time { color: var(--mt-ink-2); font-family: var(--mt-font-mono); font-size: 12px; margin-left: var(--mt-2); }
+
+/* Pastilles d'état */
+.mt-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--mt-r-pill);
+  font: 500 12px/1 var(--mt-font-sans);
+  background: var(--mt-surface);
+  color: var(--mt-ink-2);
+}
+.mt-pill--ok { background: var(--mt-accent-tint); color: var(--mt-accent-text); }
+.mt-pill--rec { background: var(--mt-rec-tint); color: var(--mt-rec); }
+.mt-pill--rec::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mt-rec); }
+
+.mt-label { font-size: 12px; color: var(--mt-ink-2); }

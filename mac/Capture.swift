@@ -12,6 +12,7 @@ final class AudioCapture: NSObject, SCStreamOutput {
     private let queue = DispatchQueue(label: "MeetinOS.audio")
     private var files: [SCStreamOutputType: AVAudioFile] = [:]
     private var failure: Error?
+    private var firstSamples: [SCStreamOutputType: CMTime] = [:]
     private var stream: SCStream?
     private let folder: URL
     let microphone: URL
@@ -48,32 +49,56 @@ final class AudioCapture: NSObject, SCStreamOutput {
         stream = capture
     }
 
-    func stop() async throws -> URL {
+    struct Tracks {
+        let microphone: URL
+        let system: URL
+        let microphoneOffset: Double
+        let systemOffset: Double
+    }
+
+    func stop() async throws -> (mix: URL, tracks: Tracks) {
         guard let stream else { throw CaptureError("Aucun enregistrement en cours.") }
         self.stream = nil
         try await stream.stopCapture()
-        try queue.sync {
+        let tracks: Tracks = try queue.sync {
             defer { files.removeAll() }
             if let failure { throw failure }
             guard files[.microphone]?.length ?? 0 > 0, files[.audio]?.length ?? 0 > 0 else {
                 throw CaptureError("Une piste audio manque. Vérifiez le micro et le son de l’appel.")
             }
+            let micStart = firstSamples[.microphone]?.seconds ?? 0
+            let systemStart = firstSamples[.audio]?.seconds ?? 0
+            let origin = min(micStart, systemStart)
+            return Tracks(
+                microphone: microphone, system: system,
+                microphoneOffset: micStart - origin, systemOffset: systemStart - origin
+            )
         }
         let output = folder.appendingPathComponent("reunion.m4a")
-        try await Self.mix(microphone: microphone, system: system, to: output)
-        return output
+        try await Self.mix(
+            microphone: microphone, system: system, to: output,
+            microphoneOffset: tracks.microphoneOffset, systemOffset: tracks.systemOffset
+        )
+        return (output, tracks)
     }
 
-    static func mix(microphone: URL, system: URL, to output: URL) async throws {
+    static func mix(
+        microphone: URL, system: URL, to output: URL,
+        microphoneOffset: Double = 0, systemOffset: Double = 0
+    ) async throws {
+        try await exportAudio([(microphone, microphoneOffset), (system, systemOffset)], to: output)
+    }
+
+    static func exportAudio(_ inputs: [(URL, Double)], to output: URL) async throws {
         let composition = AVMutableComposition()
-        for url in [microphone, system] {
+        for (url, offset) in inputs {
             let asset = AVURLAsset(url: url)
             guard let source = try await asset.loadTracks(withMediaType: .audio).first,
                   let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
                 throw CaptureError("Impossible de lire une piste audio.")
             }
             let range = try await source.load(.timeRange)
-            try track.insertTimeRange(range, of: source, at: .zero)
+            try track.insertTimeRange(range, of: source, at: CMTime(seconds: offset, preferredTimescale: 48_000))
         }
         guard let exporter = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetAppleM4A) else {
             throw CaptureError("Impossible de préparer l’export audio.")
@@ -91,11 +116,13 @@ final class AudioCapture: NSObject, SCStreamOutput {
             sample, at: 0, frameCount: Int32(sample.numSamples), into: buffer.mutableAudioBufferList
         )
         guard status == noErr else {
-            failure = CaptureError("Impossible de lire les données audio ((status)).")
+            failure = CaptureError("Impossible de lire les données audio (\(status)).")
             return
         }
         do {
             if files[type] == nil {
+                let timestamp = sample.presentationTimeStamp
+                if timestamp.seconds.isFinite { firstSamples[type] = timestamp }
                 files[type] = try AVAudioFile(
                     forWriting: type == .microphone ? microphone : system,
                     settings: format.settings, commonFormat: format.commonFormat, interleaved: format.isInterleaved

@@ -27,24 +27,34 @@ Le script compile et signe l’application localement. À la première capture, 
 
 Le [guide macOS](mac/README.md) détaille les permissions, les fichiers audio et la configuration de Gladia.
 
-## État du projet
+## De la réunion à la tâche
 
-| Brique | Rôle | État |
-|---|---|---|
-| **App Mac** · SwiftUI et ScreenCaptureKit | Carnet, capture sur deux pistes et écoute du mix. | Prototype dans le dépôt. Interface vérifiée sur Mac et mix vérifié avec des signaux de test. |
-| **Gladia** | Transcription du fichier audio, avec horodatage et séparation des voix. | Intégration dans le prototype, vérifiée avec une réponse simulée. Recette sur un vrai appel à faire. |
-| **Revue des engagements** · Holo | Proposer une tâche et montrer l’extrait source avant validation. | Prévu. |
-| **H Company Agents API** | Retrouver la fiche existante, appliquer la décision et vérifier le résultat dans l’interface cible. | Prévu. |
-| **Linkup, Stripe et Devin** | Joindre une source publique, tester un abonnement et préparer la PR correspondante. | Prévus dans le plan du hackathon. |
+1. Enregistre la réunion dans le carnet Mac et lance **Transcrire**. Pour une capture native, Gladia traite les pistes micro et audio de l’appel séparément et l’app remet les passages dans l’ordre.
+2. Dans l’onglet **Agent**, ouvre l’espace web et colle un extrait de la transcription. Holo peut proposer une tâche de code et sa citation source. La tâche reste modifiable avant confirmation.
+3. Si une recherche publique aide à cadrer la tâche, lance-la avec Linkup et ouvre les sources renvoyées.
+4. Relis la tâche et l’extrait avant de les envoyer à Devin. L’espace agent donne ensuite le lien de la session pour suivre le travail et examiner la PR éventuelle.
+5. Le parcours d’abonnement de démonstration s’ouvre dans Stripe Checkout en mode test. Les droits d’accès et le suivi des abonnements restent à intégrer.
 
-Le scénario de démo part d’une décision qui change en cours d’appel. « Léa s’en charge… finalement, Karim le fait mardi. » Après validation, l’agent doit modifier la fiche existante, la rouvrir et montrer les valeurs enregistrées.
+## Lancer le site Next.js
+
+```bash
+cd web
+npm ci
+cp .env.example .env.local
+npm run dev
+```
+
+La landing est disponible sur [localhost:3000](http://localhost:3000/) et l’espace agent sur [localhost:3000/agent](http://localhost:3000/agent). Remplis le fichier local de configuration pour activer les intégrations. Dans l’app Mac, l’adresse du site se règle dans la roue dentée.
+
+| Brique | Recette |
+|---|---|
+| **Mac** | Interface vérifiée sur Mac. Export et ordre des deux pistes testés avec des signaux de test. |
+| **Gladia** | Un extrait mixé a été transcrit lors d’un essai antérieur. Le nouveau traitement séparé a été vérifié avec des réponses simulées et reste à rejouer sur un vrai appel. |
+| **Holo, Linkup, Devin, Stripe** | Routes serveur et parcours de démo implémentés. Les appels prestataires restent à vérifier avec les clés de l’équipe. |
 
 ## Documentation
 
-- [Guide macOS](mac/README.md) · Installation et recette de capture.
-- [Plan d’exécution](docs/plan-hackathon.md) · Répartition, scénario et tâches à faire.
-- [Fiche du hackathon](docs/hackathon.md) · Règles, barème, programme et ressources partenaires.
-
-## Landing page
-
-La page statique est dans [web/](web/). Pour la prévisualiser depuis la racine du dépôt, lance `python3 -m http.server 8000 --bind 127.0.0.1 --directory web`, puis ouvre [localhost:8000](http://127.0.0.1:8000/).
+- [Guide macOS](mac/README.md) · Installation, capture et transcription.
+- [Guide Next.js](web/README.md) · Configuration des clés serveur, tests et espace agent.
+- [Plan d’exécution](docs/plan-hackathon.md) · Répartition et scénario.
+- [Fiche du hackathon](docs/hackathon.md) · Règles, barème et ressources partenaires.

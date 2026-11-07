@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 
 struct Gladia {
@@ -34,6 +35,12 @@ struct Gladia {
             struct Transcription: Decodable {
                 let full_transcript: String
                 let utterances: [Segment]?
+
+                var segments: [Segment] {
+                    if let utterances, !utterances.isEmpty { return utterances }
+                    let text = full_transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+                    return text.isEmpty ? [] : [Segment(start: 0, speaker: nil, text: text)]
+                }
             }
             let transcription: Transcription?
         }
@@ -42,6 +49,45 @@ struct Gladia {
     }
 
     func transcribe(_ file: URL) async throws -> String {
+        let transcript = try await fetchTranscript(file)
+        let segments = transcript.segments
+        guard !segments.isEmpty else { return "Aucune parole reconnue." }
+        return segments.map {
+            let label = $0.speaker.map { "Voix \($0 + 1)" } ?? "Voix"
+            return Self.line(at: $0.start, label: label, text: $0.text)
+        }.joined(separator: "\n")
+    }
+
+    func transcribe(tracks: AudioCapture.Tracks) async throws -> String {
+        async let microphone = transcribeTrack(tracks.microphone)
+        async let system = transcribeTrack(tracks.system)
+        let (mic, call) = try await (microphone, system)
+        return Self.format(microphone: mic, system: call, tracks: tracks)
+    }
+
+    static func format(microphone: [Segment], system: [Segment], tracks: AudioCapture.Tracks) -> String {
+        let local = microphone.map { ($0.start + tracks.microphoneOffset, "Micro", $0.text) }
+        let remote = system.map { ($0.start + tracks.systemOffset, "Audio de l’appel", $0.text) }
+        var lines = (local + remote).sorted { $0.0 < $1.0 }.map { line(at: $0.0, label: $0.1, text: $0.2) }
+        if microphone.isEmpty { lines.append("Micro · aucune parole reconnue.") }
+        if system.isEmpty { lines.append("Audio de l’appel · aucune parole reconnue.") }
+        return lines.joined(separator: "\n")
+    }
+
+    private static func line(at start: Double, label: String, text: String) -> String {
+        let seconds = Int(start.isFinite ? min(max(0, start), 86_400) : 0)
+        let time = String(format: "%02d:%02d", seconds / 60, seconds % 60)
+        return "[\(time)] \(label) · \(text)"
+    }
+
+    private func transcribeTrack(_ file: URL) async throws -> [Segment] {
+        let output = file.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".m4a")
+        defer { try? FileManager.default.removeItem(at: output) }
+        try await AudioCapture.exportAudio([(file, 0)], to: output)
+        return try await fetchTranscript(output).segments
+    }
+
+    private func fetchTranscript(_ file: URL) async throws -> Result.Details.Transcription {
         let boundary = UUID().uuidString
         let audio = try Data(contentsOf: file)
         var body = Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"audio\"; filename=\"reunion.m4a\"\r\nContent-Type: audio/mp4\r\n\r\n".utf8)
@@ -63,13 +109,7 @@ struct Gladia {
                 guard let transcript = result.result?.transcription else {
                     throw CaptureError("Gladia a terminé sans renvoyer de transcription.")
                 }
-                let lines = (transcript.utterances ?? []).map { segment -> String in
-                    let seconds = Int(segment.start)
-                    let time = String(format: "%02d:%02d", seconds / 60, seconds % 60)
-                    let speaker = segment.speaker.map { "Voix \($0 + 1)" } ?? "Voix"
-                    return "[\(time)] \(speaker) · \(segment.text)"
-                }
-                return lines.isEmpty ? transcript.full_transcript : lines.joined(separator: "\n")
+                return transcript
             case "error", "failed":
                 throw CaptureError("La transcription a échoué chez Gladia.")
             default:

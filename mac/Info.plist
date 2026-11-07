@@ -3,6 +3,7 @@
 <plist version="1.0"><dict>
 <key>CFBundleIdentifier</key><string>com.meetin-os.capture</string>
 <key>CFBundleExecutable</key><string>MeetinOS</string>
+<key>CFBundleIconFile</key><string>MeetinOS.icns</string>
 <key>CFBundleName</key><string>Meetin-OS</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>15.0</string>
