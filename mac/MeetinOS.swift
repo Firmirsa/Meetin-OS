@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -25,6 +26,7 @@ final class MeetingSession {
     var status = "Prêt à enregistrer"
     var transcript = ""
     var notes = ""
+    var zoomDetector = ZoomMeetingDetector()
 }
 
 struct CaptureView: View {
@@ -33,6 +35,7 @@ struct CaptureView: View {
     @Environment(\.openWindow) private var openWindow
     @Bindable var session: MeetingSession
     var isMeetingWindow = false
+    @AppStorage("detectZoomMeetings") private var detectZoomMeetings = false
     @State private var showingSettings = false
     @State private var tab: MeetingTab = .transcription
 
@@ -169,6 +172,18 @@ struct CaptureView: View {
             .padding(.vertical, 14)
         }
         .frame(minWidth: 560, minHeight: 400)
+        .task(id: detectZoomMeetings) {
+            guard !isMeetingWindow else { return }
+            session.zoomDetector = ZoomMeetingDetector()
+            guard detectZoomMeetings else { return }
+            while !Task.isCancelled {
+                if session.zoomDetector.observe(ZoomMeetingDetector.windowTitles()) {
+                    openWindow(id: "meeting")
+                }
+                do { try await Task.sleep(for: .seconds(2)) }
+                catch { return }
+            }
+        }
         .sheet(isPresented: $showingSettings) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Réglages de transcription").font(.title2.bold())
@@ -176,6 +191,16 @@ struct CaptureView: View {
                     .foregroundStyle(.secondary)
                 SecureField("Clé API Gladia", text: $session.key)
                     .textFieldStyle(.roundedBorder)
+                Divider()
+                Toggle("Ouvrir la fenêtre quand je rejoins une réunion Zoom", isOn: $detectZoomMeetings)
+                Text("Activez Meetin-OS dans Réglages Système → Confidentialité et sécurité → Accessibilité. Vous lancez l’enregistrement depuis la fenêtre de réunion.")
+                    .foregroundStyle(.secondary)
+                if detectZoomMeetings {
+                    Button("Ouvrir les réglages d’accessibilité") {
+                        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+                        NSWorkspace.shared.open(url)
+                    }
+                }
                 HStack {
                     Spacer()
                     Button("Fermer") { showingSettings = false }

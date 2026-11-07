@@ -20,6 +20,6 @@ Pour reprendre un essai après avoir relancé l’app, utilise **Ouvrir un enreg
 
 Au démarrage de la capture, Meetin-OS ouvre une fenêtre dédiée. L’onglet **Transcription** regroupe les notes et le texte renvoyé par Gladia après l’appel. L’onglet **Agent** accueillera la revue des tâches. Le bouton **Afficher la réunion** permet de rouvrir la fenêtre.
 
-La notification d’arrivée en réunion figure dans le [plan d’exécution](../docs/plan-hackathon.md#à-faire).
+Pour ouvrir la fenêtre en rejoignant un appel, active **Ouvrir la fenêtre quand je rejoins une réunion Zoom** dans les réglages de Meetin-OS et autorise l’app dans **Confidentialité et sécurité → Accessibilité**. Garde le carnet principal ouvert. La détection repose sur les titres de fenêtres de Zoom Workplace en français ou en anglais. Clique ensuite sur **Enregistrer** dans la fenêtre de réunion.
 
 [Capture Apple](https://developer.apple.com/documentation/screencapturekit/capturing-screen-content-in-macos) · [API asynchrone Gladia](https://www.gladia.io/blog/gladia-async-api-for-meeting-transcription-integration-guide-and-best-practices)

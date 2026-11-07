@@ -34,5 +34,5 @@ Pour Meetin-OS, les quatre intégrations dans le produit sont H Company, Gladia,
 
 ## À faire
 
-- [ ] **Wael · Notification d’arrivée en réunion.** Détecter l’entrée dans un appel sur un premier outil, puis proposer « Enregistrer » ou « Ignorer », dans l’esprit de Wispr Flow ou Otter. La notification demande une action explicite avant de démarrer la capture.
+- [ ] **Wael · Recette de la détection Zoom.** Activer la détection et vérifier sur un appel que la fenêtre s’ouvre une seule fois à l’arrivée. L’enregistrement se lance sur action explicite.
 - [ ] Attribuer Linkup et Stripe / Devin.
