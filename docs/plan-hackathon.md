@@ -8,7 +8,7 @@ Consulter la [fiche du hackathon](hackathon.md) pour les règles, le barème et 
 |---|---|---|
 | Wael | Développer l’app Mac (capture micro et son de l’appel, puis transcription) et l’écran de revue. Extraire les engagements et afficher l’extrait source. L’utilisateur peut corriger le responsable ou l’échéance avant validation. | Gladia pour la transcription horodatée, Holo pour structurer les engagements, Next.js et TypeScript pour l’écran de revue. |
 | Lenny | Retrouver la fiche existante dans un tableau de test, appliquer la mise à jour validée, puis rouvrir la fiche et renvoyer les valeurs relues. | H Company Agents API pour piloter le navigateur. Linkup pour joindre une source publique utile lorsqu’une tâche le demande. |
-| Sami | Participant Meetin-OS. Lot à définir avec l’équipe. | À définir. |
+| Samy | Participant Meetin-OS. Lot à définir avec l’équipe. | À définir. |
 | Devin, piloté par Wael | Préparer une PR séparée pour l’abonnement de test et l’activation de l’accès dans l’app. Wael vérifie le parcours et intègre la PR. | Cognition / Devin et Stripe Checkout en mode test. |
 
 ## Contrat entre les deux lots
@@ -33,4 +33,4 @@ Pour Meetin-OS, les quatre intégrations dans le produit sont H Company, Gladia,
 ## À faire
 
 - [ ] **Wael · Notification d’arrivée en réunion.** Détecter l’entrée dans un appel sur un premier outil, puis proposer « Enregistrer » ou « Ignorer », dans l’esprit de Wispr Flow ou Otter. La notification demande une action explicite avant de démarrer la capture.
-- [ ] Définir le lot de Sami avec l’équipe.
+- [ ] Définir le lot de Samy avec l’équipe.
