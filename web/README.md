@@ -7,22 +7,9 @@ Le site Next.js sert les téléchargements à `/telecharger` et les premiers pas
 ### Supabase
 
 1. Ouvre le [SQL Editor du projet de Lenny](https://supabase.com/dashboard/project/lqqkgyvwilltwgkxlirb/sql/new). Vérifie le projet et exécute `select to_regclass('vault.decrypted_secrets'), to_regclass('meetin_private.quota_plans');`. La vue Vault doit exister et la table des quotas doit être absente pour une première application. Si la table existe déjà, vérifie l’état en base avant de relancer le SQL.
-2. Colle la [migration des comptes et quotas](../supabase/migrations/20261107190000_meetin_accounts_and_quota.sql) dans une nouvelle requête, entre `begin;` et `commit;`, et exécute le tout. Vérifie avec `select code, monthly_ms / 60000 as minutes from meetin_private.quota_plans order by code;` : `free` doit afficher 15 et `premium` 300. Cette requête ne lit aucun secret.
+2. Pour une première application, colle la [migration des comptes et quotas](../supabase/migrations/20261107190000_meetin_accounts_and_quota.sql) dans une nouvelle requête, entre `begin;` et `commit;`, et exécute le tout. Vérifie avec `select code, monthly_ms / 60000 as minutes from meetin_private.quota_plans order by code;` : `free` doit afficher 15 et `premium` 300. Cette requête ne lit aucun secret.
 3. Active la connexion par e-mail avec confirmation. Configure **Confirm signup** et **Magic Link** pour afficher `{{ .Token }}`, le code à six chiffres que l’app demande. Le SMTP Supabase par défaut livre uniquement aux membres de l’équipe du projet. Pour d’autres adresses, configure un [serveur SMTP](https://supabase.com/docs/guides/auth/auth-smtp). [Connexion Supabase par code e-mail](https://supabase.com/docs/guides/auth/auth-email-passwordless)
 4. Dans [Supabase Vault](https://supabase.com/docs/guides/database/vault), vérifie l’entrée `gladia_api_key`. Les entrées `hai_api_key` et `devin_api_key` servent à l’agent. Les variables serveur `GLADIA_API_KEY`, `HAI_API_KEY` et `DEVIN_API_KEY` restent possibles et priment sur le Vault.
-
-#### Aligner l’historique de la migration déjà appliquée
-
-Lenny indique que le projet a enregistré cette migration sous `20261107183914`. Le fichier Git porte le numéro `20261107190000`. Depuis un checkout de `codex/hosted-gladia` lié au projet `lqqkgyvwilltwgkxlirb`, lance `supabase migration list --linked` et compare le SQL de la version distante à celui du fichier. Si les deux correspondent, aligne l’historique avant le prochain `db push`.
-
-```sh
-supabase migration repair 20261107190000 --status applied --linked
-supabase migration repair 20261107183914 --status reverted --linked
-supabase migration list --linked
-supabase db push --dry-run --linked
-```
-
-`applied` inscrit le numéro Git et `reverted` retire l’ancien numéro du registre. Ces commandes ne rejouent pas le SQL et ne suppriment aucune table. La liste doit afficher `20261107190000` des deux côtés et la simulation ne doit pas proposer cette migration. [Référence Supabase CLI](https://supabase.com/docs/reference/cli/supabase-migration-repair)
 
 ### Vercel
 
