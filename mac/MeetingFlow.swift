@@ -17,42 +17,52 @@ extension MeetingSession {
         NSApp.windows.first { $0.identifier?.rawValue.hasPrefix("notebook") == true }?.makeKeyAndOrderFront(nil)
     }
 
-    func setZoomDetection(_ enabled: Bool, openWindow: OpenWindowAction) {
+    func setCallDetection(_ enabled: Bool, openWindow: OpenWindowAction) {
         guard enabled else {
-            zoomMonitor?.cancel()
-            zoomMonitor = nil
-            if let id = zoomDetector.arrivalID { TaskNotifications.shared.removeZoomArrival(id) }
-            zoomDetector = ZoomMeetingDetector()
+            callMonitor?.cancel()
+            callMonitor = nil
+            callAccessibility = nil
+            for arrival in callDetector.arrivals { TaskNotifications.shared.removeMeetingArrival(arrival.id) }
+            callDetector = MeetingDetector()
             return
         }
-        guard zoomMonitor == nil else { return }
+        guard callMonitor == nil else { return }
         LiveAlerts.requestPermission()
-        zoomMonitor = Task { [weak self] in
+        let accessibility = MeetingAccessibility()
+        callAccessibility = accessibility
+        callMonitor = Task { [weak self] in
             while !Task.isCancelled, self != nil {
-                self?.observeZoom(openWindow: openWindow)
+                let trackedRoom = self?.callDetector.current(.meet)?.key
+                let presence = await accessibility.readAll(trackedMeet: trackedRoom)
+                guard !Task.isCancelled else { break }
+                self?.observeCalls(presence, openWindow: openWindow)
                 do { try await Task.sleep(for: .seconds(2)) }
-                catch { return }
+                catch { break }
+            }
+            await accessibility.stop()
+        }
+    }
+
+    private func observeCalls(_ presence: [MeetingSource: MeetingPresence], openWindow: OpenWindowAction) {
+        for source in MeetingSource.allCases {
+            let change = callDetector.observe(presence[source] ?? .unknown, for: source)
+            if let left = change.left { TaskNotifications.shared.removeMeetingArrival(left.id) }
+            if let joined = change.joined {
+                openWindow(id: "meeting")
+                if capture == nil { TaskNotifications.shared.postMeetingArrival(joined) }
             }
         }
     }
 
-    private func observeZoom(openWindow: OpenWindowAction) {
-        let previous = zoomDetector.arrivalID
-        if zoomDetector.observe(ZoomMeetingDetector.windowTitles()), let id = zoomDetector.arrivalID {
-            openWindow(id: "meeting")
-            if capture == nil { TaskNotifications.shared.postZoomArrival(id) }
-        } else if let previous, !zoomDetector.inMeeting {
-            TaskNotifications.shared.removeZoomArrival(previous)
-        }
-    }
-
-    func handleZoomArrivalNotification(id: UUID, start: Bool) {
-        guard let openWindowAction,
-              zoomDetector.isCurrentArrival(id, titles: ZoomMeetingDetector.windowTitles()) else { return }
+    func handleMeetingArrivalNotification(id: UUID, start: Bool) async {
+        guard accountConnected, let openWindowAction, let accessibility = callAccessibility,
+              let arrival = callDetector.arrivals.first(where: { $0.id == id }) else { return }
+        let presence = await accessibility.read(arrival.source, trackedKey: arrival.key)
+        guard accountConnected, callDetector.accepts(arrival, presence: presence) else { return }
         NSApp.activate()
         openWindowAction(id: "meeting")
         if start, capture == nil {
-            CaptureView.toggleRecording(session: self, openWindow: openWindowAction)
+            CaptureView.toggleRecording(session: self, openWindow: openWindowAction, source: arrival.source)
         }
     }
 
@@ -265,14 +275,14 @@ extension MeetingSession {
         finishDetection()
     }
 
-    func meetingDidStart() {
+    func meetingDidStart(source: MeetingSource?) {
         if meetingID != nil {
             meetingID = nil
             notes = ""
         }
         startedAt = Date()
-        startedInZoom = zoomDetector.inMeeting
-        if let id = zoomDetector.arrivalID { TaskNotifications.shared.removeZoomArrival(id) }
+        recordingSource = source ?? callDetector.arrivals.first?.source
+        for arrival in callDetector.arrivals { TaskNotifications.shared.removeMeetingArrival(arrival.id) }
         transcriptIncomplete = false
         detector = nil
         proposals = []
@@ -307,7 +317,7 @@ extension MeetingSession {
         let duration = await Self.audioDuration(audio) ?? Date().timeIntervalSince(started)
         store.add(MeetingRecord(
             id: id,
-            title: Self.defaultTitle(started, zoom: startedInZoom),
+            title: Self.defaultTitle(started, source: recordingSource),
             date: started,
             duration: duration,
             audioPath: audio.path,
@@ -319,7 +329,7 @@ extension MeetingSession {
                     microphoneOffset: $0.microphoneOffset, systemOffset: $0.systemOffset
                 )
             },
-            source: startedInZoom ? "Zoom" : nil,
+            source: recordingSource?.rawValue,
             transcriptIncomplete: transcriptIncomplete ? true : nil,
             proposals: proposals.isEmpty ? nil : proposals
         ))
@@ -421,10 +431,11 @@ extension MeetingSession {
         return duration.seconds
     }
 
-    private static func defaultTitle(_ date: Date, zoom: Bool) -> String {
+    private static func defaultTitle(_ date: Date, source: MeetingSource?) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "fr_FR")
         formatter.dateFormat = "d MMMM 'à' HH:mm"
-        return "\(zoom ? "Réunion Zoom" : "Réunion") du \(formatter.string(from: date))"
+        let title = source.map { $0 == .whatsapp ? "Appel WhatsApp" : "Réunion \($0.rawValue)" } ?? "Réunion"
+        return "\(title) du \(formatter.string(from: date))"
     }
 }

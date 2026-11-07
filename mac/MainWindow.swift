@@ -7,7 +7,7 @@ enum MainRoute: Hashable {
 struct MainWindow: View {
     @Environment(\.openWindow) private var openWindow
     @Bindable var session: MeetingSession
-    @AppStorage("detectZoomMeetings") private var detectZoomMeetings = false
+    @AppStorage("detectZoomMeetings") private var detectCalls = false
     @AppStorage("webWorkspaceURL") private var webWorkspaceURL = MeetinSite.defaultAddress
     private var client: AccountClient? { MeetinSite.baseURL(webWorkspaceURL).map { AccountClient(baseURL: $0) } }
     private var signedIn: Bool { session.account.connected(to: client?.baseURL) }
@@ -40,8 +40,8 @@ struct MainWindow: View {
         .sheet(item: $session.integrationsRequest) { request in
             IntegrationsView(session: session, workspaceURL: $webWorkspaceURL, request: request, transcribe: {})
         }
-        .onChange(of: signedIn && detectZoomMeetings, initial: true) { _, enabled in
-            session.setZoomDetection(enabled, openWindow: openWindow)
+        .onChange(of: signedIn && detectCalls, initial: true) { _, enabled in
+            session.setCallDetection(enabled, openWindow: openWindow)
         }
         .task(id: signedIn) {
             guard signedIn, let client else { return }

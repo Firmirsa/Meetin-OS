@@ -44,7 +44,7 @@ private struct SettingsSection<Content: View>: View {
 
 struct SettingsPage: View {
     @Bindable var session: MeetingSession
-    @AppStorage("detectZoomMeetings") private var detectZoomMeetings = false
+    @AppStorage("detectZoomMeetings") private var detectCalls = false
     @AppStorage(MeetingSession.liveTranscriptionKey) private var liveTranscription = true
     var body: some View {
         SettingsScaffold(title: "Paramètres", session: session) {
@@ -68,11 +68,11 @@ struct SettingsPage: View {
                         .buttonStyle(.mtGhost)
                 }
             }
-            SettingsSection(title: "Détection Zoom") {
-                Toggle("Me prévenir quand je rejoins une réunion Zoom", isOn: $detectZoomMeetings)
+            SettingsSection(title: "Détection des appels") {
+                Toggle("Me prévenir quand je rejoins un appel", isOn: $detectCalls)
                     .tint(Color.mtControlTint)
-                if detectZoomMeetings {
-                    Text("Autorise l’accessibilité et les notifications dans macOS. La fenêtre s’ouvre à ton arrivée dans Zoom. Clique sur Enregistrer dans la notification ou dans la fenêtre pour démarrer.")
+                if detectCalls {
+                    Text("Google Meet dans Chrome, Zoom et WhatsApp pour Mac. Autorise l’accessibilité et les notifications, puis clique sur Enregistrer quand l’appel est détecté.")
                         .foregroundStyle(Color.mtInk2)
                     Button("Ouvrir les réglages d’accessibilité") {
                         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!

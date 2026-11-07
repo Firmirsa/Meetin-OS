@@ -9,9 +9,9 @@ final class TaskNotifications: NSObject, UNUserNotificationCenterDelegate, @unch
     private static let context = "meetin.task.context"
     private static let proposalKey = "proposalID"
     private static let approvalKey = "approval"
-    private static let zoomCategory = "meetin.zoom-arrival"
-    private static let record = "meetin.zoom-arrival.record"
-    private static let arrivalKey = "zoomArrivalID"
+    private static let meetingCategory = "meetin.meeting-arrival"
+    private static let record = "meetin.meeting-arrival.record"
+    private static let arrivalKey = "meetingArrivalID"
 
     @MainActor private weak var session: MeetingSession?
 
@@ -30,13 +30,13 @@ final class TaskNotifications: NSObject, UNUserNotificationCenterDelegate, @unch
             ],
             intentIdentifiers: []
         )
-        let zoomCategory = UNNotificationCategory(
-            identifier: Self.zoomCategory,
+        let meetingCategory = UNNotificationCategory(
+            identifier: Self.meetingCategory,
             actions: [UNNotificationAction(identifier: Self.record, title: "Enregistrer",
                                            options: [.foreground, .authenticationRequired])],
             intentIdentifiers: []
         )
-        center.setNotificationCategories([taskCategory, zoomCategory])
+        center.setNotificationCategories([taskCategory, meetingCategory])
     }
 
     func post(_ proposal: TaskProposal) {
@@ -55,25 +55,25 @@ final class TaskNotifications: NSObject, UNUserNotificationCenterDelegate, @unch
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [proposalID])
     }
 
-    func postZoomArrival(_ id: UUID) {
+    func postMeetingArrival(_ arrival: MeetingDetector.Arrival) {
         let content = UNMutableNotificationContent()
-        content.title = "Réunion Zoom détectée"
-        content.body = "Enregistrer cette réunion avec Meetin-OS ?"
-        content.categoryIdentifier = Self.zoomCategory
-        content.userInfo = [Self.arrivalKey: id.uuidString]
+        content.title = arrival.source.notificationTitle
+        content.body = "Démarre l’enregistrement avec Meetin-OS."
+        content.categoryIdentifier = Self.meetingCategory
+        content.userInfo = [Self.arrivalKey: arrival.id.uuidString]
         UNUserNotificationCenter.current().add(
-            UNNotificationRequest(identifier: zoomNotificationID(id), content: content, trigger: nil)
+            UNNotificationRequest(identifier: meetingNotificationID(arrival.id), content: content, trigger: nil)
         )
     }
 
-    func removeZoomArrival(_ id: UUID) {
+    func removeMeetingArrival(_ id: UUID) {
         let center = UNUserNotificationCenter.current()
-        let identifiers = [zoomNotificationID(id)]
+        let identifiers = [meetingNotificationID(id)]
         center.removePendingNotificationRequests(withIdentifiers: identifiers)
         center.removeDeliveredNotifications(withIdentifiers: identifiers)
     }
 
-    private func zoomNotificationID(_ id: UUID) -> String { "\(Self.zoomCategory).\(id.uuidString)" }
+    private func meetingNotificationID(_ id: UUID) -> String { "\(Self.meetingCategory).\(id.uuidString)" }
 
     func userNotificationCenter(
         _ center: UNUserNotificationCenter, willPresent notification: UNNotification
@@ -85,11 +85,11 @@ final class TaskNotifications: NSObject, UNUserNotificationCenterDelegate, @unch
         let content = response.notification.request.content
         let info = content.userInfo
         let action = response.actionIdentifier
-        if content.categoryIdentifier == Self.zoomCategory {
+        if content.categoryIdentifier == Self.meetingCategory {
             guard let raw = info[Self.arrivalKey] as? String, let id = UUID(uuidString: raw),
                   action == Self.record || action == UNNotificationDefaultActionIdentifier else { return }
             let start = action == Self.record
-            await MainActor.run { session?.handleZoomArrivalNotification(id: id, start: start) }
+            await session?.handleMeetingArrivalNotification(id: id, start: start)
             return
         }
         guard let id = info[Self.proposalKey] as? String else { return }

@@ -59,11 +59,12 @@ final class MeetingSession {
     var route: MainRoute = .home
     var meetingID: UUID?
     var startedAt: Date?
-    var startedInZoom = false
-    var zoomDetector = ZoomMeetingDetector()
-    @ObservationIgnored var zoomMonitor: Task<Void, Never>?
+    var recordingSource: MeetingSource?
+    var callDetector = MeetingDetector()
+    @ObservationIgnored var callMonitor: Task<Void, Never>?
+    @ObservationIgnored var callAccessibility: MeetingAccessibility?
     var notebookIsOpen = false
-    var meetingIsActive: Bool { capture != nil || zoomDetector.inMeeting }
+    var meetingIsActive: Bool { capture != nil || !callDetector.arrivals.isEmpty }
 
     init() {
         TaskNotifications.shared.attach(self)
@@ -301,7 +302,7 @@ struct CaptureView: View {
         Self.toggleRecording(session: session, openWindow: openWindow)
     }
 
-    static func toggleRecording(session: MeetingSession, openWindow: OpenWindowAction) {
+    static func toggleRecording(session: MeetingSession, openWindow: OpenWindowAction, source: MeetingSource? = nil) {
         guard session.capture != nil || session.accountConnected else { return }
         guard !session.busy, session.capture != nil || (!session.agent.busy && session.launchingProposals.isEmpty) else { return }
         session.busy = true
@@ -335,7 +336,7 @@ struct CaptureView: View {
                     session.permissionHelp = nil
                     session.status = "Vérification des autorisations…"
                     try await next.start()
-                    session.meetingDidStart()
+                    session.meetingDidStart(source: source)
                     session.recordedTracks = nil
                     session.recording = nil
                     session.transcript = ""
