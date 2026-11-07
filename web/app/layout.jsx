@@ -4,7 +4,7 @@ import '../styles.css';
 export const metadata = {
   icons: { icon: "/meetinos.svg" },
   title: 'Meetin-OS',
-  description: 'Le carnet de réunion pour Mac et Windows et son espace agent.',
+  description: 'Télécharge Meetin-OS, le carnet de réunion pour Mac et Windows.',
 };
 
 export default function Layout({children}) {

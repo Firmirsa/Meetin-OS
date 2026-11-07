@@ -8,7 +8,7 @@ return <>
     </a>
     <nav aria-label="Navigation principale">
       <a href="#fonctionnement">Le parcours</a>
-      <a href="/agent">Espace agent</a>
+      <a href="/onboarding">Premiers pas</a>
       <a className="nav-link" href="https://github.com/Firmirsa/Meetin-OS">GitHub <span aria-hidden="true">↗</span></a>
     </nav>
   </header>
@@ -18,7 +18,7 @@ return <>
         <p className="eyebrow"><span></span> Prototype pour Mac et Windows</p>
         <h1 id="titre">De l’appel à la <em>tâche validée.</em></h1>
         <p className="intro">Prends tes notes pendant l’appel. Retrouve ensuite ce qui a été dit et garde le contexte des décisions.</p>
-        <div className="install-actions">
+        <div className="install-actions" id="installation">
           <a className="button" href="/downloads/Meetin-OS.pkg" download aria-describedby="install-mac">Installer sur Mac <span aria-hidden="true">↓</span></a>
           <a className="button" href="/downloads/Meetin-OS-Windows.exe" download aria-describedby="install-windows">Installer sur Windows <span aria-hidden="true">↓</span></a>
         </div>
@@ -53,7 +53,7 @@ return <>
             </div>
           </div>
         </div>
-        <figcaption>Exemple illustratif du parcours cible</figcaption>
+        <figcaption>Aperçu du parcours dans l’app Mac</figcaption>
       </figure>
     </section>
     <section className="workflow" id="fonctionnement" aria-labelledby="parcours">

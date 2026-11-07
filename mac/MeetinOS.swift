@@ -30,6 +30,8 @@ final class MeetingSession {
     var recordedTracks: AudioCapture.Tracks?
     var busy = false
     var key = ProcessInfo.processInfo.environment["GLADIA_API_KEY"] ?? ""
+    var agentAccessCode = ""
+    let agent = AgentWorkspaceState()
     var status = "Prêt à enregistrer"
     var permissionHelp: AudioPermissionHelp?
     var transcript = ""
@@ -69,7 +71,6 @@ struct CaptureView: View {
     @AppStorage("detectZoomMeetings") private var detectZoomMeetings = false
     @State private var showingSettings = false
     @AppStorage("webWorkspaceURL") private var webWorkspaceURL = "http://localhost:3000"
-    @State private var copiedForAgent = false
     @State private var tab: MeetingTab = .transcription
 
     private var hasKey: Bool {
@@ -102,6 +103,7 @@ struct CaptureView: View {
                 .buttonStyle(.borderless)
                 .help("Réglages")
                 .accessibilityLabel("Réglages")
+                .disabled(session.agent.busy)
             }
             .padding(.horizontal, 22)
             .padding(.vertical, 10)
@@ -218,6 +220,7 @@ struct CaptureView: View {
                         if session.capture == nil {
                             Button("Enregistrer", systemImage: "mic", action: toggleRecording)
                                 .buttonStyle(.mtPrimary)
+                                .disabled(session.agent.busy)
                         } else {
                             Button("Arrêter", systemImage: "stop.fill", action: toggleRecording)
                                 .buttonStyle(.mtGhost)
@@ -238,7 +241,8 @@ struct CaptureView: View {
         .onDisappear {
             if !isMeetingWindow { session.notebookCount -= 1 }
         }
-        .onChange(of: session.transcript) { copiedForAgent = false }
+        .onChange(of: webWorkspaceURL) { session.agent.invalidateReview() }
+        .onChange(of: session.agentAccessCode) { session.agent.invalidateReview() }
         .task(id: detectZoomMeetings) {
             guard !isMeetingWindow else { return }
             session.zoomDetector = ZoomMeetingDetector()
@@ -269,6 +273,10 @@ struct CaptureView: View {
                 Rectangle().fill(Color.mtLine).frame(height: 1)
                 TextField("Adresse du site Meetin-OS", text: $webWorkspaceURL)
                     .textFieldStyle(.roundedBorder)
+                    .disabled(session.agent.busy)
+                SecureField("Code d’accès agent", text: $session.agentAccessCode)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(session.agent.busy)
                 Toggle("Ouvrir la fenêtre quand je rejoins une réunion Zoom", isOn: $detectZoomMeetings)
                 if detectZoomMeetings {
                     Text("L’accès à l’accessibilité sert à détecter les fenêtres Zoom. L’enregistrement se lance manuellement.")
@@ -296,71 +304,31 @@ struct CaptureView: View {
             }
             if !isMeetingWindow && session.capture == nil {
                 Button("Ouvrir un enregistrement", systemImage: "folder", action: openRecording)
-                    .disabled(session.busy)
+                    .disabled(session.busy || session.agent.busy)
             }
             if session.recording != nil, session.capture == nil {
                 Button("Nouvel enregistrement", systemImage: "plus", action: toggleRecording)
-                    .disabled(session.busy)
+                    .disabled(session.busy || session.agent.busy)
             }
         }
     }
 
-    private var agentURL: URL? {
+    private var agentClient: AgentClient? {
+        let code = session.agentAccessCode.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let base = URL(string: webWorkspaceURL.trimmingCharacters(in: .whitespacesAndNewlines)),
               let host = base.host, base.user == nil, base.password == nil,
-              base.query == nil, base.fragment == nil,
+              base.query == nil, base.fragment == nil, base.path.isEmpty || base.path == "/", !code.isEmpty,
               base.scheme == "https" || (base.scheme == "http" && ["localhost", "127.0.0.1"].contains(host))
         else { return nil }
-        return base.appendingPathComponent("agent")
+        return AgentClient(baseURL: base, accessCode: code)
     }
 
     private var agentPanel: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("ESPACE AGENT")
-                    .font(.mtSans(11, weight: .semibold))
-                    .tracking(2)
-                    .foregroundStyle(Color.mtAccentText)
-                Text("De la décision à la tâche.")
-                    .font(.mtSerif(42))
-                    .accessibilityAddTraits(.isHeader)
-                Text("Choisissez un extrait de la réunion, ajoutez le contexte utile et relisez la tâche avant de la confier à Devin.")
-                    .foregroundStyle(Color.mtInk2)
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Contexte de réunion").font(.mtSans(16, weight: .semibold))
-                    Text(session.transcript.isEmpty
-                         ? "Lancez la transcription pour pouvoir copier le texte de la réunion."
-                         : "La transcription est prête. Vous pouvez la copier ou sélectionner un passage dans l’onglet Transcription.")
-                        .foregroundStyle(Color.mtInk2)
-                    if !session.transcript.isEmpty {
-                        Button(copiedForAgent ? "Transcription copiée" : "Copier la transcription") {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(session.transcript, forType: .string)
-                            copiedForAgent = true
-                        }
-                        .buttonStyle(.mtGhost)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .mtCard()
-                if let agentURL {
-                    Button("Ouvrir l’espace agent", systemImage: "arrow.up.right") {
-                        NSWorkspace.shared.open(agentURL)
-                    }
-                    .buttonStyle(.mtPrimary)
-                } else {
-                    Button("Configurer l’adresse du site") { showingSettings = true }
-                        .buttonStyle(.mtGhost)
-                }
-            }
-            .frame(maxWidth: 620, alignment: .leading)
-            .padding(28)
-            .frame(maxWidth: .infinity)
-        }
+        AgentWorkspace(state: session.agent, transcript: session.transcript, client: agentClient) { showingSettings = true }
     }
 
     private func openRecording() {
-        guard !session.busy, session.capture == nil else { return }
+        guard !session.busy, !session.agent.busy, session.capture == nil else { return }
         session.busy = true
         let picker = NSOpenPanel()
         picker.allowedContentTypes = [.mpeg4Audio]
@@ -371,6 +339,7 @@ struct CaptureView: View {
             session.recordedTracks = nil
             session.recording = file
             session.transcript = ""
+            session.agent.newRecording()
             session.permissionHelp = nil
             session.status = "Fichier audio prêt"
             tab = .transcription
@@ -378,7 +347,7 @@ struct CaptureView: View {
     }
 
     private func toggleRecording() {
-        guard !session.busy else { return }
+        guard !session.busy, session.capture != nil || !session.agent.busy else { return }
         session.busy = true
         Task {
             defer { session.busy = false }
@@ -400,6 +369,7 @@ struct CaptureView: View {
                     session.recordedTracks = nil
                     session.recording = nil
                     session.transcript = ""
+                    session.agent.newRecording()
                     session.capture = next
                     session.status = "Enregistrement en cours"
                     openWindow(id: "meeting")

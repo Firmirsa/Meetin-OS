@@ -40,10 +40,10 @@ Le [guide Windows](windows/README.md) décrit la capture des deux pistes et le t
 ## De la réunion à la tâche
 
 1. Enregistre la réunion dans le carnet Mac et lance **Transcrire**. Pour une capture native, Gladia traite les pistes micro et audio de l’appel séparément et l’app remet les passages dans l’ordre.
-2. Dans l’onglet **Agent**, ouvre l’espace web et colle un extrait de la transcription. Holo peut proposer une tâche de code et sa citation source. La tâche reste modifiable avant confirmation.
-3. Si une recherche publique aide à cadrer la tâche, lance-la avec Linkup et ouvre les sources renvoyées.
-4. Relis la tâche et l’extrait avant de les envoyer à Devin. L’espace agent donne ensuite le lien de la session pour suivre le travail et examiner la PR éventuelle.
-5. Le parcours d’abonnement de démonstration s’ouvre dans Stripe Checkout en mode test. Les droits d’accès et le suivi des abonnements restent à intégrer.
+2. Dans l’onglet **Agent** de l’app Mac, sélectionne un extrait de la transcription ou saisis une demande. Clique sur **Préparer la tâche**. Holo propose une action ou pose une question s’il lui manque un détail.
+3. Relis la tâche, sa destination et le contexte, puis clique sur **Confirmer et lancer**. Devin traite le travail de code ; H Computer Use agit dans le tableau de test configuré. L’app affiche le lien de suivi de la session.
+
+Le site sert à télécharger l’app et à l’installer. Sa page **Premiers pas** inclut le parcours d’abonnement de démonstration via Stripe Checkout en mode test.
 
 ## Lancer le site Next.js
 
@@ -54,19 +54,19 @@ cp .env.example .env.local
 npm run dev
 ```
 
-La landing est disponible sur [localhost:3000](http://localhost:3000/) et l’espace agent sur [localhost:3000/agent](http://localhost:3000/agent). Remplis le fichier local de configuration pour activer les intégrations. Dans l’app Mac, l’adresse du site se règle dans la roue dentée.
+Le téléchargement est disponible sur [localhost:3000](http://localhost:3000/) et les premiers pas sur [localhost:3000/onboarding](http://localhost:3000/onboarding). Pour tester l’agent Mac, configure les intégrations côté serveur, puis saisis l’adresse du site et le code d’accès de l’équipe dans les réglages de l’app.
 
 | Brique | Recette |
 |---|---|
 | **Mac** | Accès au micro et à l’audio du système, deux pistes et export vérifiés avec un son de test sur macOS 26.5.2. |
-| **Gladia** | Un extrait mixé a été transcrit lors d’un essai antérieur. Le nouveau traitement séparé a été vérifié avec des réponses simulées et reste à rejouer sur un vrai appel. |
-| **Holo, Linkup, Devin, Stripe** | Routes serveur et parcours de démo implémentés. Les appels prestataires restent à vérifier avec les clés de l’équipe. |
+| **Gladia** | Sur un vrai appel le 7 novembre, Gladia a renvoyé des passages horodatés sur les deux pistes. Le repère du micro est reconnu ; celui de la voix distante reste à confirmer. |
+| **Agent Mac** | Préparation, clarification, confirmation et réponse des routes de session testées avec des prestataires simulés. La recette réelle de Devin et H Computer Use reste à faire avec les accès de l’équipe. |
 
 ## Documentation
 
 - [Suivi du projet](docs/suivi.md) · État des tests et prochaines actions.
 - [Guide macOS](mac/README.md) · Installation, capture et transcription.
 - [Guide Windows](windows/README.md) · Installation, capture et compilation.
-- [Guide Next.js](web/README.md) · Configuration des clés serveur, tests et espace agent.
+- [Guide Next.js](web/README.md) · Installation, premiers pas et configuration des intégrations serveur.
 - [Plan d’exécution](docs/plan-hackathon.md) · Répartition et scénario.
 - [Fiche du hackathon](docs/hackathon.md) · Règles, barème et ressources partenaires.

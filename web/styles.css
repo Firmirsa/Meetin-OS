@@ -114,26 +114,17 @@ h1, h2 { font-family: var(--mt-font-serif); }
 .window-bar, .note, .workflow { background: var(--mt-surface); }
 .meeting-title { font-family: var(--mt-font-serif); }
 .task, .task-state, .planned { background: var(--mt-accent-tint); color: var(--mt-accent-text); }
-.workspace { padding-block: 32px 64px; }
-.workspace nav { margin-bottom: 35px; }
-.workspace h1 { font-size: clamp(3rem, 7vw, 5.4rem); }
-.workspace h2 { font-size: 2rem; margin-bottom: 16px; }
-.workspace-grid { display: grid; gap: 20px; grid-template-columns: 1fr 1fr; }
-.workspace .mt-card { padding: 24px; min-width: 0; }
-.workspace form { display: grid; gap: 16px; justify-items: start; }
-.workspace label { display: grid; gap: 5px; width: 100%; color: var(--mt-ink); font-size: .875rem; font-weight: 600; }
-.workspace input:not([type=checkbox]), .workspace textarea {
+.onboarding { padding-block: 32px 64px; }
+.onboarding nav { margin-bottom: 35px; }
+.onboarding h1 { font-size: clamp(3rem, 7vw, 5.4rem); }
+.checkout { margin-top: 36px; padding: 24px; max-width: 560px; }
+.checkout h2 { font-size: 2rem; margin: 8px 0 16px; }
+.checkout form { display: grid; gap: 16px; justify-items: start; }
+.checkout label { display: grid; gap: 5px; width: min(360px, 100%); color: var(--mt-ink); font-size: .875rem; font-weight: 600; }
+.checkout input {
   width: 100%; border: 1px solid var(--mt-line-strong); border-radius: var(--mt-r-input);
   background: var(--mt-canvas); color: var(--mt-ink); font: inherit; padding: 10px;
 }
-.workspace textarea { resize: vertical; }
-.workspace .confirm { display: flex; align-items: baseline; gap: 9px; }
-.workspace .access-field { max-width: 360px; margin-bottom: 24px; }
-.workspace-error { padding: 12px; background: var(--mt-warn-tint); color: var(--mt-warn); border-radius: var(--mt-r-input); }
-.workspace button:disabled { opacity: .55; cursor: default; }
-.workspace-result { white-space: pre-wrap; overflow-wrap: anywhere; }
-.workspace .mt-quote { margin: 0; }
-.checkout { margin-top: 20px; display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
-.checkout h2 { margin: 0; }
-@media (max-width: 760px) { .workspace-grid { grid-template-columns: 1fr; } }
+.checkout-error { margin: 0; color: var(--mt-warn); }
+.checkout button:disabled { opacity: .55; cursor: default; }
 @media (max-width: 460px) { .site-header { align-items: start; flex-direction: column; } }

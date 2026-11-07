@@ -1,4 +1,5 @@
 import { ApiError, execute } from '../../../lib/integrations.mjs';
+import { prepareTask, executeTask } from '../../../lib/agent.mjs';
 
 export async function POST(request, { params }) {
   try {
@@ -32,7 +33,9 @@ export async function POST(request, { params }) {
     try { body = JSON.parse(raw); }
     catch { throw new ApiError(400, 'Requête invalide.'); }
     const { operation } = await params;
-    return Response.json(await execute(operation, body, token), { headers: { 'Cache-Control': 'no-store' } });
+    const result = await (operation === 'agent-prepare' ? prepareTask(body, token)
+      : operation === 'agent-execute' ? executeTask(body, token) : execute(operation, body, token));
+    return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     const expected = error instanceof ApiError;
     return Response.json({ error: expected ? error.message : 'Cette action a échoué.' }, {
