@@ -16,6 +16,8 @@ Le script construit et signe localement l’application. Au premier lancement de
 3. Ouvrez **Réglages de transcription** (roue dentée) pour saisir une clé Gladia, puis cliquez sur **Transcrire** pour envoyer le mix. Si aucune clé n’est configurée, le bouton ouvre les réglages. La clé reste en mémoire pour cette session et peut aussi être fournie par la variable d’environnement `GLADIA_API_KEY` si le binaire est lancé depuis le terminal.
 4. Copiez le transcript horodaté depuis l’app. Le prototype appelle Gladia directement. Le raccordement au parcours web de validation reste à faire.
 
+Pour reprendre un essai après avoir relancé l’app, utilise **Ouvrir un enregistrement** et choisis le fichier M4A. Avant de quitter l’app, **Voir les pistes** permet de retrouver et copier ce fichier hors du dossier temporaire. Si Gladia refuse la clé, les réglages se rouvrent et le fichier reste prêt pour une nouvelle tentative.
+
 La notification d’arrivée en réunion figure dans le [plan d’exécution](../docs/plan-hackathon.md#à-faire).
 
 [Capture Apple](https://developer.apple.com/documentation/screencapturekit/capturing-screen-content-in-macos) · [API asynchrone Gladia](https://www.gladia.io/blog/gladia-async-api-for-meeting-transcription-integration-guide-and-best-practices)

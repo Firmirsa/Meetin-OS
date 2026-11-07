@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 @main
 struct MeetinOS: App {
@@ -147,10 +148,26 @@ struct CaptureView: View {
             .frame(width: 400)
         }
         .toolbar {
+            if capture == nil {
+                Button("Ouvrir un enregistrement", systemImage: "folder", action: openRecording)
+                    .disabled(busy)
+            }
             if recording != nil, capture == nil {
                 Button("Nouvel enregistrement", systemImage: "plus", action: toggleRecording)
                     .disabled(busy)
             }
+        }
+    }
+
+    private func openRecording() {
+        let picker = NSOpenPanel()
+        picker.allowedContentTypes = [.mpeg4Audio]
+        picker.message = "Choisissez un fichier M4A à écouter ou à transcrire."
+        picker.begin { response in
+            guard response == .OK, let file = picker.url else { return }
+            recording = file
+            transcript = ""
+            status = "Fichier audio prêt"
         }
     }
 
@@ -191,6 +208,9 @@ struct CaptureView: View {
             do {
                 transcript = try await Gladia(key: key.trimmingCharacters(in: .whitespacesAndNewlines)).transcribe(recording)
                 status = "Transcription prête"
+            } catch Gladia.RequestError.unauthorized {
+                status = Gladia.RequestError.unauthorized.localizedDescription
+                showingSettings = true
             } catch { status = error.localizedDescription }
         }
     }

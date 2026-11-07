@@ -4,6 +4,23 @@ struct Gladia {
     let key: String
     var session: URLSession = .shared
 
+    enum RequestError: LocalizedError {
+        case unauthorized
+        case http(stage: String, status: Int)
+        case invalidResponse(stage: String)
+
+        var errorDescription: String? {
+            switch self {
+            case .unauthorized:
+                return "Gladia a refusé la clé API. Remplacez-la dans les réglages, puis relancez la transcription."
+            case let .http(stage, status):
+                return "Gladia · \(stage) impossible (HTTP \(status))."
+            case let .invalidResponse(stage):
+                return "Gladia · réponse illisible pendant \(stage)."
+            }
+        }
+    }
+
     struct Segment: Decodable {
         let start: Double
         let speaker: Int?
@@ -31,16 +48,16 @@ struct Gladia {
         body.append(audio)
         body.append(Data("\r\n--\(boundary)--\r\n".utf8))
         let upload: Upload = try await request(
-            URL(string: "https://api.gladia.io/v2/upload")!, body: body,
+            URL(string: "https://api.gladia.io/v2/upload")!, stage: "envoi de l’audio", body: body,
             type: "multipart/form-data; boundary=\(boundary)"
         )
         let payload = try JSONSerialization.data(withJSONObject: ["audio_url": upload.audio_url, "diarization": true])
-        let job: Job = try await request(URL(string: "https://api.gladia.io/v2/transcription")!, body: payload)
+        let job: Job = try await request(URL(string: "https://api.gladia.io/v2/pre-recorded")!, stage: "lancement de la transcription", body: payload)
         guard job.result_url.scheme == "https", job.result_url.host == "api.gladia.io" else {
             throw CaptureError("URL de résultat Gladia inattendue.")
         }
         for _ in 0..<90 {
-            let result: Result = try await request(job.result_url)
+            let result: Result = try await request(job.result_url, stage: "récupération du résultat")
             switch result.status {
             case "done":
                 guard let transcript = result.result?.transcription else {
@@ -62,7 +79,7 @@ struct Gladia {
         throw CaptureError("Le résultat Gladia n’est pas disponible après le délai d’attente.")
     }
 
-    private func request<T: Decodable>(_ url: URL, body: Data? = nil, type: String = "application/json") async throws -> T {
+    private func request<T: Decodable>(_ url: URL, stage: String, body: Data? = nil, type: String = "application/json") async throws -> T {
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.setValue(key, forHTTPHeaderField: "x-gladia-key")
         if let body {
@@ -71,10 +88,17 @@ struct Gladia {
             request.httpBody = body
         }
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            throw CaptureError("Gladia a renvoyé une erreur HTTP \(status).")
+        guard let http = response as? HTTPURLResponse else {
+            throw RequestError.invalidResponse(stage: stage)
         }
-        return try JSONDecoder().decode(T.self, from: data)
+        if http.statusCode == 401 { throw RequestError.unauthorized }
+        guard (200..<300).contains(http.statusCode) else {
+            throw RequestError.http(stage: stage, status: http.statusCode)
+        }
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            throw RequestError.invalidResponse(stage: stage)
+        }
     }
 }
