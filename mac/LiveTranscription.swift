@@ -156,7 +156,7 @@ enum GladiaLive {
             "sample_rate": 16_000,
             "bit_depth": 16,
             "channels": 1,
-            "language_config": ["languages": [String](), "code_switching": true],
+            "language_config": ["languages": ["fr", "en"], "code_switching": true],
             "messages_config": ["receive_partial_transcripts": true]
         ] as [String: Any])
         let (data, response) = try await session.data(for: request)
@@ -361,13 +361,36 @@ final class LiveTranscript {
     }
 
     var lines: [Line] {
-        utterances.map { key, value in
+        let all = utterances.map { key, value in
             Line(
                 id: "\(key.track.rawValue)-\(key.id)", time: value.start + offset(key.track),
                 track: key.track, text: value.text, isFinal: value.isFinal
             )
         }
         .sorted { ($0.time, $0.id) < ($1.time, $1.id) }
+        let call = all.filter { $0.track == .system }
+        return all.filter { !Self.isEcho($0, of: call) }
+    }
+
+    // Sans casque, le micro capte les haut-parleurs. La piste de l'appel, plus nette, garde la phrase.
+    // Les réponses courtes restent : « Oui » ou « D'accord » ne prouvent pas un écho.
+    private static let echoWindow = 10.0
+    private static let echoMinWords = 3
+    private static let echoOverlap = 0.7
+
+    private static func isEcho(_ line: Line, of call: [Line]) -> Bool {
+        guard line.track == .microphone else { return false }
+        let words = Self.words(line.text)
+        guard words.count >= echoMinWords else { return false }
+        let heard = Set(call.filter { abs($0.time - line.time) <= echoWindow }.flatMap { Self.words($0.text) })
+        guard !heard.isEmpty else { return false }
+        return Double(words.filter(heard.contains).count) / Double(words.count) >= echoOverlap
+    }
+
+    private static func words(_ text: String) -> [String] {
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+            .split { !$0.isLetter && !$0.isNumber }
+            .map(String.init)
     }
 
     // Texte définitif uniquement : c'est lui que lit la détection de tâches.

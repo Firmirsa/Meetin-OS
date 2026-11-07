@@ -148,7 +148,12 @@ struct CaptureView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
-                        if isMeetingWindow {
+                        if let live = session.live {
+                            Text("Transcription").font(.headline).accessibilityAddTraits(.isHeader)
+                            LiveTranscriptPanel(live: live) {
+                                session.showMain(.settings, openWindow: openWindow)
+                            }
+                        } else if isMeetingWindow {
                             Text("PENDANT ET APRÈS L’APPEL")
                                 .font(.mtSans(11, weight: .semibold))
                                 .tracking(2)
@@ -178,13 +183,7 @@ struct CaptureView: View {
                         .padding(10)
                         .background(Color.mtSurface, in: RoundedRectangle(cornerRadius: MTRadius.card))
 
-                        if let live = session.live {
-                            Rectangle().fill(Color.mtLine).frame(height: 1)
-                            Text("Transcription").font(.headline).accessibilityAddTraits(.isHeader)
-                            LiveTranscriptPanel(live: live) {
-                                session.showMain(.settings, openWindow: openWindow)
-                            }
-                        } else if isMeetingWindow && session.transcript.isEmpty {
+                        if isMeetingWindow && session.live == nil && session.transcript.isEmpty {
                             Text(session.liveWaitingMessage)
                                 .foregroundStyle(Color.mtInk2)
                         }

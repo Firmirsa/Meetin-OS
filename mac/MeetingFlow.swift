@@ -278,6 +278,7 @@ extension MeetingSession {
         switch permissionHelp {
         case .systemAudio: UserDefaults.standard.set("denied", forKey: Self.systemAudioStateKey)
         case .systemAudioSilent: UserDefaults.standard.set("silent", forKey: Self.systemAudioStateKey)
+        case .systemAudioTimeout: UserDefaults.standard.removeObject(forKey: Self.systemAudioStateKey)
         case .microphone, nil: break
         }
     }

@@ -11,6 +11,7 @@ enum AudioPermissionHelp: LocalizedError {
     case microphone
     case systemAudio
     case systemAudioSilent
+    case systemAudioTimeout
 
     var settingsLabel: String {
         self == .microphone ? "Ouvrir les réglages du micro" : "Ouvrir les réglages de l’audio système"
@@ -29,6 +30,8 @@ enum AudioPermissionHelp: LocalizedError {
             "Activez Meetin-OS dans « Audio du système uniquement », puis réessayez."
         case .systemAudioSilent:
             "Aucun son de l’appel détecté. Vérifiez le son et l’autorisation « Audio du système uniquement »."
+        case .systemAudioTimeout:
+            "macOS n’a pas répondu pour l’audio du système. Répondez à la demande d’autorisation si elle est affichée, puis réessayez."
         }
     }
 }
@@ -299,6 +302,8 @@ private final class SystemAudioTap {
 
     private static func check(_ status: OSStatus) throws {
         if status == kAudioDevicePermissionsError { throw AudioPermissionHelp.systemAudio }
+        // MACH_RCV_TIMED_OUT : le service audio n'a pas répondu, par exemple pendant une demande d'autorisation.
+        if status == OSStatus(bitPattern: 0x1000_4003) { throw AudioPermissionHelp.systemAudioTimeout }
         guard status == noErr else { throw CaptureError("Impossible de démarrer l’audio du système (\(status)).") }
     }
 

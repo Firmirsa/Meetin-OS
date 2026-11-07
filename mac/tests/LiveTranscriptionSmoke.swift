@@ -106,6 +106,22 @@ struct LiveTranscriptionSmoke {
         let expected = "[00:01] Micro · Bonjour\n[00:02] Audio de l’appel · Salut\n[00:04] Micro · Ça va ?"
         precondition(text.finalText == expected, text.finalText)
 
+        // Écho du micro : la piste de l'appel garde la phrase, et les vraies répliques restent
+        let echo = LiveTranscript()
+        echo.noteFirstAudio(.microphone, at: 0)
+        echo.noteFirstAudio(.system, at: 0)
+        echo.apply(.init(id: "1", text: "Merci à tous, on se retrouve la semaine prochaine.", start: 19, isFinal: true), track: .system)
+        echo.apply(.init(id: "1", text: "Merci à tous, on se retrouve la semaine prochaine.", start: 19, isFinal: true), track: .microphone)
+        echo.apply(.init(id: "2", text: "Port des notes avant mardi.", start: 12, isFinal: true), track: .microphone)
+        echo.apply(.init(id: "2", text: "Karim corrige l'export des notes avant mardi.", start: 11, isFinal: true), track: .system)
+        echo.apply(.init(id: "3", text: "Oui, voilà.", start: 20, isFinal: true), track: .microphone)
+        echo.apply(.init(id: "4", text: "Je pense plutôt envoyer le devis lundi.", start: 21, isFinal: true), track: .microphone)
+        echo.apply(.init(id: "5", text: "Merci à tous, on se retrouve la semaine prochaine.", start: 60, isFinal: true), track: .microphone)
+        let kept = echo.lines.filter { $0.track == .microphone }.map(\.text)
+        precondition(kept == ["Oui, voilà.", "Je pense plutôt envoyer le devis lundi.", "Merci à tous, on se retrouve la semaine prochaine."], "\(kept)")
+        precondition(echo.lines.filter { $0.track == .system }.count == 2, "piste de l'appel intacte")
+        precondition(echo.confirmedText.contains("Oui, voilà.") && !echo.confirmedText.contains("Port des notes"))
+
         // Conversion 48 kHz stéréo vers 16 kHz mono, sur plusieurs tampons
         let converter = LiveAudioConverter()
         var total = 0
