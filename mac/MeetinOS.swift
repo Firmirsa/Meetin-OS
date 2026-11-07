@@ -38,7 +38,9 @@ final class MeetingSession {
     var transcriptIncomplete = false { didSet { syncMeeting() } }
     var proposals: [TaskProposal] = [] { didSet { syncMeeting() } }
     var detector: TaskDetector?
-    var launchingProposal: String?
+    var launchingProposals: Set<String> = []
+    var showAgentTab = false
+    var openWindowAction: OpenWindowAction?
     var proposalIssues: [String: String] = [:]
     var agentAccessCode = ""
     var agentAccess: AgentAccess?
@@ -56,6 +58,10 @@ final class MeetingSession {
     var zoomDetector = ZoomMeetingDetector()
     var notebookCount = 0
     var meetingIsActive: Bool { capture != nil || zoomDetector.inMeeting }
+
+    init() {
+        TaskNotifications.shared.attach(self)
+    }
 }
 
 private struct MeetingWindow: View {
@@ -128,6 +134,11 @@ struct CaptureView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .tint(Color.mtControlTint)
+                .onChange(of: session.showAgentTab, initial: true) {
+                    guard session.showAgentTab else { return }
+                    tab = .agent
+                    session.showAgentTab = false
+                }
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
             }

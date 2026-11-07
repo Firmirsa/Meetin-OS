@@ -30,7 +30,9 @@ L’historique est conservé sur ce Mac dans `~/Library/Application Support/Meet
 
 **Transcription en direct** : avec une clé Gladia et l’option activée dans **Paramètres**, le texte s’écrit pendant l’appel dans la fenêtre de réunion. L’audio est alors envoyé en continu à Gladia, une session par piste. À l’arrêt, ce texte devient la transcription de la réunion, et **Transcrire** le remplace par la version différée. Si le direct échoue, l’enregistrement continue : une notification macOS prévient si la clé est refusée, si le direct ne démarre pas ou s’il reste coupé 30 s, et la réunion affiche alors « Incomplète ».
 
-**Tâches proposées** : si le direct tourne et que l’agent est connecté, le texte définitif part chez Holo (H Company) toutes les 15 s quand il a changé. Les tâches détectées apparaissent en cartes dans l’onglet **Agent** et restent enregistrées dans la réunion, affichée « N à valider ». Rien ne part sans **Confirmer et lancer**. Un plan expire après 15 minutes : **Modifier** le reprend dans le formulaire pour en préparer un nouveau.
+**Tâches proposées** : si le direct tourne et que l’agent est connecté, le texte définitif part chez Holo (H Company) toutes les 15 s quand il a changé. Les tâches détectées apparaissent en cartes dans l’onglet **Agent** et restent enregistrées dans la réunion, affichée « N à valider ». Rien ne part sans clic sur **Confirmer et lancer** ou sur l’action de sa notification. Un plan expire après 15 minutes : **Modifier** le reprend dans le formulaire pour en préparer un nouveau.
+
+Chaque nouvelle tâche envoie une notification macOS avec son titre et sa destination, visibles aussi en partage d’écran. **Confirmer** lance le plan affiché. Si une correction l’a remplacé, rien ne part et la carte s’ouvre. **Ajouter du contexte et lancer** demande à Holo de réécrire la tâche et **la lance sans nouvelle relecture**, sauf si Holo pose une question. Le plan réellement lancé reste visible sur la carte. Pour voir les boutons en permanence, choisis le style **Alertes** dans Réglages Système → Notifications.
 
 Au démarrage de la capture, Meetin-OS ouvre une fenêtre dédiée avec les onglets **Transcription** et **Agent**. Le bouton **Afficher la réunion** permet de rouvrir la fenêtre pendant un appel détecté ou un enregistrement. À la fin de la réunion, la fenêtre principale ouvre sa fiche. Tu peux y transcrire le fichier, relire le texte et préparer la tâche. Un fichier importé s’ouvre de la même façon.
 
@@ -53,6 +55,14 @@ Le test de l’historique local s’exécute sans audio :
 swiftc -parse-as-library -target "$(uname -m)-apple-macos15.0" \
   mac/AgentClient.swift mac/MeetingStore.swift mac/MeetinSite.swift mac/tests/MeetingStoreSmoke.swift -o mac/.build/store-smoke
 mac/.build/store-smoke
+```
+
+La détection et les actions de notification se testent avec des réponses simulées :
+
+```sh
+swiftc -parse-as-library -target "$(uname -m)-apple-macos15.0" \
+  mac/AgentClient.swift mac/MeetingStore.swift mac/TaskDetection.swift mac/TaskActions.swift mac/tests/TaskDetectionSmoke.swift -o mac/.build/detect-smoke
+mac/.build/detect-smoke
 ```
 
 Le test du direct utilise une connexion simulée :

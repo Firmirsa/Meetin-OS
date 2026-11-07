@@ -83,6 +83,34 @@ struct TaskDetectionSmoke {
         let single = String(repeating: "é", count: 9_000)
         precondition(TaskDetector.window(single).utf16.count <= TaskDetector.maxTranscript)
 
+        // Notification : le plan affiché doit être le plan courant
+        typealias Actions = TaskActions
+        precondition(Actions.decide(state: .pending, currentApproval: "a", shownApproval: "a", hasClient: true) == .launch)
+        precondition(Actions.decide(state: .pending, currentApproval: "b", shownApproval: "a", hasClient: true) == .stale, "tâche corrigée entre-temps")
+        precondition(Actions.decide(state: .pending, currentApproval: "a", shownApproval: nil, hasClient: true) == .stale)
+        precondition(Actions.decide(state: .pending, currentApproval: "a", shownApproval: "a", hasClient: false) == .needsAccess)
+        precondition(Actions.decide(state: .launched, currentApproval: "a", shownApproval: "a", hasClient: true) == .alreadyHandled, "pas de double lancement")
+        precondition(Actions.decide(state: .ignored, currentApproval: "a", shownApproval: "a", hasClient: true) == .alreadyHandled)
+
+        // Contexte : passé à Holo, plan réécrit, question bloquante, limite
+        let original = try detected("x", title: "Corriger l’export", task: "Corriger l’export.").review
+        var sent: (String, String, [AgentClarification])?
+        let rewritten = try await Actions.rewrite(original, context: "  Seulement le Markdown. ") { task, quote, turns in
+            sent = (task, quote, turns)
+            return .review(try detected("y", title: "Corriger le Markdown").review)
+        }
+        guard case .review(let updated) = rewritten, updated.title == "Corriger le Markdown" else { fatalError("plan réécrit attendu") }
+        precondition(sent?.0 == "Corriger l’export." && sent?.1 == "extrait")
+        precondition(sent?.2.last?.answer == "Seulement le Markdown.", "contexte transmis")
+        guard case .question(let asked) = try await Actions.rewrite(original, context: "Vite", prepare: { _, _, _ in .question("Quel export ?") }),
+              asked == "Quel export ?" else { fatalError("une question doit bloquer") }
+        guard case .review(let same) = try await Actions.rewrite(original, context: "   ", prepare: { _, _, _ in fatalError("pas d'appel sans contexte") }),
+              same.approval == original.approval else { fatalError("contexte vide : plan inchangé") }
+        do {
+            _ = try await Actions.rewrite(original, context: String(repeating: "x", count: 601), prepare: { _, _, _ in fatalError("pas d'appel") })
+            fatalError("contexte trop long refusé")
+        } catch is AgentClient.Failure {}
+
         print("Détection de tâches : tests réussis")
     }
 }

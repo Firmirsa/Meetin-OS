@@ -62,7 +62,7 @@ struct ProposalCards: View {
             if let client {
                 Button("Confirmer et lancer") { session.launch(proposal, using: client) }
                     .buttonStyle(.mtGhost)
-                    .disabled(session.launchingProposal != nil)
+                    .disabled(session.launchingProposals.contains(proposal.id))
             } else {
                 Button("Connecter l’agent") { showIntegrations(.agent) }.buttonStyle(.mtGhost)
             }
@@ -70,12 +70,12 @@ struct ProposalCards: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.mtInk2)
                 .padding(.horizontal, 8)
-                .disabled(session.agent.busy || session.launchingProposal == proposal.id)
+                .disabled(session.agent.busy || session.launchingProposals.contains(proposal.id))
             Button("Ignorer") { session.ignore(proposal) }
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.mtInk2)
-                .disabled(session.launchingProposal == proposal.id)
-            if session.launchingProposal == proposal.id {
+                .disabled(session.launchingProposals.contains(proposal.id))
+            if session.launchingProposals.contains(proposal.id) {
                 ProgressView().controlSize(.small).accessibilityLabel("Lancement en cours")
             }
         }

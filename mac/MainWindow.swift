@@ -30,7 +30,10 @@ struct MainWindow: View {
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 940, minHeight: 620)
         .meetinNight()
-        .onAppear { session.notebookCount += 1 }
+        .onAppear {
+            session.notebookCount += 1
+            session.openWindowAction = openWindow
+        }
         .onDisappear { session.notebookCount -= 1 }
         .onOpenURL { url in
             guard session.integrationsRequest == nil, let request = IntegrationsRequest.fromLink(url) else { return }

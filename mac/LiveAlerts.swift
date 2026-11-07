@@ -6,6 +6,14 @@ enum LiveAlerts {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
+    static func postTask(_ title: String, _ message: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = message
+        content.sound = .default
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
+    }
+
     static func post(_ message: String) {
         let content = UNMutableNotificationContent()
         content.title = "Transcription en direct interrompue"

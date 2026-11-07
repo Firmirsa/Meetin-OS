@@ -40,12 +40,15 @@ extension MeetingSession {
         guard agentAccess?.planning == true, let base = AgentClient.serverURL(address) else { return }
         let client = AgentClient(baseURL: base, accessCode: agentAccessCode)
         let transcript = live.transcript
+        LiveAlerts.requestPermission()
         let detector = TaskDetector(text: { transcript.confirmedText }) { text, known in
             try await client.detect(transcript: text, known: known)
         }
         detector.onNewProposal = { [weak self, weak detector] proposal in
             guard let self, self.detector === detector else { return }
-            self.proposals.append(TaskProposal(id: proposal.id, review: proposal.review))
+            let task = TaskProposal(id: proposal.id, review: proposal.review)
+            self.proposals.append(task)
+            TaskNotifications.shared.post(task)
         }
         detector.onUpdatedProposal = { [weak self, weak detector] proposal in
             guard let self, self.detector === detector,
@@ -72,6 +75,7 @@ extension MeetingSession {
         guard let index = proposals.firstIndex(where: { $0.id == proposal.id }) else { return }
         proposals[index].state = .ignored
         proposalIssues[proposal.id] = nil
+        TaskNotifications.shared.remove(proposal.id)
     }
 
     // Reprend la tâche dans le formulaire de l'agent, pour la modifier ou préparer un nouveau plan.
@@ -83,21 +87,93 @@ extension MeetingSession {
         ignore(proposal)
     }
 
-    // Validation explicite : seul ce clic lance le plan signé.
-    func launch(_ proposal: TaskProposal, using client: AgentClient) {
-        guard launchingProposal == nil, proposal.state == .pending else { return }
-        launchingProposal = proposal.id
+    var agentClient: AgentClient? {
+        let address = UserDefaults.standard.string(forKey: "webWorkspaceURL") ?? "http://localhost:3000"
+        guard agentAccess != nil, let base = AgentClient.serverURL(address) else { return nil }
+        return AgentClient(baseURL: base, accessCode: agentAccessCode)
+    }
+
+    // Seul un clic lance une tâche : sur la carte ou dans sa notification.
+    // Avec un contexte, Holo réécrit le plan et il part sans nouvelle relecture : choix produit, signalé dans le guide Mac.
+    func launch(_ proposal: TaskProposal, using client: AgentClient, context: String? = nil, notify: Bool = false) {
+        guard !launchingProposals.contains(proposal.id), proposal.state == .pending else { return }
+        launchingProposals.insert(proposal.id)
         proposalIssues[proposal.id] = nil
         Task {
-            defer { launchingProposal = nil }
+            defer { launchingProposals.remove(proposal.id) }
             do {
-                let execution = try await client.launch(proposal.review)
+                var review = proposal.review
+                if let context {
+                    switch try await TaskActions.rewrite(review, context: context, prepare: { task, quote, turns in
+                        try await client.prepare(task: task, transcript: quote, clarifications: turns)
+                    }) {
+                    case .question(let question):
+                        reportTaskIssue(proposal, "Holo demande une précision : \(question)", notify: notify)
+                        return
+                    case .review(let updated):
+                        review = updated
+                        if let index = proposals.firstIndex(where: { $0.id == proposal.id }) { proposals[index].review = updated }
+                    }
+                }
+                let execution = try await client.launch(review)
                 guard let index = proposals.firstIndex(where: { $0.id == proposal.id }) else { return }
                 proposals[index].state = .launched
                 proposals[index].sessionURL = execution.url
+                TaskNotifications.shared.remove(proposal.id)
+                if notify { LiveAlerts.postTask("Tâche lancée", "\(review.title) · \(execution.executor.name)") }
             } catch {
-                proposalIssues[proposal.id] = error.localizedDescription
+                reportTaskIssue(proposal, error.localizedDescription, notify: notify)
             }
+        }
+    }
+
+    private func reportTaskIssue(_ proposal: TaskProposal, _ message: String, notify: Bool) {
+        proposalIssues[proposal.id] = message
+        if notify { LiveAlerts.postTask("Tâche non lancée : \(proposal.review.title)", message) }
+    }
+
+    // Réponse à une notification de tâche. Sans lancement possible, ouvre la carte concernée.
+    func handleTaskNotification(id: String, shownApproval: String?, confirm: Bool, context: String?) {
+        if !proposals.contains(where: { $0.id == id }),
+           let record = store.meetings.first(where: { $0.proposals?.contains { $0.id == id } == true }) {
+            open(record)
+        }
+        guard let proposal = proposals.first(where: { $0.id == id }) else {
+            showTaskCard()
+            return
+        }
+        guard confirm else {
+            showTaskCard()
+            return
+        }
+        switch TaskActions.decide(
+            state: proposal.state, currentApproval: proposal.review.approval,
+            shownApproval: shownApproval, hasClient: agentClient != nil
+        ) {
+        case .launch:
+            if let agentClient { launch(proposal, using: agentClient, context: context, notify: true) }
+        case .stale:
+            proposalIssues[id] = "Cette tâche a changé depuis la notification. Relis-la avant de confirmer."
+            showTaskCard()
+        case .needsAccess:
+            proposalIssues[id] = "Connecte l’agent pour lancer cette tâche."
+            showTaskCard()
+        case .alreadyHandled:
+            showTaskCard()
+        }
+    }
+
+    private func showTaskCard() {
+        showAgentTab = true
+        guard let openWindowAction else {
+            NSApp.activate()
+            return
+        }
+        if capture != nil {
+            openWindowAction(id: "meeting")
+            NSApp.activate()
+        } else {
+            showMain(recording != nil ? .meetingDetail : .meetings, openWindow: openWindowAction)
         }
     }
 
