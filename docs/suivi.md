@@ -40,3 +40,12 @@ Parcours YouTube, 8 novembre vers 13h : la recette sert `codex/youtube-integrate
 Wael s’est connecté lui-même à @Fraawdrinn dans l’Agent View. La session a ensuite été fermée et le profil enregistré (521 Ko, mis à jour à 13:03). Aucune publication n’a été lancée. Le parcours complet depuis le Mac reste à tester par Codex.
 
 Vers 13h10, à la demande de Lenny, `MEETIN_YOUTUBE_DEMO_USER_ID` pointe sur son compte Supabase (firmirsa77) au lieu de celui de Wael. La recette a été redéployée sur `0a9f614`. Le profil H et la connexion @Fraawdrinn sont inchangés. La démo se lance donc depuis l’app connectée avec le compte Google de Lenny.
+
+Diagnostic du 8 novembre après le rendu :
+- **H Computer Use.** Le journal de la session de connexion `212bfe37` ne contient aucune action humaine. Le profil H n’a donc jamais reçu de connexion YouTube. La session `bf679b61` a bien chargé le profil `ff729e54`, mais elle est tombée sur la page de consentement puis sur « Sign in », et s’est arrêtée sans publier. H ne documente aucun moyen de taper dans le navigateur distant. La piste : un profil Chromium neuf et dédié, connecté par Wael puis téléversé. La réservation YouTube de la session `bf679b61` reste à supprimer avant toute nouvelle tentative.
+- **Commandes vocales.** Aucun vocabulaire Gladia n’était configuré : « Lenny » devenait « L’ENIA » ou « Léni », et « H Company » devenait « H compagnie ». Correctif sur `lenny/voix-vocabulaire` (`2b9c70b`), qui part de `lenny/youtube-detection`, déployé en recette :
+  - vocabulaire Gladia en direct et en différé ;
+  - consigne à Holo sur les noms mal transcrits ;
+  - règle YouTube appliquée sur un texte normalisé et sur des lignes coupées.
+  
+  Mesure avec le vrai Holo, 4 essais par phrase : première personne 4/4 ; fausses tâches (notes, idée) 0/4 ; « Léni » 3/4 ; « L’ENIA » 1/4, Holo ignorant la tâche lui-même. Le gain attendu vient surtout du vocabulaire Gladia, pas encore vérifié sur une vraie voix.
