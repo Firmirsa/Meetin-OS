@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
-import { youtubeProposal, launchYoutube, youtubeStatus, youtubeDestination } from './agent-youtube.mjs';
+import { youtubeProposal, launchYoutube, youtubeStatus, youtubeDestination, isYoutubeAction } from './agent-youtube.mjs';
 import { ApiError, input, provider, safeURL, setting } from './integrations.mjs';
 
 const reviewTTL = 15 * 60 * 1000;
@@ -142,7 +142,7 @@ function approve(plan, token, env) {
 function readApproval(value, token, env, now) {
   const invalid = () => new ApiError(409, 'La validation a expiré ou la proposition a changé. Prépare la tâche à nouveau.');
   const plan = readSealed(value, token, env, 'review', invalid);
-  if (plan.expiresAt <= now || (plan.action === 'youtube_comment' ? youtubeDestination : destination(plan.executor, env)) !== plan.destination) throw invalid();
+  if (plan.expiresAt <= now || (isYoutubeAction(plan.action) ? youtubeDestination : destination(plan.executor, env)) !== plan.destination) throw invalid();
   return plan;
 }
 
@@ -150,7 +150,7 @@ export async function prepareTask(body, token, env = process.env, fetcher = fetc
   const request = optionalText(body?.task, 2000);
   const transcript = optionalText(body?.transcript, 5000);
   if (!request && !transcript) throw new ApiError(400, 'Saisis une demande ou colle un extrait de réunion.');
-  const youtube = youtubeProposal(request || transcript, token, env);
+  const youtube = await youtubeProposal(request || transcript, token, env, fetcher);
   if (youtube) {
     const plan = { ...youtube, id: randomUUID(), expiresAt: now + reviewTTL, quote: request ? '' : youtube.quote, clarifications: [] };
     return { status: 'ready', ...plan, approval: approve(plan, token, env) };
@@ -204,7 +204,7 @@ export async function detectTasks(body, token, env = process.env, fetcher = fetc
   const given = body?.known ?? [];
   if (!Array.isArray(given) || given.length > 10) throw new ApiError(400, 'Vérifie le contenu et sa longueur.');
   const known = given.map(item => ({ ref: input(item?.ref, 64), title: input(item?.title, 120), task: input(item?.task, 400) }));
-  const youtube = youtubeProposal(transcript, token, env);
+  const youtube = await youtubeProposal(transcript, token, env, fetcher, known);
   if (youtube) {
     const fingerprint = detectionFingerprint(youtube.executor, youtube.destination, youtube.task, youtube.quote);
     if (given.some(item => item.fingerprint === fingerprint)) return { tasks: [] };
@@ -266,9 +266,10 @@ export async function detectTasks(body, token, env = process.env, fetcher = fetc
 export async function executeTask(body, token, env = process.env, fetcher = fetch, now = Date.now()) {
   if (body?.confirmed !== true) throw new ApiError(400, 'Confirme la proposition avant de lancer la tâche.');
   const plan = readApproval(body.approval, token, env, now);
-  if (plan.action === 'youtube_comment') {
+  if (isYoutubeAction(plan.action)) {
     const result = await launchYoutube(plan, token, env, fetcher);
-    return { ...result, trackingToken: seal({ sessionId: result.sessionId, expiresAt: now + trackingTTL }, token, env, 'youtube-status') };
+    const receipt = { sessionId: result.sessionId, action: plan.action, comment: plan.comment ?? '', expiresAt: now + trackingTTL };
+    return { ...result, trackingToken: seal(receipt, token, env, 'youtube-status') };
   }
   const context = JSON.stringify({ title: plan.title, task: plan.task, target: plan.target, excerpt: plan.quote, clarifications: plan.clarifications });
 

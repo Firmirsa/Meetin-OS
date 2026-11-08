@@ -23,8 +23,9 @@ struct AgentExecutionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             if let url = execution.trelloResult?.verifiedURL {
-                Label(execution.trelloResult?.commentURL != nil ? "Commentaire vérifié" : "Fiche vérifiée", systemImage: "checkmark.circle")
-                Link(execution.trelloResult?.commentURL != nil ? "Voir le commentaire YouTube" : "Ouvrir la fiche dans Trello", destination: url)
+                let result = execution.trelloResult
+                Label(result?.commentURL != nil ? "Commentaire vérifié" : (result?.pageURL != nil ? "Page ouverte par H" : "Fiche vérifiée"), systemImage: "checkmark.circle")
+                Link(result?.commentURL != nil ? "Voir le commentaire YouTube" : (result?.pageURL != nil ? "Ouvrir la page YouTube" : "Ouvrir la fiche dans Trello"), destination: url)
             } else if execution.trelloResult != nil {
                 Text(execution.trelloResult?.message ?? "H n’a pas confirmé le résultat. Consultez la session pour voir ce qui manque.")
                     .foregroundStyle(Color.mtWarn)

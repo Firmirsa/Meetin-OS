@@ -24,7 +24,7 @@ struct AgentReview: Codable {
     let approval: String
 
     var usesYouTube: Bool {
-        executor == .computerUse && destination == "https://www.youtube.com/@HCompanyOfficial/videos"
+        executor == .computerUse && URL(string: destination)?.host == "www.youtube.com"
     }
 
     var usesTrello: Bool {
@@ -90,9 +90,10 @@ struct TrelloExecutionResult: Codable {
     let status: State
     let cardURL: URL?
     var commentURL: URL? = nil
+    var pageURL: URL? = nil
     var message: String? = nil
 
-    private enum CodingKeys: String, CodingKey { case status, cardURL = "cardUrl", commentURL = "commentUrl", message }
+    private enum CodingKeys: String, CodingKey { case status, cardURL = "cardUrl", commentURL = "commentUrl", pageURL = "pageUrl", message }
 
     var verifiedURL: URL? {
         if status == .verified, let url = commentURL, let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
@@ -101,6 +102,8 @@ struct TrelloExecutionResult: Codable {
            let items = parts.queryItems, items.count == 2,
            items.first(where: { $0.name == "v" })?.value?.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil,
            items.first(where: { $0.name == "lc" })?.value?.range(of: "^[A-Za-z0-9_-]{1,200}$", options: .regularExpression) != nil { return url }
+        if status == .verified, let url = pageURL, url.scheme == "https", url.host == "www.youtube.com",
+           url.port == nil, url.user == nil, url.password == nil, url.fragment == nil { return url }
         guard status == .verified, let url = cardURL, url.scheme == "https", url.host == "trello.com",
               url.port == nil, url.user == nil, url.password == nil, url.query == nil, url.fragment == nil,
               url.path.range(of: "^/c/[A-Za-z0-9]{1,64}$", options: .regularExpression) != nil else { return nil }
