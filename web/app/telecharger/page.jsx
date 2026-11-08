@@ -52,12 +52,14 @@ export default async function DownloadPage({searchParams}) {
           <p className="platform__note">{d.windows.note}</p>
           <p className="platform__file">{d.windows.file}</p>
         </li>
-        <li className="platform mt-card" data-os="linux" data-soon="true">
-          <span className="platform__tag platform__tag--soon">{d.soon}</span>
+        <li className="platform mt-card" data-os="linux">
+          <span className="platform__tag">{d.recommended}</span>
           <OsIcon os="linux" />
           <h2>{d.linux.name}</h2>
           <p className="platform__req">{d.linux.req}</p>
-          <span className="mt-btn platform__cta" aria-disabled="true">{d.linux.cta}</span>
+          <a className="mt-btn platform__cta" href="https://github.com/Firmirsa/Meetin-OS/releases">
+            <DownloadIcon size={16} /> {d.linux.cta}
+          </a>
           <p className="platform__note">{d.linux.note}</p>
         </li>
       </ul>

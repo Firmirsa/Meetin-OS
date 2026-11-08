@@ -162,11 +162,7 @@ nav { display: flex; align-items: center; gap: clamp(14px, 2.4vw, 28px); flex-wr
 .platform__file { margin: auto 0 0; padding-top: 10px; font: .72rem var(--mt-font-mono); color: var(--mt-ink-2); opacity: .8; }
 .platform__tag { position: absolute; top: 18px; right: 18px; display: none; padding: 3px 9px; border-radius: var(--mt-r-pill); font-size: .7rem; font-weight: 650;
   background: var(--mt-accent-tint); color: var(--mt-accent-text); }
-.platform[data-recommended="true"] .platform__tag, .platform__tag--soon { display: inline-block; }
-.platform__tag--soon { background: rgba(243, 241, 230, 0.08); color: var(--mt-ink-2); }
-.platform[data-soon="true"] { opacity: .72; }
-.platform[data-soon="true"] .platform__cta { cursor: default; color: var(--mt-ink-2); border-style: dashed; }
-.platform[data-soon="true"] .platform__cta:hover { background: transparent; }
+.platform[data-recommended="true"] .platform__tag { display: inline-block; }
 .download__next { margin-top: 36px; color: var(--mt-ink-2); }
 .download__next a { color: var(--mt-accent-text); }
 @media (max-width: 860px) { .platforms { grid-template-columns: 1fr; } }
