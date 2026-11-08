@@ -155,17 +155,26 @@ export async function youtubeStatus(receipt, user, env, fetcher) {
   const session = await provider(fetcher, `${sessions}/${receipt.sessionId}`, setting(env, 'HAI_API_KEY'), undefined, 'H Computer Use');
   if (session?.id !== receipt.sessionId) throw new ApiError(502, 'Suivi H inattendu.');
   const state = session.status?.status;
+  // H sometimes hangs before its first step: say so instead of spinning forever. A comment stays "attention",
+  // because H could still act later; opening a page has no effect to protect.
+  const age = Date.now() - Date.parse(session.created_at ?? '');
+  if (state === 'running' && !session.status?.steps && age > 180_000) {
+    return receipt.action === 'youtube_open'
+      ? {status: 'unverified', message: 'H ne démarre pas la session. Aucune action effectuée ; vous pouvez relancer la demande.'}
+      : {status: 'attention'};
+  }
   if (['queued', 'pending', 'running'].includes(state)) return {status: 'pending'};
   if (['paused', 'idle', 'awaiting_tool_results'].includes(state)) return {status: 'attention'};
   const a = session.latest_answer;
   const commenting = receipt.action !== 'youtube_open';
   if (state === 'completed' && a?.verified === true) {
     // A comment counts only when observed, with the exact text, from a signed-in account. Opening a page needs no account.
-    if (commenting && signedIn(a.account) && ['published', 'already_present'].includes(a.outcome) &&
+    // H often omits outcome; the observed permalink and exact text are what prove the comment.
+    if (commenting && signedIn(a.account) && (!a.outcome || ['published', 'already_present'].includes(a.outcome)) &&
         a.comment === receipt.comment && youtubeURL(a.comment_url, true)) {
       return {status: 'verified', commentUrl: youtubeURL(a.comment_url, true)};
     }
-    if (!commenting && a.outcome === 'opened' && youtubeURL(a.page_url, false)) return {status: 'verified', pageUrl: youtubeURL(a.page_url, false)};
+    if (!commenting && (!a.outcome || a.outcome === 'opened') && youtubeURL(a.page_url, false)) return {status: 'verified', pageUrl: youtubeURL(a.page_url, false)};
   }
   if (['completed', 'failed', 'timed_out', 'interrupted'].includes(state)) {
     const none = commenting ? ' Aucun commentaire publié.' : '';

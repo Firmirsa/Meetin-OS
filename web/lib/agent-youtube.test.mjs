@@ -54,6 +54,11 @@ test('opening a YouTube page needs no comment and launches without claim', async
  const status=answer=>async()=>Response.json({id:hsid,status:{status:'completed'},latest_answer:answer});
  const ok=await youtubeExecutionStatus(run,user,env,status({verified:true,outcome:'opened',account:'not logged in',page_url:'https://www.youtube.com/@HCompanyOfficial',comment:'',comment_url:''}));
  assert.deepEqual(ok,{status:'verified',pageUrl:'https://www.youtube.com/@HCompanyOfficial'});
+ // Real H answer of 8 November: verified page, no outcome field.
+ assert.deepEqual(await youtubeExecutionStatus(run,user,env,status({account:'FIRMIRSA',comment:'',page_url:'https://www.youtube.com/@HCompanyOfficial',verified:true,comment_url:''})),{status:'verified',pageUrl:'https://www.youtube.com/@HCompanyOfficial'});
+ const stuck=await youtubeExecutionStatus(run,user,env,async()=>Response.json({id:hsid,created_at:new Date(Date.now()-240_000).toISOString(),status:{status:'running',steps:0}}));
+ assert.match(stuck.message,/ne démarre pas/);
+ assert.equal((await youtubeExecutionStatus(run,user,env,async()=>Response.json({id:hsid,created_at:new Date().toISOString(),status:{status:'running',steps:0}}))).status,'pending');
  const bad=await youtubeExecutionStatus(run,user,env,status({verified:true,outcome:'opened',account:'',page_url:'https://evil.example/x',comment:'',comment_url:''}));
  assert.equal(bad.status,'unverified');
 });
@@ -83,6 +88,7 @@ test('a comment is claimed once per proposal and verified only when observed', a
  const status=answer=>async()=>Response.json({id:hsid,status:{status:'completed'},latest_answer:answer});
  const good={verified:true,outcome:'published',account:'@lenny',page_url:'https://www.youtube.com/watch?v=abcdefghijk',comment:'Super vidéo',comment_url:'https://www.youtube.com/watch?v=abcdefghijk&lc=Ugx123'};
  assert.deepEqual(await youtubeExecutionStatus(again,user,env,status(good)),{status:'verified',commentUrl:good.comment_url});
+ assert.equal((await youtubeExecutionStatus(again,user,env,status({...good,outcome:undefined}))).status,'verified');
  for(const bad of [{comment:'Autre'},{account:'not logged in'},{verified:false},{comment_url:'https://www.youtube.com/watch?v=abcdefghijk'},{comment_url:'https://evil.example/watch?v=abcdefghijk&lc=Ugx123'}]) {
   assert.equal((await youtubeExecutionStatus(again,user,env,status({...good,...bad}))).status,'unverified');
  }
