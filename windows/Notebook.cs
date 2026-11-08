@@ -401,6 +401,22 @@ internal static class MeetingStore
         catch { }
     }
 
+    // Un titre vide est refusé : l’ancien titre reste.
+    public static bool Rename(MeetingRecord record, string title)
+    {
+        var trimmed = (title ?? "").Trim();
+        if (trimmed.Length == 0) return false;
+        File.WriteAllText(Path.Combine(record.Folder, "titre.txt"), trimmed);
+        return true;
+    }
+
+    // Le dossier de la réunion (audio, notes, transcription) part dans la Corbeille de Windows, d’où il se récupère.
+    public static void Delete(MeetingRecord record) =>
+        Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(
+            record.Folder,
+            Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+            Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+
     private static string SiteFile => Path.Combine(AppData, "site.txt");
     public static string? LoadSite() => File.Exists(SiteFile) ? File.ReadAllText(SiteFile).Trim() : null;
     public static void SaveSite(string site) { Directory.CreateDirectory(AppData); File.WriteAllText(SiteFile, site); }
@@ -412,6 +428,10 @@ internal sealed class MeetingRow : Control
     private readonly MeetingRecord record;
     private readonly bool divider;
     private bool hover;
+    private const int MenuZone = 40;
+
+    public event Action? Open;
+    public ContextMenuStrip? Actions { get; set; }
 
     public MeetingRow(MeetingRecord record, bool divider)
     {
@@ -423,6 +443,16 @@ internal sealed class MeetingRow : Control
         Cursor = Cursors.Hand;
         MouseEnter += (_, _) => { hover = true; Invalidate(); };
         MouseLeave += (_, _) => { hover = false; Invalidate(); };
+        AccessibleName = record.Title;
+    }
+
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        base.OnMouseUp(e);
+        if (e.Button == MouseButtons.Right || (e.Button == MouseButtons.Left && e.X >= Width - MenuZone))
+            Actions?.Show(this, e.Location);
+        else if (e.Button == MouseButtons.Left)
+            Open?.Invoke();
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -438,7 +468,8 @@ internal sealed class MeetingRow : Control
         var pillWidth = TextRenderer.MeasureText(status, pillFont).Width + 26;
         var durationText = MeetingStore.DurationText(record.Duration);
         var durationWidth = Math.Max(TextRenderer.MeasureText(durationText, mono).Width, 52);
-        var right = Width - 18;
+        TextRenderer.DrawText(g, "⋯", title, new Rectangle(Width - MenuZone, 0, MenuZone - 8, Height), Night.Ink2, TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPadding);
+        var right = Width - MenuZone - 4;
         TextRenderer.DrawText(g, durationText, mono, new Rectangle(right - durationWidth, 0, durationWidth, Height), Night.Ink2, TextFormatFlags.VerticalCenter | TextFormatFlags.Right | TextFormatFlags.NoPadding);
         right -= durationWidth + 16;
         var pill = new Rectangle(right - pillWidth, Height / 2 - 12, pillWidth, 24);
@@ -471,6 +502,8 @@ internal sealed partial class Notebook : Form
     private readonly Capsule removeKey = new("Retirer", CapsuleKind.Ghost);
     private readonly Capsule saveSite = new("Enregistrer l’adresse", CapsuleKind.Ghost);
     private readonly Capsule agentButton = new("Agent", CapsuleKind.Ghost, "\uE99A");
+    private readonly Capsule renameMeeting = new("Renommer", CapsuleKind.Ghost, "\uE70F");
+    private readonly Capsule deleteMeeting = new("Supprimer", CapsuleKind.Ghost, "\uE74D");
     private readonly Pill incompletePill = new("Incomplète", PillKind.Run) { Visible = false, Margin = new Padding(0, 5, 0, 0) };
     private readonly TextBox notes = Editor("Notes de réunion");
     private readonly TextBox transcript = Editor("Transcription", true);
@@ -568,6 +601,8 @@ internal sealed partial class Notebook : Form
         removeKey.Click += (_, _) => { keyField.Text = ""; SaveKey(); };
         saveSite.Click += (_, _) => SaveSite();
         agentButton.Click += (_, _) => ShowPage("Agent");
+        renameMeeting.Click += (_, _) => { if (current != null) RenameMeeting(current); };
+        deleteMeeting.Click += (_, _) => { if (current != null) DeleteMeeting(current); };
         keyDot.LinkClicked += (_, _) => { ShowPage("Paramètres"); keyField.Focus(); };
         notes.TextChanged += (_, _) => SaveNotes();
         FormClosing += (_, args) =>
@@ -722,6 +757,8 @@ internal sealed partial class Notebook : Form
         actions.Controls.Add(folder);
         actions.Controls.Add(copy);
         actions.Controls.Add(agentButton);
+        actions.Controls.Add(renameMeeting);
+        actions.Controls.Add(deleteMeeting);
         actions.Controls.Add(incompletePill);
         page.Controls.Add(actions, 0, 1);
         page.SetColumnSpan(actions, 2);
@@ -865,8 +902,8 @@ internal sealed partial class Notebook : Form
             for (var i = records.Count - 1; i >= 0; i--)
             {
                 var item = records[i];
-                var row = new MeetingRow(item, i > 0);
-                row.Click += (_, _) => OpenMeeting(item);
+                var row = new MeetingRow(item, i > 0) { Actions = MeetingMenu(item) };
+                row.Open += () => OpenMeeting(item);
                 glass.Controls.Add(row);
             }
         }
@@ -891,6 +928,87 @@ internal sealed partial class Notebook : Form
         detailMeta.Text = MeetingStore.Day(item.Date) + " · " + MeetingStore.Time(item.Date) + " · " + MeetingStore.DurationText(item.Duration) + " · " + item.Tracks.Count + (item.Tracks.Count > 1 ? " pistes" : " piste");
         ShowPage("Détail");
         RefreshActions();
+    }
+
+    private bool CanDeleteMeetings => !busy && capture == null && !agentBusy;
+
+    private ContextMenuStrip MeetingMenu(MeetingRecord item)
+    {
+        var menu = new ContextMenuStrip { ShowImageMargin = false };
+        menu.Items.Add("Renommer…", null, (_, _) => RenameMeeting(item));
+        var delete = menu.Items.Add("Supprimer…", null, (_, _) => DeleteMeeting(item));
+        menu.Opening += (_, _) => delete.Enabled = CanDeleteMeetings;
+        return menu;
+    }
+
+    private void RenameMeeting(MeetingRecord item)
+    {
+        var title = Prompt("Renommer la réunion", "Le nouveau titre est enregistré sur ce PC.", item.Title);
+        if (title == null) return;
+        try
+        {
+            if (!MeetingStore.Rename(item, title)) return;
+        }
+        catch (Exception ex) { SetStatus("Titre non enregistré : " + ex.Message); return; }
+        if (current != null && current.Folder == item.Folder)
+        {
+            current = MeetingStore.FromFolder(item.Folder) ?? current;
+            detailTitle.Text = current.Title;
+        }
+        RefreshMeetings();
+    }
+
+    private void DeleteMeeting(MeetingRecord item)
+    {
+        if (!CanDeleteMeetings)
+        {
+            SetStatus("Attends la fin de l’enregistrement ou de la transcription pour supprimer.");
+            return;
+        }
+        var answer = MessageBox.Show(this,
+            "« " + item.Title + " » : l’audio, les notes et la transcription seront effacés. Le dossier part dans la Corbeille de Windows, d’où tu peux encore le récupérer.",
+            "Supprimer cette réunion ?", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+        if (answer != DialogResult.OK) return;
+        try { MeetingStore.Delete(item); }
+        catch (Exception ex) { SetStatus("Réunion non supprimée : le dossier n’a pas pu aller à la Corbeille (" + ex.Message + ")."); return; }
+        var wasOpen = current != null && current.Folder == item.Folder;
+        if (wasOpen)
+        {
+            current = null;
+            tracks = new List<AudioTrack>();
+            audioFolder = null;
+            suppressNotesSave = true;
+            notes.Text = "";
+            suppressNotesSave = false;
+            transcript.Text = "";
+            proposals = new List<TaskProposal>();
+            transcriptIncomplete = false;
+            incompletePill.Visible = false;
+            SetStatus("Prêt à enregistrer");
+        }
+        RefreshMeetings();
+        if (wasOpen) ShowPage("Réunions");
+        RefreshActions();
+    }
+
+    private string? Prompt(string title, string message, string value)
+    {
+        using var form = new Form
+        {
+            Text = title, Icon = Icon, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false,
+            StartPosition = FormStartPosition.CenterParent, BackColor = Night.Surface, ForeColor = Night.Ink, AutoScaleMode = AutoScaleMode.Dpi,
+            ClientSize = new Size(440, 170), Font = Night.Sans(10f), ShowInTaskbar = false
+        };
+        var label = new Label { Text = message, AutoSize = false, Bounds = new Rectangle(20, 18, 400, 22), ForeColor = Night.Ink2 };
+        var field = new TextBox { Text = value, Bounds = new Rectangle(20, 50, 400, 28), BackColor = Night.Well, ForeColor = Night.Ink, BorderStyle = BorderStyle.FixedSingle };
+        var ok = new Capsule("Renommer", CapsuleKind.Primary) { DialogResult = DialogResult.OK, Location = new Point(20, 104) };
+        var cancel = new Capsule("Annuler", CapsuleKind.Ghost) { DialogResult = DialogResult.Cancel, Location = new Point(150, 104) };
+        field.TextChanged += (_, _) => ok.Enabled = field.Text.Trim().Length > 0;
+        form.Controls.AddRange(new Control[] { label, field, ok, cancel });
+        form.AcceptButton = ok;
+        form.CancelButton = cancel;
+        field.SelectAll();
+        return form.ShowDialog(this) == DialogResult.OK ? field.Text.Trim() : null;
     }
 
     private void SaveNotes()
@@ -1198,6 +1316,8 @@ internal sealed partial class Notebook : Form
         folder.Enabled = !busy && audioFolder != null;
         copy.Enabled = !busy && transcript.TextLength > 0 && transcript.Text != "Transcription en cours…";
         saveKey.Enabled = !busy;
+        renameMeeting.Enabled = current != null;
+        deleteMeeting.Enabled = current != null && CanDeleteMeetings;
     }
 
     private static string? FirstName()
