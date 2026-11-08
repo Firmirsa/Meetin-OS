@@ -41,6 +41,15 @@ internal sealed partial class Notebook
     private List<AgentClarification> clarifications = new();
     private AgentExecution? execution;
     private bool agentBusy;
+    private Label? agentPageTitle;
+    private FlowLayoutPanel? agentPageContent;
+
+    // Dans la fiche, l’onglet Agent n’a ni titre « Agent » ni grandes marges, comme sur Mac.
+    private void EmbedAgentPage(bool embedded)
+    {
+        if (agentPageTitle != null) agentPageTitle.Visible = !embedded;
+        if (agentPageContent != null) agentPageContent.Padding = embedded ? new Padding(0, 0, 0, 20) : new Padding(48, 40, 48, 40);
+    }
     private string? executionUrl;
 
     private AgentClient? Client => agentAccess != null && agentCode.Length > 0 && AgentClient.ServerUri(agentSite.AbsoluteUri) is { } server ? new AgentClient(server, agentCode) : null;
@@ -131,7 +140,9 @@ internal sealed partial class Notebook
     {
         var scroll = ScrollPane();
         var content = Column(48, 40, 48, 40);
-        content.Controls.Add(new Label { Text = "Agent", Font = Night.Serif(30f), ForeColor = Night.Ink, AutoSize = true, Margin = new Padding(0, 0, 0, 18) });
+        agentPageTitle = new Label { Text = "Agent", Font = Night.Serif(30f), ForeColor = Night.Ink, AutoSize = true, Margin = new Padding(0, 0, 0, 18) };
+        agentPageContent = content;
+        content.Controls.Add(agentPageTitle);
         content.Controls.Add(detectorError);
         content.Controls.Add(proposalsHost);
         content.Controls.Add(new Label { Text = "Tâche à exécuter", Font = Night.Serif(22f), ForeColor = Night.Ink, AutoSize = true, Margin = new Padding(0, 10, 0, 10) });
@@ -207,7 +218,7 @@ internal sealed partial class Notebook
     {
         var client = Client;
         if (client == null) { ShowPage("Intégrations"); return; }
-        if (agentAccess?.Planning == false) { ShowPage("Intégrations"); integrationsIssue.Text = "Ton équipe doit activer l’agent sur son serveur. Tu peux continuer à utiliser le carnet."; integrationsIssue.Visible = true; return; }
+        if (agentAccess?.Planning == false) { integrationsIssue.Text = "Ton équipe doit activer l’agent sur son serveur. Tu peux continuer à utiliser le carnet."; integrationsIssue.Visible = true; ShowPage("Intégrations"); return; }
         var task = requestField.Text.Trim();
         var excerpt = excerptField.Text.Trim();
         if (agentBusy || (task.Length == 0 && excerpt.Length == 0)) return;
@@ -397,7 +408,7 @@ internal sealed partial class Notebook
         content.Controls.Add(new Label { Text = "Intégrations", Font = Night.Serif(30f), ForeColor = Night.Ink, AutoSize = true, Margin = new Padding(0, 0, 0, 14) });
         content.Controls.Add(integrationsIntro);
         var tools = Section("Outils", out var toolsStack);
-        toolsStack.Controls.Add(ToolRow("Gladia", "Transcrire un enregistrement", gladiaPill, "Configurer", () => ShowPage("Paramètres")));
+        toolsStack.Controls.Add(ToolRow("Gladia", "Transcrire un enregistrement", gladiaPill, "Configurer", () => { integrationsSheet?.Close(); ShowPage("Paramètres"); }));
         toolsStack.Controls.Add(ToolRow("Trello", "Créer une fiche après ta confirmation", trelloPill, null, null));
         toolsStack.Controls.Add(ToolRow("Google Calendar", "Retrouver les réunions prévues", new Pill("À venir", PillKind.Wait), null, null));
         toolsStack.Controls.Add(ToolRow("Devin", "Confier une tâche de code", devinPill, null, null));
