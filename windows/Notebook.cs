@@ -715,7 +715,9 @@ internal sealed partial class Notebook : Form
         content.Controls.Add(new Label { Text = MeetingStore.DateLine(), Font = Night.Sans(8.5f, true), ForeColor = Night.Accent, AutoSize = true, Margin = new Padding(0, 0, 0, 16) });
         var hero = new Hero(FirstName()) { Width = 700 };
         content.Controls.Add(hero);
-        content.Resize += (_, _) => hero.Width = Math.Max(300, content.ClientSize.Width - content.Padding.Horizontal);
+        void FitHome() { var w = PageWidth(scroll, content); hero.Width = w; }
+        scroll.Resize += (_, _) => FitHome();
+        scroll.VisibleChanged += (_, _) => FitHome();
         content.Controls.Add(new Label
         {
             Text = "Lance l’enregistrement quand l’appel commence. Meetin-OS garde tes notes et la transcription, et t’aide à préparer les tâches à valider.",
@@ -736,7 +738,9 @@ internal sealed partial class Notebook : Form
         content.Controls.Add(recentHeader);
         recentHost.Width = 700;
         content.Controls.Add(recentHost);
-        content.Resize += (_, _) => { var w = Math.Max(300, content.ClientSize.Width - content.Padding.Horizontal); recentHeader.Width = w; recentHost.Width = w; };
+        void FitRecent() { var w = PageWidth(scroll, content); hero.Width = w; recentHeader.MinimumSize = new Size(w, 0); recentHost.Width = w; }
+        scroll.Resize += (_, _) => FitRecent();
+        scroll.VisibleChanged += (_, _) => FitRecent();
         scroll.Controls.Add(content);
         page.Controls.Add(scroll, 0, 0);
         page.Controls.Add(new Panel { Dock = DockStyle.Fill, BackColor = Night.Line, Margin = new Padding(0) }, 0, 1);
@@ -775,7 +779,10 @@ internal sealed partial class Notebook : Form
         content.Controls.Add(header);
         allHost.Width = 700;
         content.Controls.Add(allHost);
-        content.Resize += (_, _) => { var w = Math.Max(300, content.ClientSize.Width - content.Padding.Horizontal); header.Width = w; allHost.Width = w; };
+        // L’en-tête est AutoSize : seule MinimumSize l’élargit, et la liste (Dock) suit le plus large élément de la colonne.
+        void FitList() { var w = PageWidth(scroll, content); header.MinimumSize = new Size(w, 0); allHost.Width = w; }
+        scroll.Resize += (_, _) => FitList();
+        scroll.VisibleChanged += (_, _) => FitList();
         scroll.Controls.Add(content);
         return scroll;
     }
@@ -1422,6 +1429,10 @@ internal sealed partial class Notebook : Form
     // ---------- fabrique de contrôles ----------
 
     private static Panel ScrollPane() => new() { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Night.Canvas };
+
+    // Largeur utile d’une page : celle visible du volet, moins les marges et la barre de défilement, bornée comme sur Mac.
+    private static int PageWidth(Panel scroll, FlowLayoutPanel content) =>
+        Math.Max(300, Math.Min(960, scroll.ClientSize.Width - content.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth));
 
     private static FlowLayoutPanel Column(int left, int top, int right, int bottom) => new()
     {
