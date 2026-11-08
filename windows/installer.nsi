@@ -5,10 +5,14 @@ Unicode true
 !include "WinVer.nsh"
 
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Meetin-OS"
-!define APP_VERSION "0.1.0"
+!define APP_VERSION "0.1.1"
 
 Name "Meetin-OS"
+!ifndef OUTPUT_FILE
 OutFile "../web/public/downloads/Meetin-OS-Windows.exe"
+!else
+OutFile "${OUTPUT_FILE}"
+!endif
 InstallDir "$LOCALAPPDATA\Programs\Meetin-OS"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
@@ -50,6 +54,7 @@ Section "Meetin-OS"
   SetOutPath "$INSTDIR"
   File ".build/payload/Meetin-OS.exe"
   File ".build/payload/Meetin-OS.exe.config"
+  File ".build/payload/BuildSource.json"
   File ".build/payload/NAudio.Core.dll"
   File ".build/payload/NAudio.Wasapi.dll"
   File "NAudio-LICENSE.txt"
@@ -70,6 +75,7 @@ Section "Uninstall"
   Delete "$SMPROGRAMS\Meetin-OS.lnk"
   Delete "$INSTDIR\Meetin-OS.exe"
   Delete "$INSTDIR\Meetin-OS.exe.config"
+  Delete "$INSTDIR\BuildSource.json"
   Delete "$INSTDIR\NAudio.Core.dll"
   Delete "$INSTDIR\NAudio.Wasapi.dll"
   Delete "$INSTDIR\NAudio-LICENSE.txt"

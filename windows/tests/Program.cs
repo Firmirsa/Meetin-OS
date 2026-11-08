@@ -12,9 +12,14 @@ try
     await File.WriteAllTextAsync(call, "call-fixture");
     using var http = new HttpClient(new FakeGladia());
     var client = new GladiaClient(http);
-    var tracks = new[] { new AudioTrack(mic, "Micro"), new AudioTrack(call, "Audio de l’appel") };
+    var me = Speaker.UserLabel;
+    if (me.Length == 0) throw new Exception("Le nom affiché pour le micro ne doit pas être vide.");
+    if (Speaker.Name("  Léa   Martin\n", "lea") != "Léa Martin") throw new Exception("Le nom complet doit être gardé, espaces nettoyés.");
+    if (Speaker.Name(null, " lea ") != "lea") throw new Exception("Sans nom complet, le nom de session doit servir.");
+    if (Speaker.Name("", " ") != "Vous") throw new Exception("Sans nom, le libellé doit être « Vous ».");
+    var tracks = new[] { new AudioTrack(mic, me), new AudioTrack(call, "Audio de l’appel") };
     var transcript = await client.TranscribeAsync(tracks, "test-key", CancellationToken.None);
-    var expected = string.Join(Environment.NewLine, "[00:01] Audio de l’appel · Voix distante", "[00:01] Micro · Voix locale");
+    var expected = string.Join(Environment.NewLine, "[00:01] Audio de l’appel · Voix distante", $"[00:01] {me} · Voix locale");
     if (transcript != expected) throw new Exception("La transcription des deux sources n’est pas dans l’ordre attendu.");
 
     try
@@ -23,7 +28,7 @@ try
         throw new Exception("Une clé refusée doit produire une erreur.");
     }
     catch (InvalidOperationException error) when (error.Message.Contains("refusé la clé")) { }
-    Console.WriteLine("Gladia simulé : téléversement des deux pistes, résultat ordonné et rejet de clé vérifiés.");
+    Console.WriteLine("Gladia simulé : téléversement des deux pistes, nom de l’utilisateur, résultat ordonné et rejet de clé vérifiés.");
 }
 finally { folder.Delete(recursive: true); }
 

@@ -1,3 +1,9 @@
+## 8 novembre 2026 · Installateur Windows de test 0.1.1
+
+Préparation sur `codex/google-agent` : reprise du nom de micro Windows de Samy (`1ff553c`), version 0.1.1 et script de packaging NSIS. Le workflow construit désormais son propre installateur avant de vérifier installation, ouverture et désinstallation, puis publie un artefact de test avec commit et SHA-256. Validation sur runner en attente ; aucun remplacement du téléchargement public 0.1.0. La capture réelle reste à tester sur PC.
+
+Mac : remplacement par le build 13 interrompu avant copie, car le SHA-256 du binaire préparé ne correspond pas au reçu. Le build installé précédent reste en place. Aucun remplacement pendant la réunion de Wael.
+
 # Suivi Meetin-OS
 
 ## Lecteur intégré et nom Google automatique, 8 novembre 2026

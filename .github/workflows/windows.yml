@@ -13,21 +13,24 @@ permissions:
 jobs:
   windows:
     runs-on: windows-2022
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
-      - name: Compile the Windows client
-        run: |
-          dotnet restore windows/Meetin-OS.csproj --locked-mode
-          dotnet build windows/Meetin-OS.csproj -c Release --no-restore
-          dotnet run --project windows/tests/GladiaSmoke.csproj -c Release
-      - name: Install and launch the package served by the site
+      - name: Install NSIS packaging tool
+        shell: pwsh
+        run: choco install nsis -y --no-progress
+      - name: Build and test the current Windows sources
+        shell: pwsh
+        run: ./windows/build-test.ps1
+      - name: Install and launch the freshly built package
         shell: pwsh
         run: |
-          $installer = Resolve-Path 'web/public/downloads/Meetin-OS-Windows.exe'
+          $installer = Resolve-Path 'artifacts/windows/Meetin-OS-Windows-0.1.1.exe'
+          $manifest = Get-Content 'artifacts/windows/build-manifest.json' | ConvertFrom-Json
+          if ($manifest.commit -ne $env:GITHUB_SHA) { throw 'Wrong source commit' }
           $setup = Start-Process -FilePath $installer -ArgumentList '/S' -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw "Setup failed with exit code $($setup.ExitCode)" }
 
@@ -38,6 +41,9 @@ jobs:
           $link = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
           if ($link.TargetPath -ne $exe) { throw "Start menu points to $($link.TargetPath)" }
 
+          $installedSource = Get-Content (Join-Path $folder 'BuildSource.json') | ConvertFrom-Json
+          if ($installedSource.commit -ne $env:GITHUB_SHA -or $installedSource.version -ne '0.1.1') { throw 'Wrong installed source/version' }
+          if ((Get-Item $exe).VersionInfo.ProductVersion -notlike '0.1.1*') { throw 'Wrong application version' }
           $app = Start-Process -FilePath $exe -PassThru
           try {
             for ($i = 0; $i -lt 20; $i++) {
@@ -56,3 +62,11 @@ jobs:
           if ($uninstall.ExitCode -ne 0 -or (Test-Path $exe) -or (Test-Path $shortcut)) {
             throw 'Uninstall did not remove the installed app and shortcut'
           }
+
+      - name: Publish validated test installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Meetin-OS-Windows-0.1.1-${{ github.sha }}
+          path: artifacts/windows/
+          if-no-files-found: error
+          retention-days: 14

@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../GladiaClient.cs" Link="GladiaClient.cs" />
+    <Compile Include="../Speaker.cs" Link="Speaker.cs" />
   </ItemGroup>
 </Project>

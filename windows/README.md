@@ -4,7 +4,7 @@ Le carnet est compatible avec Windows 10 ou 11 (x64) et .NET Framework 4.8 ou ul
 
 1. Sur le site, clique sur **Installer sur Windows** et ouvre `Meetin-OS-Windows.exe`. L’assistant installe Meetin-OS pour ton compte, sans droits administrateur. Windows peut signaler cet installateur de test non signé.
 2. Ouvre **Meetin-OS** depuis Démarrer. Pendant un appel, clique sur **Enregistrer** pour ouvrir le carnet de réunion, puis sur **Arrêter l’enregistrement** pour retrouver les pistes. La version Windows se déclenche manuellement.
-3. Dans **Réglages**, saisis ta clé Gladia. **Transcrire avec Gladia** envoie les pistes disponibles et affiche les passages dans l’ordre. La clé reste en mémoire pendant la session. Tu peux aussi importer un WAV, MP3 ou M4A depuis le carnet.
+3. Dans **Réglages**, saisis ta clé Gladia. **Transcrire avec Gladia** envoie les pistes disponibles et affiche les passages dans l’ordre. Les passages du micro portent ton nom complet Windows, sinon ton nom de session, sinon « Vous ». La clé reste en mémoire pendant la session. Tu peux aussi importer un WAV, MP3 ou M4A depuis le carnet.
 
 La préparation et la validation de tâches sont disponibles dans l’app Mac 0.1.2. L’ancienne adresse web de l’agent redirige vers la page d’onboarding.
 
@@ -23,3 +23,7 @@ makensis windows/installer.nsi
 Le dernier appel génère `web/public/downloads/Meetin-OS-Windows.exe`, le fichier que sert le site. Le build peut se faire sur Mac. Le workflow Windows vérifie sur un runner l’installation, le raccourci et l’ouverture du carnet.
 
 Pour la recette audio, utilise un vrai PC Windows avec deux personnes en appel. Vérifie les deux WAV séparément, puis lance Gladia et compare l’ordre des passages. [Capture audio WASAPI](https://learn.microsoft.com/en-us/windows/win32/coreaudio/loopback-recording) · [API Gladia](https://docs.gladia.io/api-reference/v2/pre-recorded/init)
+
+## Installateur de test à jour
+
+Sur Windows, installer .NET SDK 10 et NSIS, puis exécuter `pwsh -File windows/build-test.ps1` depuis le dépôt. Le résultat versionné est dans `artifacts/windows/`, avec manifeste de provenance. Le workflow publie le ZIP seulement après installation, ouverture de la fenêtre et désinstallation réussies sur le runner Windows. Le fichier public du site reste inchangé tant qu’une livraison stable n’a pas été décidée. Voir `TEST-WINDOWS.md` pour le périmètre réel et la recette audio.
