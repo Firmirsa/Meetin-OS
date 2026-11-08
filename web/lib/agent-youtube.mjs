@@ -182,7 +182,9 @@ export async function youtubeStatus(receipt, user, env, fetcher) {
     if (commenting && (a?.outcome === 'login_required' || (a && a.verified !== true && !signedIn(a.account)))) {
       return {status: 'unverified', message: 'Le navigateur H n’est connecté à aucun compte YouTube.' + none};
     }
-    if (a?.outcome === 'comments_disabled') return {status: 'unverified', message: 'Les commentaires de cette vidéo sont désactivés.' + none};
+    // H may also omit outcome and explain the block in free text.
+    const said = typeof a === 'string' ? a : [a?.comment, a?.outcome].filter(v => typeof v === 'string').join(' ');
+    if (a?.outcome === 'comments_disabled' || (!a?.outcome && /commentaires sont désactivés|comments are (?:turned off|disabled)/i.test(said))) return {status: 'unverified', message: 'Les commentaires de cette vidéo sont désactivés.' + none};
     if (a?.outcome === 'not_found') return {status: 'unverified', message: 'H n’a pas trouvé la vidéo demandée.' + none};
     return {status: 'unverified', message: commenting ? 'H n’a pas confirmé le commentaire. Vérifiez la session ; ne relancez pas la publication.' : 'H n’a pas confirmé l’ouverture de la page. Consultez la session.'};
   }

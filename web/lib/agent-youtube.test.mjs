@@ -96,6 +96,8 @@ test('a comment is claimed once per proposal and verified only when observed', a
  const signedOut=await youtubeExecutionStatus(again,user,env,status({account:'not logged in',comment:'Super vidéo',verified:false,comment_url:''}));
  assert.match(signedOut.message,/connecté à aucun compte YouTube/);
  assert.match((await youtubeExecutionStatus(again,user,env,status({...good,verified:false,outcome:'comments_disabled'}))).message,/désactivés/);
+ // Real H answer of 8 November: no outcome, explanation in the comment field.
+ assert.match((await youtubeExecutionStatus(again,user,env,status({account:'FIRMIRSA',comment:'5 vidéos vérifiées — toutes affichent « Les commentaires sont désactivés. » Aucun commentaire n’a été publié.',page_url:'https://www.youtube.com/watch?v=gNjNmPYPvwk',verified:false,comment_url:''}))).message,/désactivés/);
  await assert.rejects(youtubeExecutionStatus(again,other,env,status(good)),{status:409});
  await assert.rejects(executeTask({confirmed:true,approval:p.approval},user,{...env,MEETIN_YOUTUBE_PROFILE_ID:undefined},fetcher),{status:503,code:'youtube_setup'});
 });
