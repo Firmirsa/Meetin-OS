@@ -60,3 +60,14 @@ Petits défauts de la recette visuelle, corrigés sur `lenny/petits-defauts` (`e
 Vérifications : 25 tests web, build Next.js, 4 tests smoke Mac (Gladia, MeetingStore, détection, direct). Le message de pause n’a pas encore été revu à l’écran.
 
 Script de téléversement du profil H prêt, hors dépôt, pour l’archive Chromium que l’agent de Wael doit fournir.
+
+Actions YouTube générales par H Computer Use, le 8 novembre, sur `lenny/h-actions-web` (`c44cd8c`), qui part de `lenny/petits-defauts`. La démo figée est remplacée : plus de compte @Fraawdrinn imposé, ni de chaîne unique, ni de « Bravo ! » imposé, ni de publication unique à vie.
+- Un détecteur Holo dédié propose « commenter une vidéo » ou « ouvrir une vidéo, une chaîne ou une recherche ». La cible, le texte du commentaire et la citation viennent des mots de l’utilisateur. Le détecteur Devin et Trello est inchangé.
+- Exécution par H avec le profil `MEETIN_YOUTUBE_PROFILE_ID`, après confirmation. Une session H par proposition confirmée (migration `20261108160000_youtube_action_claims`, appliquée), sans relance automatique.
+- Un commentaire n’est déclaré réussi que s’il a été vu en ligne, avec le texte exact, depuis un compte connecté. L’app Mac affiche aussi le lien d’une page ouverte.
+
+Vérifications :
+- 27 tests web, build Next.js et 4 tests smoke Mac.
+- Mesure avec le vrai Holo, 3 essais par phrase : demandes valides 10/12, fausses demandes 0/12.
+
+Profil H : Chromium 156 neuf sous Linux (OrbStack, `linuxserver/chromium`) sur le Mac de Lenny, connecté par Lenny à son propre compte YouTube, téléversé chez H (`9d5ad7ce…`). Une session H sans publication voit le compte connecté (avatar « F », pas de bouton « Se connecter ») : Chromium 156 est accepté malgré la limite de 150 indiquée dans la documentation. `MEETIN_YOUTUBE_PROFILE_ID` est mis à jour en recette et les copies locales du profil sont supprimées. L’essai réel à la voix reste à faire.
