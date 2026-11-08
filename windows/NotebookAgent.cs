@@ -218,7 +218,7 @@ internal sealed partial class Notebook
     {
         var client = Client;
         if (client == null) { ShowPage("Intégrations"); return; }
-        if (agentAccess?.Planning == false) { ShowPage("Intégrations"); integrationsIssue.Text = "Ton équipe doit activer l’agent sur son serveur. Tu peux continuer à utiliser le carnet."; integrationsIssue.Visible = true; return; }
+        if (agentAccess?.Planning == false) { integrationsIssue.Text = "Ton équipe doit activer l’agent sur son serveur. Tu peux continuer à utiliser le carnet."; integrationsIssue.Visible = true; ShowPage("Intégrations"); return; }
         var task = requestField.Text.Trim();
         var excerpt = excerptField.Text.Trim();
         if (agentBusy || (task.Length == 0 && excerpt.Length == 0)) return;
@@ -408,7 +408,7 @@ internal sealed partial class Notebook
         content.Controls.Add(new Label { Text = "Intégrations", Font = Night.Serif(30f), ForeColor = Night.Ink, AutoSize = true, Margin = new Padding(0, 0, 0, 14) });
         content.Controls.Add(integrationsIntro);
         var tools = Section("Outils", out var toolsStack);
-        toolsStack.Controls.Add(ToolRow("Gladia", "Transcrire un enregistrement", gladiaPill, "Configurer", () => ShowPage("Paramètres")));
+        toolsStack.Controls.Add(ToolRow("Gladia", "Transcrire un enregistrement", gladiaPill, "Configurer", () => { integrationsSheet?.Close(); ShowPage("Paramètres"); }));
         toolsStack.Controls.Add(ToolRow("Trello", "Créer une fiche après ta confirmation", trelloPill, null, null));
         toolsStack.Controls.Add(ToolRow("Google Calendar", "Retrouver les réunions prévues", new Pill("À venir", PillKind.Wait), null, null));
         toolsStack.Controls.Add(ToolRow("Devin", "Confier une tâche de code", devinPill, null, null));

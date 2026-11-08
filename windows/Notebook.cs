@@ -937,6 +937,37 @@ internal sealed partial class Notebook : Form
         }
     }
 
+    // Sur Mac, Intégrations s’ouvre en feuille par-dessus la fenêtre : ici, une fenêtre modale.
+    private Form? integrationsSheet;
+
+    private void OpenIntegrationsSheet()
+    {
+        if (!pageByName.TryGetValue("Intégrations", out var sheetPage)) return;
+        var owner = (Form?)Form.ActiveForm is { } active && active != this && active.Visible ? active : this;
+        RefreshIntegrationsPage();
+        using var sheet = new Form
+        {
+            Text = "Intégrations", Icon = Icon, ClientSize = new Size(740, 660), MinimumSize = new Size(600, 420),
+            StartPosition = FormStartPosition.CenterParent, BackColor = Night.Canvas, ForeColor = Night.Ink, Font = Font,
+            ShowInTaskbar = false, MinimizeBox = false, MaximizeBox = false
+        };
+        var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(16, 10, 16, 14), BackColor = Night.Canvas };
+        var close = new Capsule("Fermer", CapsuleKind.Ghost);
+        close.Click += (_, _) => sheet.Close();
+        bar.Controls.Add(close);
+        var previous = sheetPage.Parent;
+        sheetPage.Parent = sheet;
+        sheetPage.Dock = DockStyle.Fill;
+        sheetPage.Visible = true;
+        sheet.Controls.Add(bar);
+        sheetPage.BringToFront();
+        integrationsSheet = sheet;
+        sheet.ShowDialog(owner);
+        integrationsSheet = null;
+        sheetPage.Visible = false;
+        sheetPage.Parent = previous;
+    }
+
     // Le titre se renomme en place, comme le champ de titre de la fiche Mac.
     private void CommitTitle()
     {
@@ -983,13 +1014,6 @@ internal sealed partial class Notebook : Form
         transcriptionStack.Controls.Add(Muted("L’audio est envoyé en continu à Gladia pendant l’enregistrement. Si l’agent est connecté, le texte part aussi chez Holo (H Company) toutes les 15 s pour proposer des tâches. Rien n’est lancé sans ta validation."));
         content.Controls.Add(transcription);
 
-        var zoom = Section("Détection Zoom", out var zoomStack);
-        var zoomToggle = new CheckBox { Text = "Me prévenir quand je rejoins une réunion Zoom", Checked = zoomEnabled, AutoSize = true, ForeColor = Night.Ink, Margin = new Padding(0, 4, 0, 4) };
-        zoomToggle.CheckedChanged += (_, _) => { zoomEnabled = zoomToggle.Checked; MeetingStore.SaveZoomEnabled(zoomEnabled); zoomDetector = new ZoomMeetingDetector(); zoomTimer.Enabled = zoomEnabled; };
-        zoomStack.Controls.Add(zoomToggle);
-        zoomStack.Controls.Add(Muted("Meetin-OS surveille les fenêtres de Zoom toutes les 2 s et propose de lancer l’enregistrement. L’enregistrement se lance manuellement."));
-        content.Controls.Add(zoom);
-
         var audio = Section("Autorisations audio", out var audioStack);
         audioStack.Controls.Add(Muted("Windows ne demande rien au premier enregistrement : si le micro est refusé dans Confidentialité, seul l’audio de l’appel est gardé."));
         var audioActions = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0, 12, 0, 0) };
@@ -1001,6 +1025,13 @@ internal sealed partial class Notebook : Form
         audioActions.Controls.Add(sound);
         audioStack.Controls.Add(audioActions);
         content.Controls.Add(audio);
+
+        var zoom = Section("Détection Zoom", out var zoomStack);
+        var zoomToggle = new CheckBox { Text = "Me prévenir quand je rejoins une réunion Zoom", Checked = zoomEnabled, AutoSize = true, ForeColor = Night.Ink, Margin = new Padding(0, 4, 0, 4) };
+        zoomToggle.CheckedChanged += (_, _) => { zoomEnabled = zoomToggle.Checked; MeetingStore.SaveZoomEnabled(zoomEnabled); zoomDetector = new ZoomMeetingDetector(); zoomTimer.Enabled = zoomEnabled; };
+        zoomStack.Controls.Add(zoomToggle);
+        zoomStack.Controls.Add(Muted("Meetin-OS surveille les fenêtres de Zoom toutes les 2 s et propose de lancer l’enregistrement. L’enregistrement se lance manuellement."));
+        content.Controls.Add(zoom);
 
         var site = Section("Espace web", out var siteStack);
         siteStack.Controls.Add(Muted("Adresse du site Meetin-OS utilisée pour l’agent, les intégrations et l’abonnement."));
@@ -1014,6 +1045,7 @@ internal sealed partial class Notebook : Form
         siteField.Text = agentSite.GetLeftPart(UriPartial.Authority);
         RefreshKeyPill();
         scroll.Controls.Add(content);
+        CenterColumn(scroll, content, 660);
         return scroll;
     }
 
@@ -1035,6 +1067,7 @@ internal sealed partial class Notebook : Form
         content.Controls.Add(section);
         content.Controls.Add(new Label { Text = "Meetin-OS pour Windows · " + Application.ProductVersion.Split('+')[0], ForeColor = Night.Ink2, AutoSize = true, Margin = new Padding(0, 18, 0, 0) });
         scroll.Controls.Add(content);
+        CenterColumn(scroll, content, 660);
         return scroll;
     }
 
@@ -1053,7 +1086,7 @@ internal sealed partial class Notebook : Form
         if (name == "Agent" && pageByName.TryGetValue("Agent", out var agentPage) && agentPage.Parent != pages) { agentPage.Parent = pages; agentPage.Dock = DockStyle.Fill; EmbedAgentPage(false); }
         if (name == "Accueil" || name == "Réunions") RefreshMeetings();
         if (name == "Agent") RefreshAgentPage();
-        if (name == "Intégrations") RefreshIntegrationsPage();
+        if (name == "Intégrations") { OpenIntegrationsSheet(); return; }
         foreach (var pair in pageByName) pair.Value.Visible = pair.Key == name;
         if (name == "Détail") SelectDetailTab(false);
         foreach (var pair in navByName)
@@ -1616,6 +1649,20 @@ internal sealed partial class Notebook : Form
     }
 
     // ---------- fabrique de contrôles ----------
+
+    // Comme la colonne de 620 des Paramètres et du Compte sur Mac : centrée, 48 de marge au minimum.
+    private static void CenterColumn(Panel scroll, FlowLayoutPanel content, int width)
+    {
+        void Place()
+        {
+            var s = scroll.DeviceDpi / 96f;
+            var available = scroll.ClientSize.Width - SystemInformation.VerticalScrollBarWidth;
+            var side = Math.Max((int)(48 * s), (available - (int)(width * s)) / 2);
+            if (content.Padding.Left != side) content.Padding = new Padding(side, content.Padding.Top, side, content.Padding.Bottom);
+        }
+        scroll.Resize += (_, _) => Place();
+        scroll.VisibleChanged += (_, _) => Place();
+    }
 
     private static Panel ScrollPane() => new() { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Night.Canvas };
 
