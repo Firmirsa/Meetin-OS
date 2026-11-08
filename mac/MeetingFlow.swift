@@ -93,8 +93,12 @@ extension MeetingSession {
         guard let client = agentClient else { return }
         let transcript = live.transcript
         LiveAlerts.requestPermission()
-        let detector = TaskDetector(text: { transcript.confirmedText }) { text, known in
-            try await client.detect(transcript: text, known: known)
+        let detector = TaskDetector(text: { transcript.confirmedText }) { [weak self] text, known in
+            guard let self else { throw CancellationError() }
+            let revision = self.captureRevision
+            let result = try await client.detect(transcript: text, known: known)
+            guard self.captureRevision == revision else { throw CancellationError() }
+            return result
         }
         detector.onNewProposal = { [weak self, weak detector] proposal in
             guard let self, self.detector === detector else { return }
@@ -190,7 +194,7 @@ extension MeetingSession {
 
     private func reportTaskIssue(_ proposal: TaskProposal, _ message: String, notify: Bool) {
         proposalIssues[proposal.id] = message
-        if notify { LiveAlerts.postTask("Tâche non lancée : \(proposal.review.title)", message) }
+        if notify { LiveAlerts.postTask("Vérifier le lancement : \(proposal.review.title)", message) }
     }
 
     // Réponse à une notification de tâche. Sans lancement possible, ouvre la carte concernée.
@@ -239,10 +243,53 @@ extension MeetingSession {
         }
     }
 
-    func makeLive() -> LiveTranscription? {
+    func pauseCapture() async {
+        guard !busy, captureState == .recording, let capture else { return }
+        busy = true
+        defer { busy = false }
+        captureRevision += 1
+        detector?.stop()
+        capturePaused = true
+        status = "Enregistrement en pause"
+        do { try capture.pause() }
+        catch { status = "Enregistrement en pause. \(error.localizedDescription)" }
+        await finishCaptureSegment()
+    }
+
+    func resumeCapture() async {
+        guard !busy, captureState == .paused, let capture else { return }
+        busy = true
+        defer { busy = false }
+        let nextSegment = captureSegment + 1
+        let next = makeLive(transcript: live?.transcript, segment: nextSegment, startTime: capture.activeDuration)
+        let listener: ((AudioTrack, AVAudioPCMBuffer, UInt64) -> Void)? = next.map { live in
+            { track, buffer, time in live.feed(track, buffer, hostTime: time) }
+        }
+        do {
+            try capture.resume(onAudio: listener)
+            capturePaused = false
+            captureSegment = nextSegment
+            if let next {
+                live = next
+                next.start()
+                if let detector { detector.start() }
+                else { startDetection(reading: next) }
+            } else if live != nil {
+                transcriptIncomplete = true
+            }
+            status = "Enregistrement en cours"
+        } catch let help as AudioPermissionHelp {
+            permissionHelp = help
+            status = "Enregistrement en pause. \(help.localizedDescription)"
+        } catch {
+            status = "Enregistrement en pause. \(error.localizedDescription)"
+        }
+    }
+
+    func makeLive(transcript: LiveTranscript? = nil, segment: Int = 0, startTime: Double = 0) -> LiveTranscription? {
         guard liveTranscriptionEnabled, let client = accountClient, accountConnected else { return nil }
         LiveAlerts.requestPermission()
-        let live = LiveTranscription(openSocket: { [account] in
+        let live = LiveTranscription(transcript: transcript, segment: segment, startTime: startTime, openSocket: { [account] in
             let usage = try await account.refreshUsage(client)
             guard usage.remainingMs > 0 else {
                 throw CaptureError("Ton quota audio est atteint. Consulte ton plan dans Compte.")
@@ -260,21 +307,27 @@ extension MeetingSession {
         return live
     }
 
+    func finishCaptureSegment() async {
+        guard let live else { return }
+        await live.finish()
+        if live.isIncomplete { transcriptIncomplete = true }
+    }
+
     // Le texte du direct devient la transcription, avant l'ajout de la réunion à l'historique.
     func finishLive() async {
         guard let live else { return }
         status = "Finalisation de la transcription…"
-        await live.finish()
+        await finishCaptureSegment()
         let text = live.transcript.finalText
-        if !text.isEmpty {
-            transcript = text
-            transcriptIncomplete = live.isIncomplete
-        }
+        if !text.isEmpty { transcript = text }
         self.live = nil
         finishDetection()
     }
 
     func meetingDidStart(source: MeetingSource?) {
+        capturePaused = false
+        captureSegment = 0
+        captureRevision += 1
         if meetingID != nil {
             meetingID = nil
             notes = ""

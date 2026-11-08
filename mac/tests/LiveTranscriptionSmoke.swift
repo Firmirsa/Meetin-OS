@@ -149,6 +149,56 @@ struct LiveTranscriptionSmoke {
         precondition(sockets.withLock { $0.count } == 2, "une session par piste")
         precondition(sockets.withLock { $0.allSatisfy { $0.stopped && $0.sent > 0 } }, "audio puis stop_recording")
 
+        // Pause : deux flux fermés, puis deux nouveaux flux. Le même identifiant Gladia
+        // dans deux tranches garde deux phrases et utilise le temps audio cumulé.
+        let resumedSockets = Mutex<[FakeSocket]>([])
+        let resumed = LiveTranscription(transcript: full.transcript, segment: 1, startTime: 2.5, openSocket: {
+            let socket = FakeSocket(incoming: [message("x", "Reprise", start: 0, final: true)])
+            resumedSockets.withLock { $0.append(socket) }
+            return socket
+        })
+        resumed.start()
+        let origin = mach_absolute_time()
+        for track in AudioTrack.allCases {
+            resumed.feed(track, tone(rate: 48_000, channels: 1, frames: 9_600), hostTime: origin)
+        }
+        await resumed.finish()
+        await full.finish()
+        precondition(full.transcript === resumed.transcript)
+        precondition(resumed.transcript.lines.count == 4)
+        precondition(resumed.transcript.lines.filter { $0.text == "Reprise" }.allSatisfy { abs($0.time - 2.5) < 0.001 })
+        precondition(resumedSockets.withLock { $0.count == 2 && $0.allSatisfy { $0.stopped } })
+
+        // Les tranches audio sont jointes sur la même chronologie, sans l'intervalle de pause.
+        do {
+            let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: folder) }
+            let first = folder.appendingPathComponent("first.caf")
+            let second = folder.appendingPathComponent("second.caf")
+            let buffer = tone(rate: 48_000, channels: 1, frames: 24_000)
+            for url in [first, second] {
+                let writer = try AVAudioFile(forWriting: url, settings: buffer.format.settings)
+                try writer.write(from: buffer)
+            }
+            let span = AudioCapture.SampleSpan(start: 50, duration: 0.5, hasSignal: true)
+            let segment = AudioCapture.Segment(microphone: span, system: .init(start: 50.25, duration: 0.5, hasSignal: true))
+            precondition(segment.duration == 0.75)
+            let composition = try await AudioCapture.audioComposition([[(first, 0), (second, segment.duration)], [(first, 0.25)]])
+            let tracks = try await composition.loadTracks(withMediaType: .audio)
+            let duration = try await composition.load(.duration)
+            precondition(abs(duration.seconds - 1.25) < 0.005, "durée compacte : \(duration.seconds)")
+            precondition(tracks.count == 2, "micro et système restent séparés")
+            let delayedRange = try await tracks[1].load(.timeRange)
+            precondition(abs(delayedRange.end.seconds - 0.75) < 0.005, "décalage initial de la piste conservé")
+            let exported = folder.appendingPathComponent("segments.m4a")
+            try await AudioCapture.exportAudioLanes([[(first, 0), (second, segment.duration)], [(first, 0.25)]], to: exported)
+            let exportedDuration = try await AVURLAsset(url: exported).load(.duration).seconds
+            precondition(abs(exportedDuration - 1.25) < 0.05, "durée exportée compacte : \(exportedDuration)")
+        } catch {
+            preconditionFailure("export des tranches : \(error)")
+        }
+
         // Coupure puis reprise sur la même adresse
         let attempts = Mutex<[FakeSocket]>([])
         let urls = Mutex<[URL]>([])

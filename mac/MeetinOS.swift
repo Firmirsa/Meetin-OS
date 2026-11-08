@@ -33,7 +33,19 @@ struct MeetinOS: App {
 @MainActor
 @Observable
 final class MeetingSession {
+    enum CaptureState { case idle, recording, paused }
+
     var capture: AudioCapture?
+    var capturePaused = false
+    var captureSegment = 0
+    var captureRevision = 0
+
+    var captureState: CaptureState {
+        guard capture != nil else { return .idle }
+        return capturePaused ? .paused : .recording
+    }
+
+    var captureActiveDuration: TimeInterval { capture?.activeDuration ?? 0 }
     var recording: URL?
     var recordedTracks: AudioCapture.Tracks?
     var busy = false
@@ -308,16 +320,23 @@ struct CaptureView: View {
             defer { session.busy = false }
             do {
                 if let current = session.capture {
-                    defer { session.capture = nil }
                     session.status = "Préparation du fichier audio…"
                     let result: (mix: URL, tracks: AudioCapture.Tracks?, help: AudioPermissionHelp?)
                     do {
+                        try current.pause()
+                        await session.finishCaptureSegment()
                         result = try await current.stop()
                     } catch {
-                        await session.finishLive()
+                        session.capturePaused = true
+                        await session.finishCaptureSegment()
+                        if current.activeDuration == 0 {
+                            await session.finishLive()
+                            session.capture = nil
+                        }
                         throw error
                     }
                     await session.finishLive()
+                    defer { session.capture = nil }
                     session.recording = result.mix
                     session.recordedTracks = result.tracks
                     session.permissionHelp = result.help

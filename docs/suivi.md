@@ -1,5 +1,42 @@
 # Suivi Meetin-OS
 
+## Priorité Mac confirmée par Wael, 8 novembre 2026
+
+Le parcours natif prend la priorité sur l’agentique : onboarding court, carnet rapidement accessible, connexions personnelles avec états réels, fenêtre réunion avec Transcription / Agent / Résumé. **Pause suspend l’audio et la transcription ; Reprendre continue la même réunion.** Les notes, segments et brouillons sont conservés ; Terminer reste une action distincte. Aucun enregistrement de la conversation en cours n’est autorisé pour tester ce lot.
+
+Pause/reprise a été intégrée localement après le lot `routage_complexe`. Le coordinateur a corrigé la perte du décalage initial d’une piste vide ; les tests Swift Gladia et direct passent désormais avec sons synthétiques, composition et export M4A réels, sans ouvrir le micro. Les commandes visibles sont en cours dans le lot UX.
+
+À la demande de Wael, le lot UX est exécuté via le CLI officiel Devin `3000.12.28`, modèle demandé et accepté `gpt-6-1-sol-medium`, sur une copie isolée sans secrets. Mission réellement lancée : onboarding, onglets Transcription / Agent / Résumé, boutons et branchement Pause/Reprendre. Le coordinateur conserve revue, intégration, build et livraison. Les participants persistants puis les vrais consentements OAuth personnels Trello et Calendar suivent ; ces connexions ne doivent pas être remplacées par un parcours factice. La branche `samy/nom-utilisateur-transcription` doit être prise en compte avant le lot participants. Aucun service externe ni migration distante n’a été modifié pour ces nouveaux lots.
+
+## Livraisons Git incrémentales, 8 novembre 2026
+
+Wael autorise les commits et pushes ciblés sur la branche de travail après contrôle. Pas de fusion, force-push ni autorisation de déploiement supplémentaire.
+
+Premier push réussi : `codex/google-agent`, `646052b`, précédé de `1cab806`. Le correctif Google de Léni `b1ebc3b` a été récupéré sans perdre les changements locaux. Livraison : ouverture Google native, dédoublonnage exact, question publique Linkup après clic explicite, blocage du profil Trello global pour les comptes Google. Une copie du contenu exact de l’index a passé la compilation Mac, le smoke Swift de détection et les 22 tests Node avant le push. Pas de test Linkup réel ni de connexion Trello personnelle livrée. Le serveur de recette doit être mis à jour pour exposer le nouveau parcours Linkup. Un push ne prouve pas un déploiement Vercel.
+
+La copie actuellement installée dans Applications reste celle décrite ci-dessous. Les nouveaux lots Mac seront recompilés et réinstallés après leur intégration.
+
+## Recette et préparation de démo, 8 novembre 2026
+
+Référence de travail : `HCompany-google-agent`, branche `codex/google-agent`, base `b82c55c`, avec modifications locales non commitées. `git pull --ff-only` a confirmé la synchronisation avant ce lot. Ne pas repartir du dossier `HCompany/main`, plus ancien pour ce parcours.
+
+**Décision produit actuelle : chacun connecte son propre Trello.** La configuration d’un tableau/profil H global par Lenny n’est plus la prochaine action produit. Les anciens essais de tableau partagé ci-dessous restent des preuves historiques, pas un parcours multi-utilisateur. Le [diagnostic et le parcours proposé](connexion-trello.md) sont en lecture seule ; OAuth Trello et son stockage ne sont pas encore implémentés.
+
+| Lot | Implémentation et contrôles | Recette réelle et limite |
+|---|---|---|
+| Google et agent | Session Google vérifiée côté serveur ; préparation Holo existante. | Depuis l’app sur `meetin-os-recette`, une demande fictive a produit une carte à confirmer avec la correction « Karim, mardi 10 novembre 2026 ». Aucun Devin lancé dans ce lot. Après installation du nouveau build, choix du compte Google puis retour au carnet observés, sans clic sur un lien bleu. |
+| Anti-doublons et ambiguïté | Empreinte exacte de l’outil, la destination, la tâche et la citation partagée Mac/serveur ; plus de fusion au seul titre ; corrections `replaces` explicites conservées ; référence inconnue rejetée. La préparation manuelle H demande un titre/lien de fiche étayé par la source. | Tests simulés Node et Swift réussis. Pas de déduplication sémantique exhaustive. Ciblage automatique inchangé. La relance Devin sur deux instances reste non idempotente : deux POST simulés reproduits. |
+| Linkup | Recherche publique facultative dans Agent, `/api/agent-research` protégé par Google, question seule envoyée après clic, liens HTTPS filtrés. Aucun envoi automatique de transcription. | Tests simulés réussis, pas de requête réelle à Linkup. Le serveur déployé ne fournit pas encore ce nouveau parcours ; le Mac affiche « L’accès à Linkup n’a pas été confirmé ». |
+| H, Gladia et Stripe | Holo réel confirmé ; H Computer Use et Gladia relay restent implémentés. Stripe Checkout/webhook testé avec clients et événements de test simulés. | Pas de vrai appel à deux dans ce lot, aucune capture de la conversation en cours. Trello par utilisateur non prêt. Le compte recette n’affiche pas de bouton Premium, donc Checkout non disponible dans ce parcours. Aucun paiement réel. |
+| Build Mac | 21 tests web réussis ; test Swift de détection/actions réussi ; build Next.js réussi sur copie de validation ; compilation Mac complète et signature vérifiées. Mac 0.1.5 build 6 installé dans Applications avec `https://meetin-os-recette.vercel.app`. | Empreinte du binaire installé : `818c8979ef090473e78fa548d5671c5a2dfd0a9b157374d007af0215ad5485d7`. Google et panneau Linkup observés dans cette copie. Notification d’arrivée non recettée dans ce lot ; nouvelle signature pouvant nécessiter réautorisation audio/accessibilité. |
+| Rendu | [Texte, protocole et pitch préparés](demo-recette.md). Six champs BuilderBase vérifiés et formulaire H Showcase inspecté sans rien soumettre. | Le portail affiche 14 h 30, le briefing 14 h : conserver 14 h comme limite de préparation. Durée officielle du pitch et prise en compte de Devin utilisé seulement pendant le développement non confirmées. |
+
+Archive locale de travail : `/private/tmp/meetin-demo-20261108` contient le bundle compilé, une archive des sources sans secrets, le diff et un manifeste. Ancien bundle conservé dans `/Users/wael/Library/Application Support/Meetin-OS/Build Backups/demo-20261108.AZ1OtP/Meetin-OS.app`. Aucun commit, push, fusion ou déploiement serveur effectué dans ce lot. Les changements serveur locaux ne sont donc pas validés en recette Vercel.
+
+Profils natifs acceptés successivement, un exécutant à la fois : `routage_complexe` (configuration Sol High) pour auth/dédoublonnage et diagnostic Trello ; `routage_code` (Sol Medium) pour Linkup ; `routage_borne` (Luna Medium) pour les textes. Les outils confirment l’affectation, pas une télémétrie indépendante du modèle ou de l’effort réellement exécutés. Le coordinateur a gardé intégration, compte/browser, compilation et installation.
+
+**Prochaine action :** décider et préparer le client OAuth Trello personnel et son stockage privé, sans réactiver le profil global. Faire ensuite l’appel court avec Wael lorsqu’il est disponible et les autorisations audio prêtes. Les paramètres de recette encore nécessaires sont listés dans la fiche de démo ; aucune valeur secrète n’y figure.
+
 Dernier point : 8 novembre 2026. La [bêta 0.1.0](https://github.com/Firmirsa/Meetin-OS/releases/tag/v0.1.0-beta) contient les installateurs Mac et Windows. Le [plan d’exécution](plan-hackathon.md) reste la référence pour la répartition et la démo.
 
 | Sujet | État | Prochaine action |
@@ -17,3 +54,17 @@ Dernier point : 8 novembre 2026. La [bêta 0.1.0](https://github.com/Firmirsa/Me
 | Site et démo · Lenny et équipe | Le site Next.js contient les téléchargements et les premiers pas. Sur `codex/hosted-gladia`, l’abonnement se lance depuis Compte sur Mac et le site affiche le retour de Stripe Checkout. Le 7 novembre, Mac 0.1.4 a été compilé et ouvert sur le Mac de Wael avec `https://meetin-os.vercel.app`. Le site répond, mais `/api/account-status` renvoie encore le refus du code d’équipe et `/api/gladia-live` répond 405. La version hébergée ne permet pas encore la recette du compte et du direct. | Déployer la branche sur Vercel avec les variables de recette, vérifier les routes, puis tester les deux voix sur un appel court. |
 
 Le 8 novembre, le build Mac 0.1.5 de `codex/google-agent` a été installé dans Applications. Les tests locaux valident la session Google pour l’agent et le rejet de l’ancien code partagé. Sur le site public Vercel, `account-auth` répond encore HTTP 401 à la demande de connexion Google. Déployer le serveur sur l’environnement de recette configuré pour Google avant l’essai des notifications.
+
+Le 8 novembre, build Mac 0.1.5 installé dans Applications avec `https://meetin-os-recette.vercel.app`. La route de démarrage Google répond HTTP 200. Le build inclut un repli sur la fenêtre principale ou visible quand macOS ne fournit pas de fenêtre active. Le bouton démarre la connexion, mais le retour Google et la notification d’arrivée dans Meet restent à vérifier.
+
+Le 8 novembre, le carnet connecté a été observé. Un Meet solo dans Chrome Codex Agents a été rejoint puis quitté. Détection activée dans Meetin-OS, aucune alerte d’arrivée observée pendant cet essai. Le build suivant réactive la fenêtre Mac avant la session Google et utilise le retour natif par schéma. Une nouvelle connexion complète reste à vérifier.
+
+Au second essai du 8 novembre, les Réglages Système indiquaient que l’accès Accessibilité de Meetin-OS était désactivé. Le détecteur ignore les appels dans cet état. Le retest réel attend l’autorisation macOS et une session Google ouverte.
+
+Le 8 novembre, le carnet a été observé après la connexion Google effectuée par Wael, sans observation directe de la transition navigateur. Un build qui examine les fenêtres Meet en premier a été installé et testé en appel solo. Le bouton Quitter l’appel était présent et Accessibilité activée, mais aucune alerte d’arrivée n’a été observée. Le test simulé du détecteur passe.
+
+Le 8 novembre, après réajout du build de diagnostic dans Accessibilité, macOS a confirmé l’accès du processus installé. Dans un Meet solo, Chrome exposait la salle et le bouton Quitter l’appel, mais aucune soumission de notification n’a été observée. Désactiver puis réactiver la détection pendant l’appel n’a pas déclenché d’alerte. Le problème restant se situe avant la soumission à macOS.
+
+Le 8 novembre, en sélectionnant réellement l’onglet Meet dans la fenêtre Chrome, le build autorisé a vu une fenêtre candidate mais aucune zone web associée à la salle. Le build suivant accepte aussi l’adresse Meet exposée sans schéma et donne davantage de temps à la lecture de Chrome. Il a été installé et le test simulé passe. Il attend une nouvelle autorisation Accessibilité pour le test réel.
+
+Le 8 novembre, Mac 0.1.5 recompilé depuis `b82c55c` avec les modifications locales et réinstallé dans Applications sur `meetin-os-recette`. Essai réel après déconnexion depuis Compte. Le bouton Google a ouvert une fenêtre Google dans Chrome Codex Agents. Cette fenêtre a disparu et le carnet a affiché le compte connecté et le quota Gratuit. Aucune page blanche ni clic sur un lien bleu observé par l’agent entre ses contrôles.

@@ -309,6 +309,7 @@ actor GladiaLiveSession {
 final class LiveTranscript {
     struct Line: Identifiable, Equatable {
         let id: String
+        let segment: Int
         let time: Double
         let track: AudioTrack
         let text: String
@@ -318,19 +319,25 @@ final class LiveTranscript {
     }
 
     private struct Key: Hashable {
+        let segment: Int
         let track: AudioTrack
         let id: String
     }
 
     private var utterances: [Key: GladiaLive.Transcript] = [:]
-    private var firstAudio: [AudioTrack: Double] = [:]
+    private var firstAudio: [Int: [AudioTrack: Double]] = [:]
+    private var segmentStarts: [Int: Double] = [:]
 
-    func noteFirstAudio(_ track: AudioTrack, at seconds: Double) {
-        if firstAudio[track] == nil { firstAudio[track] = seconds }
+    func startSegment(_ segment: Int, at time: Double) {
+        segmentStarts[segment] = time
     }
 
-    func apply(_ transcript: GladiaLive.Transcript, track: AudioTrack) {
-        let key = Key(track: track, id: transcript.id)
+    func noteFirstAudio(_ track: AudioTrack, at seconds: Double, segment: Int = 0) {
+        if firstAudio[segment]?[track] == nil { firstAudio[segment, default: [:]][track] = seconds }
+    }
+
+    func apply(_ transcript: GladiaLive.Transcript, track: AudioTrack, segment: Int = 0) {
+        let key = Key(segment: segment, track: track, id: transcript.id)
         if transcript.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             utterances[key] = nil
         } else {
@@ -338,16 +345,17 @@ final class LiveTranscript {
         }
     }
 
-    private func offset(_ track: AudioTrack) -> Double {
-        guard let first = firstAudio[track], let origin = firstAudio.values.min() else { return 0 }
-        return first - origin
+    private func offset(_ track: AudioTrack, segment: Int) -> Double {
+        let start = segmentStarts[segment] ?? 0
+        guard let times = firstAudio[segment], let first = times[track], let origin = times.values.min() else { return start }
+        return start + first - origin
     }
 
     var lines: [Line] {
         let all = utterances.map { key, value in
             Line(
-                id: "\(key.track.rawValue)-\(key.id)", time: value.start + offset(key.track),
-                track: key.track, text: value.text, isFinal: value.isFinal
+                id: "\(key.segment)-\(key.track.rawValue)-\(key.id)", segment: key.segment,
+                time: value.start + offset(key.track, segment: key.segment), track: key.track, text: value.text, isFinal: value.isFinal
             )
         }
         .sorted { ($0.time, $0.id) < ($1.time, $1.id) }
@@ -365,7 +373,7 @@ final class LiveTranscript {
         guard line.track == .microphone else { return false }
         let words = Self.words(line.text)
         guard words.count >= echoMinWords else { return false }
-        let heard = Set(call.filter { abs($0.time - line.time) <= echoWindow }.flatMap { Self.words($0.text) })
+        let heard = Set(call.filter { $0.segment == line.segment && abs($0.time - line.time) <= echoWindow }.flatMap { Self.words($0.text) })
         guard !heard.isEmpty else { return false }
         return Double(words.filter(heard.contains).count) / Double(words.count) >= echoOverlap
     }
@@ -393,7 +401,8 @@ final class LiveTranscription {
         case failed(String)
     }
 
-    let transcript = LiveTranscript()
+    let transcript: LiveTranscript
+    private let segment: Int
     private(set) var state: State = .connecting
     private(set) var lostAudio = false
     // Vrai si le texte peut manquer une partie de l'appel : panne, audio perdu ou derniers textes non reçus.
@@ -408,6 +417,7 @@ final class LiveTranscription {
     @ObservationIgnored private var outageAlert: Task<Void, Never>?
     @ObservationIgnored private var alerted = false
     @ObservationIgnored private var finishing = false
+    @ObservationIgnored private var sealed = false
     @ObservationIgnored private var trackStates: [AudioTrack: State] = [:]
     @ObservationIgnored private var sessions: [GladiaLiveSession] = []
     @ObservationIgnored private var finishedCount = 0
@@ -428,21 +438,31 @@ final class LiveTranscription {
         retryDelay: Double = 1,
         finishTimeout: Double = 8,
         outageAlertDelay: Double = 30,
+        transcript: LiveTranscript? = nil,
+        segment: Int = 0,
+        startTime: Double = 0,
         openSocket: @escaping @Sendable () async throws -> LiveSocket
     ) {
         self.retryDelay = retryDelay
         self.finishTimeout = finishTimeout
         self.outageAlertDelay = outageAlertDelay
         self.openSocket = openSocket
+        self.transcript = transcript ?? LiveTranscript()
+        self.segment = segment
+        self.transcript.startSegment(segment, at: startTime)
         for track in AudioTrack.allCases {
             pipes[track] = LiveAudioPipe(
                 onFirstBuffer: { [weak self] seconds in
-                    Task { @MainActor in self?.transcript.noteFirstAudio(track, at: seconds) }
+                    Task { @MainActor in
+                        guard let self, !self.sealed else { return }
+                        self.transcript.noteFirstAudio(track, at: seconds, segment: segment)
+                    }
                 },
                 onDrop: { [weak self] in
                     Task { @MainActor in
-                        self?.lostAudio = true
-                        self?.isIncomplete = true
+                        guard let self, !self.sealed else { return }
+                        self.lostAudio = true
+                        self.isIncomplete = true
                     }
                 }
             )
@@ -470,6 +490,7 @@ final class LiveTranscription {
 
     // Envoie la fin de l'audio et attend les derniers textes, sans jamais dépasser le délai.
     func finish() async {
+        guard !finishing else { return }
         finishing = true
         outageAlert?.cancel()
         for pipe in pipes.values { pipe.finish() }
@@ -478,13 +499,15 @@ final class LiveTranscription {
             try? await Task.sleep(for: .milliseconds(100))
         }
         if finishedCount < sessions.count { isIncomplete = true }
+        sealed = true
         for session in sessions { await session.abort() }
     }
 
     private func handle(_ event: GladiaLiveSession.Event, track: AudioTrack) {
+        guard !sealed else { return }
         switch event {
         case .transcript(let value):
-            transcript.apply(value, track: track)
+            transcript.apply(value, track: track, segment: segment)
         case .connected:
             update(.live, track: track)
         case .reconnecting:
