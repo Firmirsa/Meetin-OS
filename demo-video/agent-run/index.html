@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent run · Meetin-OS</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../../brand/tokens.css">
+<link rel="stylesheet" href="../../brand/components/components.css">
+<link rel="stylesheet" href="director.css">
+</head>
+<body>
+<div id="stage">
+  <div class="bg" aria-hidden="true"></div>
+
+  <div class="win" id="win">
+    <div class="chrome">
+      <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="tab"><span class="tab-ico" aria-hidden="true"></span><span id="tab-title">Loading…</span></span>
+      <span class="url">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 7V5.2a3.5 3.5 0 0 1 7 0V7" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="7" width="10" height="7" rx="2" fill="currentColor"/></svg>
+        <span id="url-text"></span>
+      </span>
+    </div>
+    <div class="viewport" id="viewport">
+      <div class="inner" id="inner">
+        <iframe id="site" src="../site-hackathon/index.html" title="Hackathon site"></iframe>
+        <div class="content-fx" id="content-fx" aria-hidden="true">
+          <div class="beam" id="beam"></div>
+          <div id="chips"></div>
+          <div id="boxes"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="hud" id="hud" aria-label="Meetin-OS meeting window and H Computer Use session">
+    <!-- Meetin-OS meeting window, Agent tab: same layout and content as the Mac app
+         (MeetinOS.swift header and Transcription/Agent picker, ProposalCards.swift card), in English. -->
+    <section class="panel meetin">
+      <header class="mw-head">
+        <svg class="mw-logo" viewBox="0 0 96 96" aria-hidden="true"><rect width="96" height="96" rx="22" fill="#14201C" stroke="rgba(243,241,230,.2)" stroke-width="2"/><g transform="translate(48 48) scale(.86) translate(-48 -48)"><path d="M10 34L20 48L10 62M23 34L33 48L23 62M86 34L76 48L86 62M73 34L63 48L73 62" fill="none" stroke="#FAF8F1" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="48" cy="48" r="8.5" fill="#CFE86B"/></g></svg>
+        <span class="mw-name">Meetin-OS</span>
+        <span class="mw-sub">Meeting</span>
+        <span class="mw-spacer"></span>
+        <span class="mw-btn"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2.5h2.2a1.3 1.3 0 1 1 2.6 0H13v3.2a1.3 1.3 0 1 1 0 2.6V13H9.8a1.3 1.3 0 1 0-2.6 0H3V9.8a1.3 1.3 0 1 0 0-2.6V2.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Integrations</span>
+        <svg class="mw-gear" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.3" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </header>
+      <div class="mw-tabs"><span>Transcript</span><span class="is-on">Agent</span></div>
+      <div class="mw-body">
+        <h2 class="hud-section">Proposed tasks</h2>
+        <article class="task-card">
+          <div class="task-head">
+            <span class="task-title">Make MeetinOS win the hackathon</span>
+            <span class="mt-pill mt-pill--ok">Launched</span>
+          </div>
+          <p class="task-text">Open the participants list, select MeetinOS and confirm 1st place.</p>
+          <p class="task-meta">H Computer Use · https://builderbase.com/event/h-company-42ai-computer-use-agents-hackathon</p>
+          <p class="task-meta">“Make us win the hackathon.”</p>
+          <span class="task-link">Track in H Computer Use</span>
+        </article>
+      </div>
+    </section>
+
+    <!-- H Company agent view, opened by "Track in H Computer Use": where the steps are followed.
+         Simplified: H's real page looks different. Limits come from web/lib/agent.mjs. -->
+    <section class="panel hview">
+      <header class="hv-bar">
+        <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="hv-url">platform.hcompany.ai/agent-view/3f9c2a1e-7b4d…</span>
+      </header>
+      <div class="hv-body">
+        <div class="h-head">
+          <span class="h-name">H Computer Use</span>
+          <span class="h-live"><i></i>Running</span>
+        </div>
+        <p class="h-meta" id="h-meta">h/web-surfer-pro · step 1/25 · 0:03 / 2:00</p>
+
+        <section class="hud-think">
+          <p class="mt-label">Thinking</p>
+          <p class="hud-think-line"><span id="think"></span><i class="caret" id="caret"></i></p>
+        </section>
+
+        <section class="hud-stats" id="stats">
+          <div><span>Teams scanned</span><b id="stat-scanned">0/40</b></div>
+          <div><span>Leader</span><b id="stat-leader">—</b></div>
+          <div><span>Bias</span><b id="stat-bias">checking…</b></div>
+        </section>
+
+        <section class="hud-log">
+          <p class="mt-label">Actions</p>
+          <ol id="log"></ol>
+        </section>
+      </div>
+    </section>
+  </aside>
+
+  <div class="fx" id="fx" aria-hidden="true">
+    <div id="trail"></div>
+    <div id="ripples"></div>
+    <div class="cursor" id="cursor">
+      <svg viewBox="0 0 34 40"><path d="M4 3 L4 31 L11.5 24.5 L16.5 36 L21.2 34 L16.2 22.6 L26 22.6 Z" fill="#F3F1E6" stroke="#0F1613" stroke-width="2.2" stroke-linejoin="round"/></svg>
+      <span class="cursor-tag">Agent</span>
+    </div>
+  </div>
+
+  <div class="endcard" id="endcard" aria-hidden="true">
+    <div class="end-bg" id="end-bg"></div>
+    <div class="end-content" id="end-content">
+      <svg class="end-logo" id="end-logo" viewBox="0 0 96 96"><rect width="96" height="96" rx="22" fill="#14201C" stroke="rgba(243,241,230,.18)" stroke-width="1.5"/><g transform="translate(48 48) scale(.86) translate(-48 -48)"><path d="M10 34L20 48L10 62M23 34L33 48L23 62M86 34L76 48L86 62M73 34L63 48L73 62" fill="none" stroke="#FAF8F1" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="48" cy="48" r="8.5" fill="#CFE86B"/></g></svg>
+      <p class="end-name" id="end-name">Meetin-OS</p>
+      <p class="end-note" id="end-note">*The jury still decides. For now.</p>
+    </div>
+    <div class="wipe" id="wipe"></div>
+  </div>
+</div>
+<script src="director.js"></script>
+</body>
+</html>
