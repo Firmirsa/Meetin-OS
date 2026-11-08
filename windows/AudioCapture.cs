@@ -36,7 +36,7 @@ internal sealed class AudioCapture
     }
 
     public string Folder { get; }
-    // Reçoit les octets PCM 16 kHz mono de chaque piste (direct Gladia) : « Micro » ou « Audio de l’appel ».
+    // Reçoit les octets PCM 16 kHz mono de chaque piste (direct Gladia), identifiée par « Micro » ou « Audio de l’appel ».
     public Action<string, byte[], int, double>? LiveTap { get; set; }
     public Task Started => started.Task;
     public Task<CaptureResult> Finished => finished.Task;
@@ -96,7 +96,7 @@ internal sealed class AudioCapture
         try
         {
             using var input = devices.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia);
-            return new TrackWriter(input, new AudioTrack(Path.Combine(Folder, "micro.wav"), "Micro"), false);
+            return new TrackWriter(input, new AudioTrack(Path.Combine(Folder, "micro.wav"), Speaker.UserLabel), false);
         }
         catch (Exception error)
         {
@@ -159,6 +159,8 @@ internal sealed class AudioCapture
         public AudioTrack Track { get; }
         public bool HasAudio { get; private set; }
         public Action<string, byte[], int, double>? Tap { get; set; }
+        // Identifiant interne de la piste pour le direct : le libellé affiché, lui, peut porter le nom de l’utilisateur.
+        private string Id => Track.Path.EndsWith("micro.wav", StringComparison.OrdinalIgnoreCase) ? "Micro" : "Audio de l’appel";
 
         public void Start()
         {
@@ -196,7 +198,7 @@ internal sealed class AudioCapture
                 if (silent) WriteSilence(frames);
                 else if (frames > 0)
                 {
-                    Tap?.Invoke(Track.Label ?? "", samples, frames * Format.BlockAlign, framesWritten / (double)Format.SampleRate);
+                    Tap?.Invoke(Id, samples, frames * Format.BlockAlign, framesWritten / (double)Format.SampleRate);
                     writer.Write(samples, 0, frames * Format.BlockAlign);
                     framesWritten += frames;
                     HasAudio = true;
@@ -210,7 +212,7 @@ internal sealed class AudioCapture
             while (bytes > 0)
             {
                 var count = Math.Min(bytes, silence.Length);
-                Tap?.Invoke(Track.Label ?? "", silence, count, framesWritten / (double)Format.SampleRate);
+                Tap?.Invoke(Id, silence, count, framesWritten / (double)Format.SampleRate);
                 writer.Write(silence, 0, count);
                 bytes -= count;
                 framesWritten += count / Format.BlockAlign;

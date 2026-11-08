@@ -299,15 +299,39 @@ internal static class MeetingStore
     {
         var dir = new DirectoryInfo(folder);
         var wavs = dir.GetFiles("*.wav").Where(f => f.Length > 44).OrderBy(f => f.Name == "micro.wav" ? 0 : 1).ToList();
-        if (wavs.Count == 0) return null;
+        var importedPath = Path.Combine(folder, "audio.txt");
+        var imported = wavs.Count == 0 && File.Exists(importedPath) ? File.ReadAllText(importedPath).Trim() : null;
+        if (wavs.Count == 0 && (imported == null || !File.Exists(imported))) return null;
         var name = dir.Name;
         var date = name.Length >= 19 && DateTime.TryParseExact(name.Substring(0, 19), "yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed) ? parsed : dir.CreationTime;
-        var tracks = wavs.Select(f => new AudioTrack(f.FullName, f.Name == "micro.wav" ? "Micro" : "Audio de l’appel")).ToList();
+        var tracks = imported != null
+            ? new List<AudioTrack> { new(imported) }
+            : wavs.Select(f => new AudioTrack(f.FullName, f.Name == "micro.wav" ? Speaker.UserLabel : "Audio de l’appel")).ToList();
         var titlePath = Path.Combine(folder, "titre.txt");
-        var title = File.Exists(titlePath) ? File.ReadAllText(titlePath).Trim() : "Réunion du " + date.ToString("d MMMM", French);
+        var title = File.Exists(titlePath) ? File.ReadAllText(titlePath).Trim() : DefaultTitle(date, false);
         var sourcePath = Path.Combine(folder, "source.txt");
         var source = File.Exists(sourcePath) && File.ReadAllText(sourcePath).Trim() is { Length: > 0 } s ? s : "Windows";
-        return new MeetingRecord(folder, date, title, tracks, Duration(wavs[0].FullName), File.Exists(Path.Combine(folder, "transcription.txt")), source);
+        return new MeetingRecord(folder, date, title, tracks, SafeDuration(tracks[0].Path), File.Exists(Path.Combine(folder, "transcription.txt")), source);
+    }
+
+    public static string DefaultTitle(DateTime date, bool zoom) =>
+        (zoom ? "Réunion Zoom du " : "Réunion du ") + date.ToString("d MMMM 'à' HH:mm", French);
+
+    private static TimeSpan SafeDuration(string path)
+    {
+        try { return path.EndsWith(".wav", StringComparison.OrdinalIgnoreCase) ? Duration(path) : TimeSpan.Zero; }
+        catch { return TimeSpan.Zero; }
+    }
+
+    // Un enregistrement ouvert depuis un fichier rejoint l’historique ; le fichier reste à sa place et n’est jamais supprimé avec la réunion.
+    public static MeetingRecord? AddImported(string file)
+    {
+        var folder = Path.Combine(Recordings, DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss") + "_import");
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(folder, "audio.txt"), file);
+        File.WriteAllText(Path.Combine(folder, "titre.txt"), Path.GetFileNameWithoutExtension(file));
+        File.WriteAllText(Path.Combine(folder, "source.txt"), "Import");
+        return FromFolder(folder);
     }
 
     private static TimeSpan Duration(string wav)
@@ -502,6 +526,8 @@ internal sealed partial class Notebook : Form
     private readonly Capsule removeKey = new("Retirer", CapsuleKind.Ghost);
     private readonly Capsule saveSite = new("Enregistrer l’adresse", CapsuleKind.Ghost);
     private readonly Capsule agentButton = new("Agent", CapsuleKind.Ghost, "\uE99A");
+    private readonly Capsule newRecording = new("Nouvel enregistrement", CapsuleKind.Ghost, "\uE710");
+    private readonly Capsule showMeeting = new("Afficher la réunion", CapsuleKind.Ghost, "\uE7C4") { Visible = false };
     private readonly Capsule renameMeeting = new("Renommer", CapsuleKind.Ghost, "\uE70F");
     private readonly Capsule deleteMeeting = new("Supprimer", CapsuleKind.Ghost, "\uE74D");
     private readonly Pill incompletePill = new("Incomplète", PillKind.Run) { Visible = false, Margin = new Padding(0, 5, 0, 0) };
@@ -545,6 +571,11 @@ internal sealed partial class Notebook : Form
     private bool startedInZoom;
     private ZoomMeetingDetector zoomDetector = new();
     private readonly System.Windows.Forms.Timer zoomTimer = new() { Interval = 2000 };
+    private readonly RecordingLevel recordingLevel = new();
+    private readonly RecordingBar homeBar;
+    private readonly NotifyIcon tray = new() { Text = "Meetin-OS" };
+    private Form? meetingWindow;
+    private string? notificationTarget;
     private bool transcriptIncomplete;
     private List<TaskProposal> proposals = new();
 
@@ -560,6 +591,13 @@ internal sealed partial class Notebook : Form
 
         Text = "Meetin-OS";
         Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+        tray.Icon = Icon;
+        tray.Visible = true;
+        tray.BalloonTipClicked += (_, _) => OpenFromNotification();
+        tray.Click += (_, _) => OpenFromNotification();
+        homeBar = new RecordingBar(recordingLevel) { Visible = false };
+        homeBar.StopRequested += () => capture?.Stop();
+        KeyPreview = true;
         StartPosition = FormStartPosition.CenterScreen;
         var work = Screen.PrimaryScreen.WorkingArea;
         ClientSize = new Size(Math.Max(940, (int)(work.Width * 0.8)), Math.Max(620, (int)(work.Height * 0.8)));
@@ -601,6 +639,8 @@ internal sealed partial class Notebook : Form
         removeKey.Click += (_, _) => { keyField.Text = ""; SaveKey(); };
         saveSite.Click += (_, _) => SaveSite();
         agentButton.Click += (_, _) => ShowPage("Agent");
+        newRecording.Click += async (_, _) => { if (CanSwitchMeeting) await RecordAsync(); };
+        showMeeting.Click += (_, _) => { if (meetingWindow is { IsDisposed: false } window) { window.Show(); window.Activate(); } };
         renameMeeting.Click += (_, _) => { if (current != null) RenameMeeting(current); };
         deleteMeeting.Click += (_, _) => { if (current != null) DeleteMeeting(current); };
         keyDot.LinkClicked += (_, _) => { ShowPage("Paramètres"); keyField.Focus(); };
@@ -675,7 +715,9 @@ internal sealed partial class Notebook : Form
         content.Controls.Add(new Label { Text = MeetingStore.DateLine(), Font = Night.Sans(8.5f, true), ForeColor = Night.Accent, AutoSize = true, Margin = new Padding(0, 0, 0, 16) });
         var hero = new Hero(FirstName()) { Width = 700 };
         content.Controls.Add(hero);
-        content.Resize += (_, _) => hero.Width = Math.Max(300, content.ClientSize.Width - content.Padding.Horizontal);
+        void FitHome() { var w = PageWidth(scroll, content); hero.Width = w; }
+        scroll.Resize += (_, _) => FitHome();
+        scroll.VisibleChanged += (_, _) => FitHome();
         content.Controls.Add(new Label
         {
             Text = "Lance l’enregistrement quand l’appel commence. Meetin-OS garde tes notes et la transcription, et t’aide à préparer les tâches à valider.",
@@ -696,7 +738,9 @@ internal sealed partial class Notebook : Form
         content.Controls.Add(recentHeader);
         recentHost.Width = 700;
         content.Controls.Add(recentHost);
-        content.Resize += (_, _) => { var w = Math.Max(300, content.ClientSize.Width - content.Padding.Horizontal); recentHeader.Width = w; recentHost.Width = w; };
+        void FitRecent() { var w = PageWidth(scroll, content); hero.Width = w; recentHeader.MinimumSize = new Size(w, 0); recentHost.Width = w; }
+        scroll.Resize += (_, _) => FitRecent();
+        scroll.VisibleChanged += (_, _) => FitRecent();
         scroll.Controls.Add(content);
         page.Controls.Add(scroll, 0, 0);
         page.Controls.Add(new Panel { Dock = DockStyle.Fill, BackColor = Night.Line, Margin = new Padding(0) }, 0, 1);
@@ -704,12 +748,16 @@ internal sealed partial class Notebook : Form
         var bar = new Panel { Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(24, 14, 24, 18), BackColor = Night.Canvas, MinimumSize = new Size(0, 96) };
         bar.Controls.Add(status);
         bar.Controls.Add(record);
+        bar.Controls.Add(homeBar);
         void Center()
         {
             status.Location = new Point((bar.ClientSize.Width - status.Width) / 2, 12);
-            record.Location = new Point((bar.ClientSize.Width - record.Width) / 2, status.Visible ? status.Bottom + 8 : 24);
-            bar.Height = record.Bottom + 18;
+            var top = status.Visible ? status.Bottom + 8 : 24;
+            record.Location = new Point((bar.ClientSize.Width - record.Width) / 2, top);
+            homeBar.Location = new Point((bar.ClientSize.Width - homeBar.Width) / 2, top);
+            bar.Height = Math.Max(record.Bottom, homeBar.Bottom) + 18;
         }
+        homeBar.SizeChanged += (_, _) => Center();
         bar.Resize += (_, _) => Center();
         status.SizeChanged += (_, _) => Center();
         status.VisibleChanged += (_, _) => Center();
@@ -731,7 +779,10 @@ internal sealed partial class Notebook : Form
         content.Controls.Add(header);
         allHost.Width = 700;
         content.Controls.Add(allHost);
-        content.Resize += (_, _) => { var w = Math.Max(300, content.ClientSize.Width - content.Padding.Horizontal); header.Width = w; allHost.Width = w; };
+        // L’en-tête est AutoSize : seule MinimumSize l’élargit, et la liste (Dock) suit le plus large élément de la colonne.
+        void FitList() { var w = PageWidth(scroll, content); header.MinimumSize = new Size(w, 0); allHost.Width = w; }
+        scroll.Resize += (_, _) => FitList();
+        scroll.VisibleChanged += (_, _) => FitList();
         scroll.Controls.Add(content);
         return scroll;
     }
@@ -757,6 +808,8 @@ internal sealed partial class Notebook : Form
         actions.Controls.Add(folder);
         actions.Controls.Add(copy);
         actions.Controls.Add(agentButton);
+        actions.Controls.Add(showMeeting);
+        actions.Controls.Add(newRecording);
         actions.Controls.Add(renameMeeting);
         actions.Controls.Add(deleteMeeting);
         actions.Controls.Add(incompletePill);
@@ -911,9 +964,10 @@ internal sealed partial class Notebook : Form
         host.ResumeLayout();
     }
 
-    private void OpenMeeting(MeetingRecord item)
+    // afterRecording : la réunion qui vient d’être enregistrée s’ouvre même si le carnet est encore occupé à la finaliser.
+    private void OpenMeeting(MeetingRecord item, bool afterRecording = false)
     {
-        if (capture != null) { SetStatus("Enregistrement en cours. Arrête-le pour rouvrir une réunion."); return; }
+        if (!afterRecording && !CanSwitchMeeting) { SetStatus(capture != null ? "Enregistrement en cours. Arrête-le pour rouvrir une réunion." : "Attends la fin de l’opération en cours pour changer de réunion."); return; }
         current = item;
         tracks = item.Tracks;
         audioFolder = item.Folder;
@@ -930,7 +984,8 @@ internal sealed partial class Notebook : Form
         RefreshActions();
     }
 
-    private bool CanDeleteMeetings => !busy && capture == null && !agentBusy;
+    private bool CanSwitchMeeting => !busy && capture == null && !agentBusy;
+    private bool CanDeleteMeetings => CanSwitchMeeting;
 
     private ContextMenuStrip MeetingMenu(MeetingRecord item)
     {
@@ -1025,6 +1080,7 @@ internal sealed partial class Notebook : Form
         List<string> titles;
         try { titles = ZoomMeetingDetector.WindowTitles(); } catch { return; }
         if (!zoomDetector.Observe(titles) || busy || capture != null) return;
+        if (Form.ActiveForm == null) Notify("Tu es en appel Zoom", "Lancer l’enregistrement dans Meetin-OS ?", "Accueil");
         if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
         Activate();
         ShowPage("Accueil");
@@ -1044,7 +1100,13 @@ internal sealed partial class Notebook : Form
             capture = recording = new AudioCapture();
             startedInZoom = zoomDetector.InMeeting;
             live = StartLive(recording);
+            var meter = new AudioLevelMeter();
+            var liveTap = recording.LiveTap;
+            recording.LiveTap = (track, bytes, count, time) => { meter.Feed(bytes, count); liveTap?.Invoke(track, bytes, count, time); };
             await recording.Started;
+            recordingLevel.Start(meter, DateTime.Now);
+            record.Visible = false;
+            homeBar.Visible = true;
             SetStatus("Enregistrement en cours");
             proposals = new List<TaskProposal>();
             detector = StartDetection();
@@ -1056,18 +1118,17 @@ internal sealed partial class Notebook : Form
             };
             var meetingNotes = Editor("Notes pendant la réunion");
             meetingNotes.Text = notes.Text;
-            var stop = new Capsule("Arrêter", CapsuleKind.Ghost, "\uE71A");
-            var elapsed = Stopwatch.StartNew();
-            var indicator = new Pill("EN COURS  00:00:00", PillKind.Rec) { Margin = new Padding(0, 5, 14, 0) };
-            using var timer = new System.Windows.Forms.Timer { Interval = 500 };
-            timer.Tick += (_, _) => indicator.Set($"EN COURS  {elapsed.Elapsed:hh\\:mm\\:ss}", PillKind.Rec);
-            stop.Click += (_, _) =>
+            var stop = new RecordingBar(recordingLevel) { Margin = new Padding(0, 0, 14, 0) };
+            var indicator = new Pill("Finalisation…", PillKind.Wait) { Margin = new Padding(0, 14, 14, 0), Visible = false };
+            void StopRecording()
             {
                 stop.Enabled = false;
-                timer.Stop();
-                indicator.Set("Finalisation…", PillKind.Wait);
+                indicator.Visible = true;
                 recording.Stop();
-            };
+            }
+            stop.StopRequested += StopRecording;
+            homeBar.StopRequested += StopRecording;
+            meetingWindow = meeting;
             meeting.FormClosing += (_, args) =>
             {
                 if (capture != recording) return;
@@ -1086,9 +1147,9 @@ internal sealed partial class Notebook : Form
             var row = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = false, Margin = new Padding(0, 0, 0, 18) };
             row.Controls.Add(indicator);
             row.Controls.Add(stop);
-            var livePill = new Pill(LiveLabel(), LivePillKind()) { Margin = new Padding(14, 5, 0, 0) };
+            var livePill = new Pill(LiveLabel(), LivePillKind()) { Margin = new Padding(0, 14, 0, 0) };
             row.Controls.Add(livePill);
-            var taskPill = new Pill("0 tâche proposée", PillKind.Wait) { Margin = new Padding(10, 5, 0, 0), Visible = false };
+            var taskPill = new Pill("0 tâche proposée", PillKind.Wait) { Margin = new Padding(10, 14, 0, 0), Visible = false };
             row.Controls.Add(taskPill);
             panel.Controls.Add(row, 0, 1);
             panel.SetColumnSpan(row, 2);
@@ -1102,7 +1163,6 @@ internal sealed partial class Notebook : Form
             panel.Controls.Add(liveCard, 1, 2);
             meeting.Controls.Add(panel);
             meeting.Show(this);
-            timer.Start();
             using var liveTimer = new System.Windows.Forms.Timer { Interval = 700 };
             liveTimer.Tick += (_, _) =>
             {
@@ -1120,6 +1180,9 @@ internal sealed partial class Notebook : Form
 
             var result = await recording.Finished;
             capture = null;
+            homeBar.StopRequested -= StopRecording;
+            recordingLevel.Stop();
+            meetingWindow = null;
             meeting.Close();
             var liveResult = await FinishLiveAsync();
             if (result.Tracks.Count > 0)
@@ -1129,7 +1192,7 @@ internal sealed partial class Notebook : Form
                 if (startedInZoom)
                 {
                     File.WriteAllText(Path.Combine(recording.Folder, "source.txt"), "Zoom");
-                    File.WriteAllText(Path.Combine(recording.Folder, "titre.txt"), "Réunion Zoom du " + DateTime.Now.ToString("d MMMM", CultureInfo.GetCultureInfo("fr-FR")));
+                    File.WriteAllText(Path.Combine(recording.Folder, "titre.txt"), MeetingStore.DefaultTitle(DateTime.Now, true));
                 }
                 if (liveResult != null)
                 {
@@ -1140,7 +1203,7 @@ internal sealed partial class Notebook : Form
                 systemAudioOk = result.Tracks.Any(t => t.Path.EndsWith("appel.wav", StringComparison.OrdinalIgnoreCase)) ? true : systemAudioOk;
                 var saved = MeetingStore.FromFolder(recording.Folder);
                 SetStatus(result.Tracks.Count == 2 ? "Deux pistes enregistrées." : "Pistes disponibles : " + result.Tracks.Count + ".", result.Warnings);
-                if (saved != null) OpenMeeting(saved);
+                if (saved != null) OpenMeeting(saved, afterRecording: true);
             }
             else SetStatus("Aucune piste enregistrée.", result.Warnings);
             RefreshReadiness(result.MicrophoneDenied);
@@ -1151,27 +1214,60 @@ internal sealed partial class Notebook : Form
         {
             recording?.Stop();
             capture = null;
+            recordingLevel.Stop();
+            meetingWindow = null;
+            homeBar.Visible = false;
+            record.Visible = true;
             busy = false;
             RefreshActions();
         }
     }
 
+    // Ctrl+R démarre ou arrête l’enregistrement, comme ⌘R sur Mac.
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        if (keyData == (Keys.Control | Keys.R))
+        {
+            if (capture != null) capture.Stop();
+            else if (record.Enabled && !busy) _ = RecordAsync();
+            return true;
+        }
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    // Notifications Windows : une tâche à valider, le direct interrompu ou une réunion Zoom détectée. Le clic ouvre la page visée.
+    private void Notify(string title, string message, string page, ToolTipIcon icon = ToolTipIcon.None)
+    {
+        notificationTarget = page;
+        try { tray.ShowBalloonTip(8000, title, message, icon); } catch { }
+    }
+
+    private void OpenFromNotification()
+    {
+        if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+        Activate();
+        if (notificationTarget is { } page) { notificationTarget = null; ShowPage(page); }
+    }
+
+    protected override void OnFormClosed(FormClosedEventArgs e)
+    {
+        tray.Visible = false;
+        tray.Dispose();
+        base.OnFormClosed(e);
+    }
+
     private void ImportAudio()
     {
+        if (!CanSwitchMeeting) return;
         using var dialog = new OpenFileDialog { Title = "Ouvrir un enregistrement", Filter = "Audio|*.wav;*.mp3;*.m4a;*.ogg;*.flac;*.webm" };
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        current = null;
-        tracks = new List<AudioTrack> { new(dialog.FileName) };
-        audioFolder = Path.GetDirectoryName(dialog.FileName);
-        suppressNotesSave = true;
-        notes.Text = "";
-        suppressNotesSave = false;
-        transcript.Clear();
-        detailTitle.Text = Path.GetFileNameWithoutExtension(dialog.FileName);
-        detailMeta.Text = "Audio importé · " + dialog.FileName;
-        SetStatus("Audio importé : " + Path.GetFileName(dialog.FileName));
-        ShowPage("Détail");
-        RefreshActions();
+        MeetingRecord? record;
+        try { record = MeetingStore.AddImported(dialog.FileName); }
+        catch (Exception error) { SetStatus("Fichier non ajouté : " + error.Message); return; }
+        if (record == null) { SetStatus("Fichier audio introuvable : " + dialog.FileName); return; }
+        RefreshMeetings();
+        OpenMeeting(record);
+        SetStatus("Fichier audio prêt : " + Path.GetFileName(dialog.FileName));
     }
 
     private async Task TranscribeAsync()
@@ -1316,6 +1412,8 @@ internal sealed partial class Notebook : Form
         folder.Enabled = !busy && audioFolder != null;
         copy.Enabled = !busy && transcript.TextLength > 0 && transcript.Text != "Transcription en cours…";
         saveKey.Enabled = !busy;
+        newRecording.Enabled = CanSwitchMeeting;
+        showMeeting.Visible = capture != null && meetingWindow is { IsDisposed: false };
         renameMeeting.Enabled = current != null;
         deleteMeeting.Enabled = current != null && CanDeleteMeetings;
     }
@@ -1331,6 +1429,10 @@ internal sealed partial class Notebook : Form
     // ---------- fabrique de contrôles ----------
 
     private static Panel ScrollPane() => new() { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Night.Canvas };
+
+    // Largeur utile d’une page : celle visible du volet, moins les marges et la barre de défilement, bornée comme sur Mac.
+    private static int PageWidth(Panel scroll, FlowLayoutPanel content) =>
+        Math.Max(300, Math.Min(960, scroll.ClientSize.Width - content.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth));
 
     private static FlowLayoutPanel Column(int left, int top, int right, int bottom) => new()
     {
