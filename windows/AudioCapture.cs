@@ -14,6 +14,7 @@ internal sealed class CaptureResult
 {
     public List<AudioTrack> Tracks { get; } = new();
     public List<string> Warnings { get; } = new();
+    public bool MicrophoneDenied { get; set; }
 }
 
 internal sealed class AudioCapture
@@ -35,6 +36,8 @@ internal sealed class AudioCapture
     }
 
     public string Folder { get; }
+    // Reçoit les octets PCM 16 kHz mono de chaque piste (direct Gladia) : « Micro » ou « Audio de l’appel ».
+    public Action<string, byte[], int, double>? LiveTap { get; set; }
     public Task Started => started.Task;
     public Task<CaptureResult> Finished => finished.Task;
     public void Stop() => stopRequested = true;
@@ -49,19 +52,19 @@ internal sealed class AudioCapture
         try
         {
             using var devices = new MMDeviceEnumerator();
-            using var input = devices.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia);
             using var output = devices.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
             Directory.CreateDirectory(Folder);
-            mic = new TrackWriter(input, new AudioTrack(Path.Combine(Folder, "micro.wav"), "Micro"), false);
-            call = new TrackWriter(output, new AudioTrack(Path.Combine(Folder, "appel.wav"), "Audio de l’appel"), true);
+            call = new TrackWriter(output, new AudioTrack(Path.Combine(Folder, "appel.wav"), "Audio de l’appel"), true) { Tap = LiveTap };
+            mic = OpenMicrophone(devices, result);
+            if (mic != null) mic.Tap = LiveTap;
             var origin = Clock100ns();
-            mic.Start();
+            mic?.Start();
             call.Start();
             started.SetResult(true);
 
             while (!stopRequested)
             {
-                mic.ReadPackets(origin);
+                mic?.ReadPackets(origin);
                 call.ReadPackets(origin);
                 if (Clock100ns() - origin >= 2 * TimeSpan.TicksPerHour)
                 {
@@ -81,6 +84,27 @@ internal sealed class AudioCapture
             CompleteTrack(mic, result);
             CompleteTrack(call, result);
             finished.SetResult(result);
+        }
+    }
+
+    private const int AccessDenied = unchecked((int)0x80070005);
+
+    // Windows ne demande jamais l’accès au micro pour une app de bureau : si la confidentialité le refuse,
+    // l’appel est quand même enregistré et le carnet guide vers les Paramètres.
+    private TrackWriter? OpenMicrophone(MMDeviceEnumerator devices, CaptureResult result)
+    {
+        try
+        {
+            using var input = devices.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia);
+            return new TrackWriter(input, new AudioTrack(Path.Combine(Folder, "micro.wav"), "Micro"), false);
+        }
+        catch (Exception error)
+        {
+            result.MicrophoneDenied = error.HResult == AccessDenied;
+            result.Warnings.Add(result.MicrophoneDenied
+                ? "Micro refusé par Windows : seul l’audio de l’appel est enregistré."
+                : $"Micro indisponible ({error.Message}) : seul l’audio de l’appel est enregistré.");
+            return null;
         }
     }
 
@@ -134,6 +158,7 @@ internal sealed class AudioCapture
 
         public AudioTrack Track { get; }
         public bool HasAudio { get; private set; }
+        public Action<string, byte[], int, double>? Tap { get; set; }
 
         public void Start()
         {
@@ -171,6 +196,7 @@ internal sealed class AudioCapture
                 if (silent) WriteSilence(frames);
                 else if (frames > 0)
                 {
+                    Tap?.Invoke(Track.Label ?? "", samples, frames * Format.BlockAlign, framesWritten / (double)Format.SampleRate);
                     writer.Write(samples, 0, frames * Format.BlockAlign);
                     framesWritten += frames;
                     HasAudio = true;
@@ -184,10 +210,11 @@ internal sealed class AudioCapture
             while (bytes > 0)
             {
                 var count = Math.Min(bytes, silence.Length);
+                Tap?.Invoke(Track.Label ?? "", silence, count, framesWritten / (double)Format.SampleRate);
                 writer.Write(silence, 0, count);
                 bytes -= count;
+                framesWritten += count / Format.BlockAlign;
             }
-            framesWritten += frames;
         }
 
         public void Dispose()

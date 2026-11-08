@@ -46,7 +46,7 @@ export default async function DownloadPage({searchParams}) {
           <OsIcon os="windows" />
           <h2>{d.windows.name}</h2>
           <p className="platform__req">{d.windows.req}</p>
-          <a className="mt-btn platform__cta" href="/downloads/Meetin-OS-Windows-0.1.1.exe" download>
+          <a className="mt-btn platform__cta" href="/downloads/Meetin-OS-Windows.exe" download>
             <DownloadIcon size={16} /> {d.windows.cta}
           </a>
           <p className="platform__note">{d.windows.note}</p>
