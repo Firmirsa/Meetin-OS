@@ -17,7 +17,7 @@ export function youtubeProposal(source, user, env) {
   const quote = source.split(/[\n.!?]+/u).map(s => s.trim().replace(/^\[[^\]]+\]\s*(?:[^·\n]*·\s*)+/u, '')).find(s =>
     /^(?:il faut|nous allons|on va|je veux que l.agent)\b/iu.test(s) &&
     /\bcomment(?:er|e)\b/iu.test(s) && /\byou\s*tube\b/iu.test(s) &&
-    /\bh[\s-]*company\b/iu.test(s) && /\bbravo\b/iu.test(s) &&
+    /\b(?:h|ash|hache)[\s-]*(?:company|compagnie|compagny|compani)\b/iu.test(s) && /\bbravo\b/iu.test(s) &&
     !/\b(?:pas|jamais|sans|si|peut-être|pourrait|voudrait|avant|après)\b/iu.test(s));
   if (!quote || quote.length > 1500) return null;
   return { action, executor: 'computer_use', destination: youtubeDestination,
