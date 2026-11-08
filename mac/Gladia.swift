@@ -66,11 +66,12 @@ struct Gladia {
     }
 
     static func format(microphone: [Segment], system: [Segment], tracks: AudioCapture.Tracks) -> String {
-        let local = microphone.map { ($0.start + tracks.microphoneOffset, "Micro", $0.text) }
-        let remote = system.map { ($0.start + tracks.systemOffset, "Audio de l’appel", $0.text) }
+        let me = AudioTrack.microphone.label, call = AudioTrack.system.label
+        let local = microphone.map { ($0.start + tracks.microphoneOffset, me, $0.text) }
+        let remote = system.map { ($0.start + tracks.systemOffset, call, $0.text) }
         var lines = (local + remote).sorted { $0.0 < $1.0 }.map { line(at: $0.0, label: $0.1, text: $0.2) }
-        if microphone.isEmpty { lines.append("Micro · aucune parole reconnue.") }
-        if system.isEmpty { lines.append("Audio de l’appel · aucune parole reconnue.") }
+        if microphone.isEmpty { lines.append("\(me) · aucune parole reconnue.") }
+        if system.isEmpty { lines.append("\(call) · aucune parole reconnue.") }
         return lines.joined(separator: "\n")
     }
 

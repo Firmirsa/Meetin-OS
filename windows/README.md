@@ -4,7 +4,7 @@ Le carnet est compatible avec Windows 10 ou 11 (x64) et .NET Framework 4.8 ou ul
 
 1. Sur le site, clique sur **Installer sur Windows** et ouvre `Meetin-OS-Windows.exe`. L’assistant installe Meetin-OS pour ton compte, sans droits administrateur. Windows peut signaler cet installateur de test non signé.
 2. Ouvre **Meetin-OS** depuis Démarrer. Pendant un appel, clique sur **Enregistrer** pour ouvrir le carnet de réunion, puis sur **Arrêter l’enregistrement** pour retrouver les pistes. La version Windows se déclenche manuellement.
-3. Dans **Réglages**, saisis ta clé Gladia. **Transcrire avec Gladia** envoie les pistes disponibles et affiche les passages dans l’ordre. La clé reste en mémoire pendant la session. Tu peux aussi importer un WAV, MP3 ou M4A depuis le carnet.
+3. Dans **Réglages**, saisis ta clé Gladia. **Transcrire avec Gladia** envoie les pistes disponibles et affiche les passages dans l’ordre. Les passages du micro portent ton nom complet Windows, sinon ton nom de session, sinon « Vous ». La clé reste en mémoire pendant la session. Tu peux aussi importer un WAV, MP3 ou M4A depuis le carnet.
 
 La préparation et la validation de tâches sont disponibles dans l’app Mac 0.1.2. L’ancienne adresse web de l’agent redirige vers la page d’onboarding.
 

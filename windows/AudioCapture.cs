@@ -52,8 +52,8 @@ internal sealed class AudioCapture
             using var input = devices.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia);
             using var output = devices.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
             Directory.CreateDirectory(Folder);
-            mic = new TrackWriter(input, new AudioTrack(Path.Combine(Folder, "micro.wav"), "Micro"), false);
-            call = new TrackWriter(output, new AudioTrack(Path.Combine(Folder, "appel.wav"), "Audio de l’appel"), true);
+            mic = new TrackWriter(input, new AudioTrack(Path.Combine(Folder, "micro.wav"), Speaker.UserLabel), "Micro", false);
+            call = new TrackWriter(output, new AudioTrack(Path.Combine(Folder, "appel.wav"), "Audio de l’appel"), "Audio de l’appel", true);
             var origin = Clock100ns();
             mic.Start();
             call.Start();
@@ -94,12 +94,12 @@ internal sealed class AudioCapture
             else
             {
                 File.Delete(writer.Track.Path);
-                result.Warnings.Add($"{writer.Track.Label} : aucun signal détecté.");
+                result.Warnings.Add($"{writer.Source} : aucun signal détecté.");
             }
         }
         catch (Exception error)
         {
-            result.Warnings.Add($"{writer.Track.Label} : fichier audio incomplet ({error.Message}).");
+            result.Warnings.Add($"{writer.Source} : fichier audio incomplet ({error.Message}).");
         }
     }
 
@@ -113,9 +113,11 @@ internal sealed class AudioCapture
         private int framesWritten;
         private bool running;
 
-        public TrackWriter(MMDevice device, AudioTrack track, bool loopback)
+        // source nomme l'appareil dans les avertissements ; le libellé de la piste sert à la transcription.
+        public TrackWriter(MMDevice device, AudioTrack track, string source, bool loopback)
         {
             Track = track;
+            Source = source;
             client = device.AudioClient;
             try
             {
@@ -133,6 +135,7 @@ internal sealed class AudioCapture
         }
 
         public AudioTrack Track { get; }
+        public string Source { get; }
         public bool HasAudio { get; private set; }
 
         public void Start()
