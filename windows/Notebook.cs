@@ -305,7 +305,9 @@ internal static class MeetingStore
         var tracks = wavs.Select(f => new AudioTrack(f.FullName, f.Name == "micro.wav" ? "Micro" : "Audio de l’appel")).ToList();
         var titlePath = Path.Combine(folder, "titre.txt");
         var title = File.Exists(titlePath) ? File.ReadAllText(titlePath).Trim() : "Réunion du " + date.ToString("d MMMM", French);
-        return new MeetingRecord(folder, date, title, tracks, Duration(wavs[0].FullName), File.Exists(Path.Combine(folder, "transcription.txt")), "Windows");
+        var sourcePath = Path.Combine(folder, "source.txt");
+        var source = File.Exists(sourcePath) && File.ReadAllText(sourcePath).Trim() is { Length: > 0 } s ? s : "Windows";
+        return new MeetingRecord(folder, date, title, tracks, Duration(wavs[0].FullName), File.Exists(Path.Combine(folder, "transcription.txt")), source);
     }
 
     private static TimeSpan Duration(string wav)
@@ -353,6 +355,50 @@ internal static class MeetingStore
         Directory.CreateDirectory(AppData);
         if (string.IsNullOrWhiteSpace(key)) { if (File.Exists(KeyFile)) File.Delete(KeyFile); return; }
         File.WriteAllBytes(KeyFile, ProtectedData.Protect(Encoding.UTF8.GetBytes(key.Trim()), null, DataProtectionScope.CurrentUser));
+    }
+
+    private static string CodeFile => Path.Combine(AppData, "agent.key");
+    public static string LoadAgentCode()
+    {
+        try { return File.Exists(CodeFile) ? Encoding.UTF8.GetString(ProtectedData.Unprotect(File.ReadAllBytes(CodeFile), null, DataProtectionScope.CurrentUser)).Trim() : ""; }
+        catch { return ""; }
+    }
+    public static void SaveAgentCode(string code)
+    {
+        Directory.CreateDirectory(AppData);
+        if (string.IsNullOrWhiteSpace(code)) { if (File.Exists(CodeFile)) File.Delete(CodeFile); return; }
+        File.WriteAllBytes(CodeFile, ProtectedData.Protect(Encoding.UTF8.GetBytes(code.Trim()), null, DataProtectionScope.CurrentUser));
+    }
+
+    private static string LiveFile => Path.Combine(AppData, "live.txt");
+    public static bool LoadLiveEnabled() => !File.Exists(LiveFile) || File.ReadAllText(LiveFile).Trim() != "off";
+    public static void SaveLiveEnabled(bool enabled) { Directory.CreateDirectory(AppData); File.WriteAllText(LiveFile, enabled ? "on" : "off"); }
+    private static string ZoomFile => Path.Combine(AppData, "zoom.flag");
+    public static bool LoadZoomEnabled() => File.Exists(ZoomFile) && File.ReadAllText(ZoomFile).Trim() == "on";
+    public static void SaveZoomEnabled(bool enabled) { Directory.CreateDirectory(AppData); File.WriteAllText(ZoomFile, enabled ? "on" : "off"); }
+
+    public static List<TaskProposal> LoadProposals(string folder)
+    {
+        try
+        {
+            var path = Path.Combine(folder, "proposals.json");
+            if (!File.Exists(path)) return new List<TaskProposal>();
+            using var stream = File.OpenRead(path);
+            return new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(List<TaskProposal>)).ReadObject(stream) as List<TaskProposal> ?? new List<TaskProposal>();
+        }
+        catch { return new List<TaskProposal>(); }
+    }
+
+    public static void SaveProposals(string folder, List<TaskProposal> proposals)
+    {
+        try
+        {
+            var path = Path.Combine(folder, "proposals.json");
+            if (proposals.Count == 0) { if (File.Exists(path)) File.Delete(path); return; }
+            using var stream = File.Create(path);
+            new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(List<TaskProposal>)).WriteObject(stream, proposals);
+        }
+        catch { }
     }
 
     private static string SiteFile => Path.Combine(AppData, "site.txt");
@@ -414,7 +460,7 @@ internal sealed class MeetingRow : Control
     }
 }
 
-internal sealed class Notebook : Form
+internal sealed partial class Notebook : Form
 {
     private readonly Capsule record = new("Commencer à enregistrer", CapsuleKind.Record);
     private readonly Capsule import = new("Ouvrir un enregistrement", CapsuleKind.Ghost, "\uE8B7");
@@ -424,6 +470,8 @@ internal sealed class Notebook : Form
     private readonly Capsule saveKey = new("Enregistrer la clé", CapsuleKind.Primary);
     private readonly Capsule removeKey = new("Retirer", CapsuleKind.Ghost);
     private readonly Capsule saveSite = new("Enregistrer l’adresse", CapsuleKind.Ghost);
+    private readonly Capsule agentButton = new("Agent", CapsuleKind.Ghost, "\uE99A");
+    private readonly Pill incompletePill = new("Incomplète", PillKind.Run) { Visible = false, Margin = new Padding(0, 5, 0, 0) };
     private readonly TextBox notes = Editor("Notes de réunion");
     private readonly TextBox transcript = Editor("Transcription", true);
     private readonly TextBox keyField = Field("Clé API Gladia", true);
@@ -455,11 +503,27 @@ internal sealed class Notebook : Form
     private bool busy;
     private bool? systemAudioOk;
     private bool suppressNotesSave;
+    private LiveTranscription? live;
+    private TaskDetector? detector;
+    private AgentAccess? agentAccess;
+    private string agentCode;
+    private bool liveEnabled;
+    private bool zoomEnabled;
+    private bool startedInZoom;
+    private ZoomMeetingDetector zoomDetector = new();
+    private readonly System.Windows.Forms.Timer zoomTimer = new() { Interval = 2000 };
+    private bool transcriptIncomplete;
+    private List<TaskProposal> proposals = new();
 
     public Notebook()
     {
         apiKey = Environment.GetEnvironmentVariable("GLADIA_API_KEY")?.Trim() is { Length: > 0 } env ? env : MeetingStore.LoadKey();
         agentSite = SiteUri(Environment.GetEnvironmentVariable("MEETIN_WEB_URL")) ?? SiteUri(MeetingStore.LoadSite()) ?? new Uri("http://localhost:3000");
+        agentCode = MeetingStore.LoadAgentCode();
+        liveEnabled = MeetingStore.LoadLiveEnabled();
+        zoomEnabled = MeetingStore.LoadZoomEnabled();
+        zoomTimer.Tick += (_, _) => PollZoom();
+        zoomTimer.Enabled = zoomEnabled;
 
         Text = "Meetin-OS";
         Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
@@ -486,8 +550,11 @@ internal sealed class Notebook : Form
         AddPage("Accueil", HomePage());
         AddPage("Réunions", MeetingsPage());
         AddPage("Détail", DetailPage());
+        AddPage("Agent", AgentPage());
+        AddPage("Intégrations", IntegrationsPage());
         AddPage("Paramètres", SettingsPage());
         AddPage("Compte", AccountPage());
+        if (agentCode.Length > 0) _ = RefreshAccessAsync(false);
         meetings = MeetingStore.Load();
         systemAudioOk = meetings.Any(m => m.Tracks.Any(t => t.Path.EndsWith("appel.wav", StringComparison.OrdinalIgnoreCase))) ? true : null;
         ShowPage("Accueil");
@@ -500,6 +567,7 @@ internal sealed class Notebook : Form
         saveKey.Click += (_, _) => SaveKey();
         removeKey.Click += (_, _) => { keyField.Text = ""; SaveKey(); };
         saveSite.Click += (_, _) => SaveSite();
+        agentButton.Click += (_, _) => ShowPage("Agent");
         keyDot.LinkClicked += (_, _) => { ShowPage("Paramètres"); keyField.Focus(); };
         notes.TextChanged += (_, _) => SaveNotes();
         FormClosing += (_, args) =>
@@ -534,14 +602,13 @@ internal sealed class Notebook : Form
         var top = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, FlowDirection = FlowDirection.TopDown, WrapContents = false, Margin = new Padding(0) };
         top.Controls.Add(Nav("Accueil", "\uE80F"));
         top.Controls.Add(Nav("Réunions", "\uE7C3"));
+        top.Controls.Add(Nav("Agent", "\uE99A"));
         side.Controls.Add(top, 0, 1);
 
         var section = new Label { Text = "COMPTE", Font = Night.Sans(8f, true), ForeColor = Night.Ink2, AutoSize = true, Margin = new Padding(10, 0, 0, 6) };
         side.Controls.Add(section, 0, 3);
         var bottom = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, FlowDirection = FlowDirection.TopDown, WrapContents = false, Margin = new Padding(0) };
-        var integrations = new Capsule("Intégrations", CapsuleKind.Nav, "\uE71B") { Width = 226 };
-        integrations.Click += (_, _) => Open(new Uri(agentSite, "/integrations").AbsoluteUri);
-        bottom.Controls.Add(integrations);
+        bottom.Controls.Add(Nav("Intégrations", "\uE71B"));
         bottom.Controls.Add(Nav("Paramètres", "\uE713"));
         bottom.Controls.Add(Nav("Compte", "\uE77B"));
         var billing = new Capsule("Facturation et abonnement", CapsuleKind.Nav, "\uE8C7") { Width = 226 };
@@ -654,6 +721,8 @@ internal sealed class Notebook : Form
         actions.Controls.Add(transcribe);
         actions.Controls.Add(folder);
         actions.Controls.Add(copy);
+        actions.Controls.Add(agentButton);
+        actions.Controls.Add(incompletePill);
         page.Controls.Add(actions, 0, 1);
         page.SetColumnSpan(actions, 2);
         notesCard.Margin = new Padding(0, 0, 10, 0);
@@ -688,7 +757,18 @@ internal sealed class Notebook : Form
         keyActions.Controls.Add(getKey);
         transcriptionStack.Controls.Add(keyActions);
         transcriptionStack.Controls.Add(keyMessage);
+        var liveToggle = new CheckBox { Text = "Transcription en direct pendant l’enregistrement", Checked = liveEnabled, AutoSize = true, ForeColor = Night.Ink, Margin = new Padding(0, 14, 0, 4) };
+        liveToggle.CheckedChanged += (_, _) => { liveEnabled = liveToggle.Checked; MeetingStore.SaveLiveEnabled(liveEnabled); };
+        transcriptionStack.Controls.Add(liveToggle);
+        transcriptionStack.Controls.Add(Muted("L’audio est envoyé en continu à Gladia pendant l’enregistrement. Si l’agent est connecté, le texte part aussi chez Holo (H Company) toutes les 15 s pour proposer des tâches. Rien n’est lancé sans ta validation."));
         content.Controls.Add(transcription);
+
+        var zoom = Section("Détection Zoom", out var zoomStack);
+        var zoomToggle = new CheckBox { Text = "Me prévenir quand je rejoins une réunion Zoom", Checked = zoomEnabled, AutoSize = true, ForeColor = Night.Ink, Margin = new Padding(0, 4, 0, 4) };
+        zoomToggle.CheckedChanged += (_, _) => { zoomEnabled = zoomToggle.Checked; MeetingStore.SaveZoomEnabled(zoomEnabled); zoomDetector = new ZoomMeetingDetector(); zoomTimer.Enabled = zoomEnabled; };
+        zoomStack.Controls.Add(zoomToggle);
+        zoomStack.Controls.Add(Muted("Meetin-OS surveille les fenêtres de Zoom toutes les 2 s et propose de lancer l’enregistrement. L’enregistrement se lance manuellement."));
+        content.Controls.Add(zoom);
 
         var audio = Section("Autorisations audio", out var audioStack);
         audioStack.Controls.Add(Muted("Windows ne demande rien au premier enregistrement : si le micro est refusé dans Confidentialité, seul l’audio de l’appel est gardé."));
@@ -749,6 +829,8 @@ internal sealed class Notebook : Form
     private void ShowPage(string name)
     {
         if (name == "Accueil" || name == "Réunions") RefreshMeetings();
+        if (name == "Agent") RefreshAgentPage();
+        if (name == "Intégrations") RefreshIntegrationsPage();
         foreach (var pair in pageByName) pair.Value.Visible = pair.Key == name;
         foreach (var pair in navByName)
         {
@@ -802,6 +884,9 @@ internal sealed class Notebook : Form
         notes.Text = File.Exists(item.NotesPath) ? File.ReadAllText(item.NotesPath) : "";
         suppressNotesSave = false;
         transcript.Text = File.Exists(item.TranscriptPath) ? File.ReadAllText(item.TranscriptPath) : "";
+        proposals = MeetingStore.LoadProposals(item.Folder);
+        transcriptIncomplete = File.Exists(Path.Combine(item.Folder, "incomplete.txt"));
+        incompletePill.Visible = transcriptIncomplete;
         detailTitle.Text = item.Title;
         detailMeta.Text = MeetingStore.Day(item.Date) + " · " + MeetingStore.Time(item.Date) + " · " + MeetingStore.DurationText(item.Duration) + " · " + item.Tracks.Count + (item.Tracks.Count > 1 ? " pistes" : " piste");
         ShowPage("Détail");
@@ -816,6 +901,20 @@ internal sealed class Notebook : Form
 
     // ---------- enregistrement ----------
 
+    private void PollZoom()
+    {
+        if (!zoomEnabled) return;
+        List<string> titles;
+        try { titles = ZoomMeetingDetector.WindowTitles(); } catch { return; }
+        if (!zoomDetector.Observe(titles) || busy || capture != null) return;
+        if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+        Activate();
+        ShowPage("Accueil");
+        SetStatus("Réunion Zoom détectée.");
+        var answer = MessageBox.Show(this, "Une réunion Zoom vient de commencer. Lancer l’enregistrement ?", "Meetin-OS", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        if (answer == DialogResult.Yes && !busy && capture == null) _ = RecordAsync();
+    }
+
     private async Task RecordAsync()
     {
         AudioCapture? recording = null;
@@ -825,8 +924,12 @@ internal sealed class Notebook : Form
         {
             SetStatus("Ouverture du micro et de la sortie audio…");
             capture = recording = new AudioCapture();
+            startedInZoom = zoomDetector.InMeeting;
+            live = StartLive(recording);
             await recording.Started;
             SetStatus("Enregistrement en cours");
+            proposals = new List<TaskProposal>();
+            detector = StartDetection();
             using var meeting = new Form
             {
                 Text = "Réunion en cours · Meetin-OS", Icon = Icon, ClientSize = new Size(720, 460),
@@ -853,27 +956,69 @@ internal sealed class Notebook : Form
                 args.Cancel = true;
                 recording.Stop();
             };
-            var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(32, 28, 32, 24), BackColor = Night.Canvas };
+            var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 3, Padding = new Padding(32, 28, 32, 24), BackColor = Night.Canvas };
+            panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            panel.Controls.Add(new Label { Text = "Réunion en cours", Font = Night.Serif(26f), ForeColor = Night.Ink, AutoSize = true, Margin = new Padding(0, 0, 0, 14) }, 0, 0);
+            var heading = new Label { Text = "Réunion en cours", Font = Night.Serif(26f), ForeColor = Night.Ink, AutoSize = true, Margin = new Padding(0, 0, 0, 14) };
+            panel.Controls.Add(heading, 0, 0);
+            panel.SetColumnSpan(heading, 2);
             var row = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = false, Margin = new Padding(0, 0, 0, 18) };
             row.Controls.Add(indicator);
             row.Controls.Add(stop);
+            var livePill = new Pill(LiveLabel(), LivePillKind()) { Margin = new Padding(14, 5, 0, 0) };
+            row.Controls.Add(livePill);
+            var taskPill = new Pill("0 tâche proposée", PillKind.Wait) { Margin = new Padding(10, 5, 0, 0), Visible = false };
+            row.Controls.Add(taskPill);
             panel.Controls.Add(row, 0, 1);
-            panel.Controls.Add(Card("Notes de réunion", meetingNotes), 0, 2);
+            panel.SetColumnSpan(row, 2);
+            var notesCardLive = Card("Notes de réunion", meetingNotes);
+            notesCardLive.Margin = new Padding(0, 0, 10, 0);
+            panel.Controls.Add(notesCardLive, 0, 2);
+            var liveText = Editor("Transcription en direct", true);
+            liveText.Text = live == null ? LiveWaitingMessage() : "En attente du premier passage…";
+            var liveCard = Card("Transcription en direct", liveText);
+            liveCard.Margin = new Padding(10, 0, 0, 0);
+            panel.Controls.Add(liveCard, 1, 2);
             meeting.Controls.Add(panel);
             meeting.Show(this);
             timer.Start();
+            using var liveTimer = new System.Windows.Forms.Timer { Interval = 700 };
+            liveTimer.Tick += (_, _) =>
+            {
+                livePill.Set(LiveLabel(), LivePillKind());
+                if (live != null)
+                {
+                    var text = live.Transcript.FinalText;
+                    if (text.Length > 0 && text != liveText.Text) { liveText.Text = text; liveText.SelectionStart = liveText.TextLength; liveText.ScrollToCaret(); }
+                }
+                var count = proposals.Count(p => p.State == ProposalState.Pending);
+                taskPill.Visible = count > 0;
+                if (count > 0) taskPill.Set(count + (count > 1 ? " tâches proposées" : " tâche proposée"), PillKind.Run);
+            };
+            liveTimer.Start();
 
             var result = await recording.Finished;
             capture = null;
             meeting.Close();
+            var liveResult = await FinishLiveAsync();
             if (result.Tracks.Count > 0)
             {
                 Directory.CreateDirectory(recording.Folder);
                 File.WriteAllText(Path.Combine(recording.Folder, "notes.txt"), meetingNotes.Text);
+                if (startedInZoom)
+                {
+                    File.WriteAllText(Path.Combine(recording.Folder, "source.txt"), "Zoom");
+                    File.WriteAllText(Path.Combine(recording.Folder, "titre.txt"), "Réunion Zoom du " + DateTime.Now.ToString("d MMMM", CultureInfo.GetCultureInfo("fr-FR")));
+                }
+                if (liveResult != null)
+                {
+                    File.WriteAllText(Path.Combine(recording.Folder, "transcription.txt"), liveResult);
+                    if (transcriptIncomplete) File.WriteAllText(Path.Combine(recording.Folder, "incomplete.txt"), "Le direct a pu manquer une partie de l’appel.");
+                }
+                MeetingStore.SaveProposals(recording.Folder, proposals);
                 systemAudioOk = result.Tracks.Any(t => t.Path.EndsWith("appel.wav", StringComparison.OrdinalIgnoreCase)) ? true : systemAudioOk;
                 var saved = MeetingStore.FromFolder(recording.Folder);
                 SetStatus(result.Tracks.Count == 2 ? "Deux pistes enregistrées." : "Pistes disponibles : " + result.Tracks.Count + ".", result.Warnings);
@@ -936,6 +1081,10 @@ internal sealed class Notebook : Form
             {
                 File.WriteAllText(current.TranscriptPath, text);
                 current.Transcribed = true;
+                var flag = Path.Combine(current.Folder, "incomplete.txt");
+                if (File.Exists(flag)) File.Delete(flag);
+                transcriptIncomplete = false;
+                incompletePill.Visible = false;
             }
             SetStatus("Transcription terminée.");
         }
@@ -1077,6 +1226,8 @@ internal sealed class Notebook : Form
         glass.Controls.Add(stack);
         return glass;
     }
+
+    private static Label FieldLabel(string text) => new() { Text = text, AutoSize = true, Font = Night.Sans(10f, true), ForeColor = Night.Ink, Margin = new Padding(0, 0, 0, 6) };
 
     private static Label Muted(string text) => new() { Text = text, ForeColor = Night.Ink2, AutoSize = true, MaximumSize = new Size(560, 0), Font = Night.Sans(10f), Margin = new Padding(0) };
 
