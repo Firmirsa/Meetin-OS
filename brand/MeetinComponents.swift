@@ -354,6 +354,7 @@ struct MTRecordingBar: View {
     var level: Double = 0.5                  // 0...1
     var onPause: () -> Void = {}
     var onStop: () -> Void = {}
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let barBG = Color(red: 0x14 / 255, green: 0x20 / 255, blue: 0x1C / 255)
     private let barFG = Color(red: 0xFA / 255, green: 0xF8 / 255, blue: 0xF1 / 255)
@@ -378,7 +379,8 @@ struct MTRecordingBar: View {
                 }
             }
             .frame(height: 24)
-            .animation(.easeInOut(duration: 0.15), value: level)
+            // « Réduire les animations » : les barres changent de hauteur sans transition.
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: level)
 
             Button("Pause", action: onPause)
                 .buttonStyle(.plain)

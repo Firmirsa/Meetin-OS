@@ -20,6 +20,8 @@ Le script construit et signe localement l’application. Au premier enregistreme
 L’**Accueil**, le carnet et l’enregistrement restent disponibles sans compte. **Intégrations**, dans la barre latérale et la fenêtre de réunion, permet d’activer Gladia ou de connecter l’agent plus tard.
 
 1. Lancez un appel de test avec un autre participant. Sur l’**Accueil**, cliquez sur **Commencer à enregistrer** (⌘R), faites parler chaque personne à tour de rôle, puis cliquez sur **Arrêter**.
+
+   Pendant l’enregistrement, la barre sombre de la marque (`MTRecordingBar`, maquette `brand/animations/son-qui-bouge.gif`) remplace le bouton d’arrêt, dans la fenêtre de réunion et sur l’Accueil. Elle affiche la durée réelle et des barres de niveau qui suivent le son du micro et de l’appel, environ 25 fois par seconde. Au silence, elles redescendent presque à plat. Avec **Réduire les animations** dans macOS, elles changent de hauteur sans transition. **Arrêter** arrête l’enregistrement comme l’ancien bouton. **Pause** est affiché mais ne fait rien pour l’instant.
 2. Cliquez sur **Écouter** pour vérifier les deux voix. **Voir les pistes** révèle le dossier de la réunion contenant le mix et les deux pistes séparées.
 3. Cliquez sur **Transcrire** pour envoyer les pistes micro et appel séparément. Si une clé Gladia est nécessaire, l’app ouvre le formulaire correspondant et reprend l’envoi quand vous cliquez sur **Transcrire** dans ce formulaire. La clé peut aussi s’ajouter dans **Paramètres** ou **Intégrations** et reste dans le trousseau de ce Mac. La variable d’environnement `GLADIA_API_KEY` a la priorité si le binaire est lancé depuis le terminal. Une version signée localement peut demander l’accès au trousseau après chaque compilation. Le texte indique la piste source et l’horodatage de chaque passage. Un M4A importé est traité comme un fichier unique.
 4. Dans l’onglet **Agent**, insère et ajuste l’extrait de transcription ou saisis une demande. Clique sur **Préparer la tâche**, réponds à la question éventuelle, puis relis l’action et sa destination avant de confirmer. Le lien de session s’affiche quand Devin ou H Computer Use accepte le lancement.
@@ -63,6 +65,14 @@ La détection et les actions de notification se testent avec des réponses simul
 swiftc -parse-as-library -target "$(uname -m)-apple-macos15.0" \
   mac/AgentClient.swift mac/MeetingStore.swift mac/TaskDetection.swift mac/TaskActions.swift mac/tests/TaskDetectionSmoke.swift -o mac/.build/detect-smoke
 mac/.build/detect-smoke
+```
+
+La mesure du son de la barre d’enregistrement se teste avec des sons synthétiques :
+
+```sh
+swiftc -parse-as-library -target "$(uname -m)-apple-macos15.0" \
+  mac/RecordingBar.swift brand/MeetinTheme.swift brand/MeetinComponents.swift mac/tests/RecordingLevelSmoke.swift -o mac/.build/level-smoke
+mac/.build/level-smoke
 ```
 
 Le direct et **Transcrire** reconnaissent uniquement le français et l’anglais pour l’instant.

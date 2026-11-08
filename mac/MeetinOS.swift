@@ -46,6 +46,7 @@ final class MeetingSession {
     var agentAccess: AgentAccess?
     var integrationsRequest: IntegrationsRequest?
     let agent = AgentWorkspaceState()
+    let recordingLevel = RecordingLevel()
     var status = "Prêt à enregistrer"
     var permissionHelp: AudioPermissionHelp? { didSet { noteSystemAudioPermission() } }
     var transcript = "" { didSet { syncMeeting() } }
@@ -256,8 +257,7 @@ struct CaptureView: View {
                                 .buttonStyle(.mtPrimary)
                                 .disabled(session.agent.busy)
                         } else {
-                            Button("Arrêter", systemImage: "stop.fill", action: toggleRecording)
-                                .buttonStyle(.mtGhost)
+                            LiveRecordingBar(level: session.recordingLevel, onStop: toggleRecording)
                         }
                     }
                 }
@@ -307,6 +307,7 @@ struct CaptureView: View {
             do {
                 if let current = session.capture {
                     defer { session.capture = nil }
+                    session.recordingLevel.stop()
                     session.status = "Préparation du fichier audio…"
                     let result: (mix: URL, tracks: AudioCapture.Tracks?, help: AudioPermissionHelp?)
                     do {
@@ -325,8 +326,10 @@ struct CaptureView: View {
                 } else {
                     let next = AudioCapture()
                     let live = session.makeLive()
-                    if let live {
-                        next.onAudio = { track, buffer, hostTime in live.feed(track, buffer, hostTime: hostTime) }
+                    let meter = AudioLevelMeter()
+                    next.onAudio = { track, buffer, hostTime in
+                        meter.feed(buffer)
+                        live?.feed(track, buffer, hostTime: hostTime)
                     }
                     session.statusBelongsToMeeting = false
                     session.permissionHelp = nil
@@ -338,6 +341,7 @@ struct CaptureView: View {
                     session.transcript = ""
                     session.agent.newRecording()
                     session.capture = next
+                    session.recordingLevel.start(reading: meter, since: session.startedAt ?? Date())
                     session.live = live
                     live?.start()
                     if let live { session.startDetection(reading: live) }
