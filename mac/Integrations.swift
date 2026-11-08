@@ -27,6 +27,7 @@ struct IntegrationsView: View {
     let transcribe: () -> Void
     @State private var page: IntegrationsPage
     @State private var accountAddress: String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var checking = false
     @State private var issue = ""
 
@@ -71,11 +72,17 @@ struct IntegrationsView: View {
                     .font(.callout).foregroundStyle(Color.mtInk2)
             }
             toolRow("Google Meetin-OS", purpose: "Compte, quota de transcription et accès à l’agent", status: session.accountConnected ? "Connecté" : "Facultatif") {
-                Button(session.accountConnected ? "Gérer" : "Connecter") { show(.gladia) }
+                if session.accountConnected {
+                    Button("Gérer", systemImage: "person.crop.circle") { show(.gladia) }
+                        .buttonStyle(.mtGhost).help("Afficher le compte Google lié")
+                } else {
+                    GoogleSignInButton(account: session.account, client: session.accountClient, onConnected: refresh)
+                }
             }
             toolRow("Trello", purpose: "Connexion personnelle non disponible dans cette version", status: "À venir") { EmptyView() }
             toolRow("Google Calendar", purpose: "Google Meetin-OS ne connecte pas ton agenda", status: "À venir") { EmptyView() }
             toolRow("Devin", purpose: "Service de code via le serveur, pas un compte personnel relié ici", status: toolStatus(session.agentAccess?.devin)) { EmptyView() }
+            toolRow("H Company", purpose: "Préparation des propositions via Holo, service fourni par le serveur", status: toolStatus(session.agentAccess?.planning)) { EmptyView() }
             toolRow("Linkup", purpose: "Recherche publique facultative, envoyée uniquement après clic", status: toolStatus(session.agentAccess?.linkup)) { EmptyView() }
             Text("Aucune clé d’équipe à saisir. Trello et Calendar attendent leur propre parcours de consentement.")
                 .font(.callout).foregroundStyle(Color.mtInk2)
@@ -85,7 +92,7 @@ struct IntegrationsView: View {
                 if session.agentAccess == nil {
                     Button("Connecter l’agent") { show(.agent) }.buttonStyle(.mtPrimary)
                 } else {
-                    Button("Vérifier les accès", action: refresh).buttonStyle(.mtPrimary).disabled(checking || session.agent.busy)
+                    Button("Vérifier les accès", systemImage: "arrow.clockwise", action: refresh).buttonStyle(.mtPrimary).disabled(checking || session.agent.busy)
                 }
             }
         }
@@ -125,7 +132,8 @@ struct IntegrationsView: View {
     }
 
     private func toolRow<Action: View>(_ name: String, purpose: String, status: String, @ViewBuilder action: () -> Action) -> some View {
-        HStack(alignment: .center) {
+        HStack(alignment: .center, spacing: 14) {
+            providerLogo(name)
             VStack(alignment: .leading, spacing: 3) {
                 Text(name).font(.headline)
                 Text(purpose).font(.callout).foregroundStyle(Color.mtInk2)
@@ -134,7 +142,24 @@ struct IntegrationsView: View {
             Text(status).font(.caption).foregroundStyle(Color.mtInk2)
             action()
         }
-        .padding(.vertical, 6)
+        .padding(16)
+        .background(Color.mtGlass, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.mtLine, lineWidth: 1))
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.16), value: status)
+    }
+
+    @ViewBuilder private func providerLogo(_ name: String) -> some View {
+        let resource = ["Google Meetin-OS": "GoogleG", "Google Calendar": "Calendar", "Trello": "Trello",
+                        "Devin": "Devin", "H Company": "HCompany", "Linkup": "Linkup"][name]
+        if let resource,
+           let url = Bundle.main.url(forResource: resource, withExtension: "png",
+                                     subdirectory: resource == "GoogleG" ? nil : "Integrations"),
+           let logo = NSImage(contentsOf: url) {
+            Image(nsImage: logo).resizable().scaledToFit()
+                .frame(width: 32, height: 32).padding(8)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 10))
+                .accessibilityHidden(true)
+        }
     }
 
     private func toolStatus(_ configured: Bool?) -> String {

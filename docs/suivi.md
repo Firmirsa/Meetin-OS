@@ -1,5 +1,13 @@
 # Suivi Meetin-OS
 
+## Installation Samy et retouche UI préparée, 8 novembre 2026
+
+À 10 h 52 (Paris), installation autorisée du lot Samy `7b974e0` dans Applications : **0.1.6 build 10**, recette. Aucune capture active avant fermeture normale ; processus absent avant remplacement. Sauvegarde dans `~/Library/Application Support/Meetin-OS/Build Backups/before-samy-build10.91tz5ivn`. Signature vérifiée et carnet inchangé. À la réouverture : compte connecté, quatre réunions présentes, menus Renommer/Supprimer visibles, accueil avec Enregistrer seul. Micro à autoriser affiché. Aucun enregistrement démarré par l’agent. Reçu : `/private/tmp/meetin-samy-integrated-20261108/installation-receipt.json`. Le numéro de packaging passe de 9 à 10, exécutable validé inchangé.
+
+Lot suivant préparé localement, sans Devin : logos officiels Google, Calendar, Trello, Devin, H Company et Linkup ; accès Google réel réutilisé, états des services fondés sur les réponses existantes, aucune connexion personnelle fictive. Facturation présente Gratuit/Premium depuis `brand/billing-plans.json`, extrait et comparé à la migration de quota existante (15/300 min). Le quota de l’offre actuelle vient du serveur. Aucun prix inventé ; le tarif reste à confirmer sur Stripe seulement si Checkout disponible. Pictogrammes et aides ajoutés aux actions. Se déconnecter est rendu exclusivement dans Compte.
+
+Build **0.1.6 (11)** compilé et signature stricte vérifiée dans `/private/tmp/meetin-ui-polish-20261108/Meetin-OS.app`, **non installé**. Navigation, capture et règles serveur inchangées. Contrôle visuel hors écran des cartes (compte fictif Gratuit) et des cinq nouveaux logos réussi en thème sombre : `/private/tmp/meetin-ui-preview.png`. Il ne s’agit pas d’une capture du parcours complet. Le parcours réel des nouveaux écrans reste à recetter après une installation autorisée ; aucune manipulation de la session pendant l’essai de Wael.
+
 ## Intégration Mac des nouveaux commits de Samy, 8 novembre 2026
 
 Références récupérées : `28feb68` (renommer/supprimer les réunions), `a9420ad` (barre audio animée), `8db7236` (site Linux, hors périmètre Mac). Les deux ajouts Mac sont portés sur `codex/google-agent` en conservant la détection réactive `23330e6`. Le conflit de bouton Nouvel enregistrement conserve le blocage pendant une capture. La suppression demande confirmation, est bloquée pendant capture/transcription/action et préserve les fichiers audio importés ; les dossiers audio propres vont à la Corbeille.

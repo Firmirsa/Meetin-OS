@@ -1,0 +1,12 @@
+[
+  {
+    "id": "free",
+    "name": "Gratuit",
+    "limitMs": 900000
+  },
+  {
+    "id": "premium",
+    "name": "Premium",
+    "limitMs": 18000000
+  }
+]

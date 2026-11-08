@@ -4,6 +4,8 @@ import SwiftUI
 struct HostedAccountView: View {
     let session: MeetingSession
     @Binding var address: String
+    var showsSignOut = false
+    var showsPlans = false
     var onConnected: () -> Void = {}
 
     @State private var busy = false
@@ -36,11 +38,12 @@ struct HostedAccountView: View {
                 LabeledContent("E-mail", value: plan.email)
                 LabeledContent("Plan", value: plan.planName)
                 LabeledContent("Audio restant", value: "\(duration(plan.remainingMs)) sur \(duration(plan.limitMs)) ce mois-ci")
+                if showsPlans { planCards(current: plan) }
                 if plan.plan != "premium" && plan.checkoutAvailable {
-                    Button("Passer à Premium") { openBilling(manage: false) }.buttonStyle(.mtPrimary).disabled(billingDisabled)
+                    Button("Passer à Premium", systemImage: "sparkles") { openBilling(manage: false) }.buttonStyle(.mtPrimary).disabled(billingDisabled)
                 }
                 if plan.canManageBilling {
-                    Button("Gérer l’abonnement") { openBilling(manage: true) }.buttonStyle(.mtGhost).disabled(billingDisabled)
+                    Button("Gérer l’abonnement", systemImage: "creditcard") { openBilling(manage: true) }.buttonStyle(.mtGhost).disabled(billingDisabled)
                 }
                 if plan.plan != "premium" && !plan.checkoutAvailable {
                     Text("Le passage à Premium n’est pas configuré sur ce serveur.")
@@ -59,16 +62,58 @@ struct HostedAccountView: View {
                     .font(.mtSans(13)).foregroundStyle(Color.mtInk2)
             }
             HStack {
-                Button("Actualiser le quota", action: refresh).buttonStyle(.mtGhost).disabled(busy || session.billingRequestBusy)
-                Button("Se déconnecter") {
+                Button("Actualiser le quota", systemImage: "arrow.clockwise", action: refresh).buttonStyle(.mtGhost).disabled(busy || session.billingRequestBusy)
+                    .help("Vérifier le plan et le quota auprès du serveur")
+                if showsSignOut {
+                Button("Se déconnecter", systemImage: "rectangle.portrait.and.arrow.right") {
                     run { client in
                         await session.account.signOut(client)
                     }
                 }.buttonStyle(.mtGhost)
                     .disabled(busy || session.billingRequestBusy || session.billingLaunchPending || session.busy || session.capture != nil)
+                    .help("Déconnecter le compte Google de ce Mac")
+                }
             }
-            Text("La déconnexion conserve les réunions et les brouillons sur ce Mac.")
-                .font(.mtSans(12)).foregroundStyle(Color.mtInk2)
+            if showsSignOut { Text("La déconnexion conserve les réunions et les brouillons sur ce Mac.")
+                .font(.mtSans(12)).foregroundStyle(Color.mtInk2) }
+        }
+    }
+
+    private struct Offer: Decodable, Identifiable {
+        let id: String
+        let name: String
+        let limitMs: Int
+    }
+
+    private var offers: [Offer] {
+        guard let url = Bundle.main.url(forResource: "BillingPlans", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let plans = try? JSONDecoder().decode([Offer].self, from: data) else { return [] }
+        return plans
+    }
+
+    private func planCards(current: AccountSummary) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), alignment: .top)], spacing: 12) {
+            ForEach(offers) { offer in
+                let selected = current.plan == offer.id
+                VStack(alignment: .leading, spacing: 12) {
+                    Label(offer.name, systemImage: offer.id == "free" ? "leaf" : "sparkles")
+                        .font(.mtSans(20, weight: .medium))
+                    Text(selected ? "Votre offre" : "Offre du catalogue")
+                        .font(.mtSans(12)).foregroundStyle(selected ? Color.mtAccent : Color.mtInk2)
+                    Text("\(duration(selected ? current.limitMs : offer.limitMs)) d’audio / mois")
+                        .font(.mtSans(15))
+                    if offer.id == "premium" && !selected {
+                        Text(current.checkoutAvailable ? "Tarif confirmé sur Stripe avant paiement" : "Souscription indisponible sur ce serveur")
+                            .font(.mtSans(12)).foregroundStyle(Color.mtInk2)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
+                .padding(16)
+                .background(Color.mtGlass, in: RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(selected ? Color.mtAccent : Color.mtLine, lineWidth: 1))
+                .accessibilityElement(children: .combine)
+            }
         }
     }
 

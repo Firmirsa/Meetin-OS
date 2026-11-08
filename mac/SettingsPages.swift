@@ -59,7 +59,7 @@ struct SettingsPage: View {
                 }.buttonStyle(.mtGhost)
                 Toggle("Transcription en direct pendant l’enregistrement", isOn: $liveTranscription)
                     .tint(Color.mtControlTint)
-                Text("L’audio est envoyé en continu à Gladia pendant l’enregistrement. Si l’agent est connecté, le texte part aussi chez Holo (H Company) toutes les 15 s pour proposer des tâches. Rien n’est lancé sans ta validation.")
+                Text("L’audio est envoyé en continu à Gladia pendant l’enregistrement. Si l’agent est connecté, le texte part aussi chez Holo (H Company) après les nouvelles phrases définitives pour proposer des tâches. Rien n’est lancé sans ta validation.")
                     .font(.mtSans(13))
                     .foregroundStyle(Color.mtInk2)
             }
@@ -108,7 +108,7 @@ struct AccountPage: View {
     var body: some View {
         SettingsScaffold(title: "Compte", session: session, showsBack: showsBack) {
             SettingsSection(title: "Compte Meetin-OS") {
-                HostedAccountView(session: session, address: accountAddress)
+                HostedAccountView(session: session, address: accountAddress, showsSignOut: true)
             }
             SettingsSection(title: "Agent") {
                 Text("Votre connexion Google donne accès aux outils de l’onglet Agent.")
@@ -138,7 +138,7 @@ struct BillingPage: View {
     var body: some View {
         SettingsScaffold(title: "Facturation et abonnement", session: session, showsBack: showsBack) {
             SettingsSection(title: "Abonnement Meetin-OS") {
-                HostedAccountView(session: session, address: $webWorkspaceURL)
+                HostedAccountView(session: session, address: $webWorkspaceURL, showsPlans: true)
                 Text("Le paiement et la gestion s’ouvrent sur le site officiel Stripe dans ton navigateur. Au retour, seul le plan confirmé par le serveur fait foi.")
                     .font(.mtSans(13)).foregroundStyle(Color.mtInk2)
             }
