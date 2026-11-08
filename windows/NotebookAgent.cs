@@ -51,7 +51,11 @@ internal sealed partial class Notebook
     {
         if (!liveEnabled || string.IsNullOrWhiteSpace(apiKey)) return null;
         var session = new LiveTranscription(apiKey);
-        session.Problem += message => BeginInvoke(new Action(() => SetStatus(message)));
+        session.Problem += message => BeginInvoke(new Action(() =>
+        {
+            SetStatus(message);
+            if (Form.ActiveForm == null) Notify("Transcription en direct interrompue", message, "Accueil", ToolTipIcon.Warning);
+        }));
         recording.LiveTap = session.Feed;
         transcriptIncomplete = false;
         return session;
@@ -112,6 +116,7 @@ internal sealed partial class Notebook
         {
             proposals.Add(proposal);
             SetStatus("Tâche proposée : " + proposal.Review.Title);
+            Notify("À valider : " + proposal.Review.Title, proposal.Review.Executor.Name() + " · " + proposal.Review.Destination, "Agent");
             if (pageByName["Agent"].Visible) RefreshAgentPage();
         };
         created.UpdatedProposal += _ => { if (pageByName["Agent"].Visible) RefreshAgentPage(); };

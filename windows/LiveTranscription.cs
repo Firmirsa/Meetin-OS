@@ -34,7 +34,7 @@ internal sealed class LiveLine
     public string Track { get; }
     public string Text { get; }
     public bool IsFinal { get; }
-    public string Formatted => LiveTranscript.Line(Time, Track, Text);
+    public string Formatted => LiveTranscript.Line(Time, Track == "Micro" ? Speaker.UserLabel : Track, Text);
 }
 
 internal sealed class LiveTranscript
