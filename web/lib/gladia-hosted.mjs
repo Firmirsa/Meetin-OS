@@ -7,6 +7,19 @@ const gladiaURL = 'https://api.gladia.io';
 export const bytesPerMillisecond = 32; // PCM 16 kHz mono, signed 16-bit little endian
 export const batchBytes = 90_000 * bytesPerMillisecond;
 const language_config = {languages: ['fr', 'en'], code_switching: true};
+// Names Gladia otherwise mishears in meetings ("Lenny" → "L'ENIA", "H Company" → "H compagnie").
+export const custom_vocabulary_config = {
+  default_intensity: 0.5,
+  vocabulary: [
+    {value: 'Lenny', pronunciations: ['Léni', 'Lény', 'Lenni', "L'ENIA"]},
+    {value: 'Wael', pronunciations: ['Waël', 'Wail', 'Waelle']},
+    'Samy',
+    {value: 'H Company', pronunciations: ['H compagnie', 'Ash Company', 'Hache company', 'H-Company']},
+    {value: 'Holo', pronunciations: ['Hollow', 'Olo']},
+    'Devin', 'YouTube', 'Trello', 'Gladia', 'Linkup',
+    {value: 'Meetin-OS', pronunciations: ['Meeting OS', 'Mitin OS']},
+  ],
+};
 
 export async function gladiaKey(env, fetcher) {
   const key = await providerKey('gladia', env, fetcher);
@@ -84,7 +97,7 @@ export async function startBatch(request, env = process.env, fetcher = fetch) {
 
     // After dispatch, an unknown outcome keeps the reservation charged.
     charged = ms;
-    const started = await gladia('/v2/pre-recorded', key, JSON.stringify({audio_url: audio, diarization: true, language_config}), fetcher);
+    const started = await gladia('/v2/pre-recorded', key, JSON.stringify({audio_url: audio, diarization: true, language_config, custom_vocabulary: true, custom_vocabulary_config}), fetcher);
     if (!started.ok) {
       if (started.status < 500) charged = 0;
       throw new ApiError(502, 'Gladia n’a pas démarré la transcription.');
@@ -126,6 +139,7 @@ export async function upstreamLiveURL(key, fetcher) {
   const response = await gladia('/v2/live', key, JSON.stringify({
     encoding: 'wav/pcm', sample_rate: 16_000, bit_depth: 16, channels: 1, language_config,
     messages_config: {receive_partial_transcripts: true, receive_final_transcripts: true},
+    realtime_processing: {custom_vocabulary: true, custom_vocabulary_config},
   }), fetcher);
   if (!response.ok) throw new ApiError(502, 'Le direct Gladia est indisponible.');
   const created = await response.json();

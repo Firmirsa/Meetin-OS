@@ -11,14 +11,25 @@ function owner(user, env) {
   return uuid.test(user) && user === env.MEETIN_YOUTUBE_DEMO_USER_ID;
 }
 
+// Lowercase, no accents, punctuation and hyphens as spaces: "H-Company", "H compagnie" and "You Tube" compare alike.
+function normalized(text) {
+  return text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function demoCommand(sentence) {
+  const s = normalized(sentence);
+  return /^(?:il faut|nous allons|on va|je veux que l agent)\b/.test(s) &&
+    /\bcomment(?:er|e|es|ez)\b/.test(s) && /\byou ?tube\b/.test(s) &&
+    /\b(?:h|ash|hache|ache) ?(?:company|compagnie|compagny|compani|campagne)\b/.test(s) && /\bbravo\b/.test(s) &&
+    !/\b(?:pas|jamais|sans|si|peut etre|pourrait|voudrait|avant|apres)\b/.test(s);
+}
+
 // Narrow, explicit opt-in demo command. Ordinary speech, questions and negations do not launch or propose this action.
+// Live transcription may cut one sentence across lines, so speaker labels are removed and lines joined first.
 export function youtubeProposal(source, user, env) {
   if (!owner(user, env)) return null;
-  const quote = source.split(/[\n.!?]+/u).map(s => s.trim().replace(/^\[[^\]]+\]\s*(?:[^·\n]*·\s*)+/u, '')).find(s =>
-    /^(?:il faut|nous allons|on va|je veux que l.agent)\b/iu.test(s) &&
-    /\bcomment(?:er|e)\b/iu.test(s) && /\byou\s*tube\b/iu.test(s) &&
-    /\b(?:h|ash|hache)[\s-]*(?:company|compagnie|compagny|compani)\b/iu.test(s) && /\bbravo\b/iu.test(s) &&
-    !/\b(?:pas|jamais|sans|si|peut-être|pourrait|voudrait|avant|après)\b/iu.test(s));
+  const text = source.split('\n').map(line => line.trim().replace(/^\[[^\]]+\]\s*(?:[^·\n]*·\s*)+/u, '')).join(' ');
+  const quote = text.split(/[.!?]+/u).map(s => s.replace(/\s+/gu, ' ').trim()).find(demoCommand);
   if (!quote || quote.length > 1500) return null;
   return { action, executor: 'computer_use', destination: youtubeDestination,
     title: 'Commenter une vidéo officielle H Company', task, quote, comment, channel: '@HCompanyOfficial', account: '@Fraawdrinn' };

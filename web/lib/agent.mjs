@@ -38,6 +38,7 @@ const detector = [
   'Report only explicit commitments or decisions to do a concrete action, whether the speaker commits or assigns someone else, for example "Léa adds a test".',
   'Skip ideas, questions, hypotheticals, past work and vague intentions.',
   'Skip a task when its action or target is unclear, or when the sentence is too garbled to know what to change. Never ask a question. Never invent a target, assignee, deadline or decision.',
+  'Person names are often mistranscribed, for example "L\'ENIA" or "Léni" for Lenny. A doubtful or misspelled name never makes a task unclear: keep the task when the action and target are clear.',
   'Use executor "devin" only for a change to the software in the configured repository: fix a bug, build or change a feature, add a test, or edit a file of the repository.',
   'Use executor "computer_use" only for one create or update action on a card in the configured test board UI.',
   'A task must fit one of these two tools exactly. Skip everything else, even a firm commitment:',

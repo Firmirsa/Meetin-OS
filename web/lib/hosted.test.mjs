@@ -141,6 +141,9 @@ test('live relay forwards only the remaining audio and settles actual usage', {t
       return new Response(null, {status: 204});
     }
     assert.equal(url, 'https://api.gladia.io/v2/live');
+    const init = JSON.parse(options.body);
+    assert.equal(init.realtime_processing.custom_vocabulary, true);
+    assert.ok(init.realtime_processing.custom_vocabulary_config.vocabulary.some(entry => entry.value === 'H Company'));
     return Response.json({url: 'wss://api.gladia.io/v2/live?token=fixture'});
   };
   class Socket extends EventEmitter {
