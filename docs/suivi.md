@@ -77,3 +77,10 @@ Essai réel vers 16h, voix de Lenny :
 - Deux sessions de reproduction lancées juste après ont abouti. L’une a trouvé `https://www.youtube.com/@HCompanyOfficial` avec le compte FIRMIRSA, mais sans le champ `outcome`.
 
 Correctif `932852c` : un résultat vérifié est accepté sans `outcome` (lien de la page, ou lien permanent du commentaire avec le texte exact depuis un compte connecté). Une session encore à 0 étape après 3 minutes est signalée au lieu d’afficher « En cours » indéfiniment. Recette redéployée ; le commentaire réel reste à essayer.
+
+Essai réel du commentaire YouTube vers 16h18, voix de Lenny. Parcours complet : carte, confirmation unique, réservation par proposition, puis session H `776e30ea`, terminée en 23 étapes.
+- H a trouvé `@HCompanyOfficial`, avec le compte FIRMIRSA (@Firmirsa_) connecté.
+- Il a vérifié 5 vidéos : toutes ont les commentaires désactivés. Aucun commentaire publié, comme prévu.
+- H a encore omis `outcome` et a écrit son explication dans le champ `comment`. Correctif `f2e16dc` : ce blocage est reconnu dans le texte libre. Recette redéployée.
+
+Prochain essai de publication : choisir une chaîne dont les commentaires sont ouverts.
