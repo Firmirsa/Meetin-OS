@@ -71,3 +71,9 @@ Vérifications :
 - Mesure avec le vrai Holo, 3 essais par phrase : demandes valides 10/12, fausses demandes 0/12.
 
 Profil H : Chromium 156 neuf sous Linux (OrbStack, `linuxserver/chromium`) sur le Mac de Lenny, connecté par Lenny à son propre compte YouTube, téléversé chez H (`9d5ad7ce…`). Une session H sans publication voit le compte connecté (avatar « F », pas de bouton « Se connecter ») : Chromium 156 est accepté malgré la limite de 150 indiquée dans la documentation. `MEETIN_YOUTUBE_PROFILE_ID` est mis à jour en recette et les copies locales du profil sont supprimées. L’essai réel à la voix reste à faire.
+
+Essai réel vers 16h, voix de Lenny :
+- « Ouvre la chaîne YouTube de H Company » a donné la carte « Ouvrir sur YouTube », et la confirmation a lancé H avec le profil connecté (avatar « F »). Cette session est restée bloquée à 0 étape, un incident côté H, et je l’ai arrêtée.
+- Deux sessions de reproduction lancées juste après ont abouti. L’une a trouvé `https://www.youtube.com/@HCompanyOfficial` avec le compte FIRMIRSA, mais sans le champ `outcome`.
+
+Correctif `932852c` : un résultat vérifié est accepté sans `outcome` (lien de la page, ou lien permanent du commentaire avec le texte exact depuis un compte connecté). Une session encore à 0 étape après 3 minutes est signalée au lieu d’afficher « En cours » indéfiniment. Recette redéployée ; le commentaire réel reste à essayer.
