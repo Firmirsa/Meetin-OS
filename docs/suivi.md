@@ -14,3 +14,8 @@ Dernier point : 7 novembre 2026. La [bêta 0.1.0](https://github.com/Firmirsa/Me
 | Recette H Computer Use · Trello | Le 7 novembre, après confirmation de Wael, HoloTab en mode supervisé a créé « Relire le guide » dans À faire sur le tableau Meetin-OS Démo, depuis Chrome connecté à Trello. Vérification dans Trello : une seule fiche dans la liste, puis ouverture de cette fiche. | Rejouer la création depuis l’app Mac avec un profil H Platform connecté au tableau de test. |
 | Premiers pas · Mac et web | Mac 0.1.3 propose le carnet sans compte et un écran Intégrations. Le 7 novembre, test local avec réponses simulées du code refusé, de la préparation reprise après connexion et de la proposition Trello conservée jusqu’à la vérification des accès. Le site présente les outils facultatifs en français et en anglais. | Relier le profil H de démo au tableau Trello et rejouer le parcours avec les accès réels. |
 | Site et démo · Lenny et équipe | Le site Next.js contient les téléchargements, les premiers pas et Stripe Checkout en mode test. L’installateur Mac 0.1.3 est dans le dépôt. | Vérifier la version servie par Vercel et répéter le parcours avec les comptes de test. |
+
+
+## Maquette Linux, 8 novembre 2026
+
+À la demande explicite de Wael, le bouton Linux de la page de téléchargement est un élément simulé pour la vidéo du hackathon : bouton HTML sans gestionnaire, URL, requête ni fichier. Aucun paquet Linux ne correspond à ce visuel et aucun support Linux n’est validé. Livraison limitée à cette carte FR/EN, sans changement des liens Mac ou Windows.

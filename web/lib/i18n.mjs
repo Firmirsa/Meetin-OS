@@ -57,8 +57,8 @@ const fr = {
       note: 'Ouvre le paquet pour ajouter Meetin-OS à Applications. La version de test n’est pas notariée.', help: 'Aide Apple'},
     windows: {name: 'Windows', req: 'Windows 10 ou 11 (x64)', cta: 'Télécharger pour Windows', file: 'Meetin-OS-Windows.exe',
       note: 'Ouvre l’installateur pour ajouter Meetin-OS au menu Démarrer. Windows peut signaler cette version de test non signée.'},
-    linux: {name: 'Linux', req: 'Ubuntu, Debian, Fedora', cta: 'En préparation',
-      note: 'La version Linux est en préparation. En attendant, Meetin-OS fonctionne sur Mac et Windows.'},
+    linux: {name: 'Linux', req: 'Ubuntu, Debian, Fedora', cta: 'Télécharger pour Linux',
+      note: 'Ton carnet de réunion, sur ton bureau Linux.'},
     next: 'Ensuite : ', nextLink: 'les premiers pas',
   },
   onboarding: {
@@ -116,8 +116,8 @@ const en = {
       note: 'Open the package to add Meetin-OS to Applications. This test build is not notarized.', help: 'Apple help'},
     windows: {name: 'Windows', req: 'Windows 10 or 11 (x64)', cta: 'Download for Windows', file: 'Meetin-OS-Windows.exe',
       note: 'Run the installer to add Meetin-OS to the Start menu. Windows may flag this unsigned test build.'},
-    linux: {name: 'Linux', req: 'Ubuntu, Debian, Fedora', cta: 'In progress',
-      note: 'The Linux version is in progress. Meanwhile, Meetin-OS runs on Mac and Windows.'},
+    linux: {name: 'Linux', req: 'Ubuntu, Debian, Fedora', cta: 'Download for Linux',
+      note: 'Your meeting notebook, on your Linux desktop.'},
     next: 'Next: ', nextLink: 'get started',
   },
   onboarding: {
