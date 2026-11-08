@@ -19,6 +19,8 @@ test('explicit demo proposal is source-backed, owner-bound, signed and requires 
  await assert.rejects(executeTask({confirmed:true,approval:Buffer.from(JSON.stringify(forged)).toString('base64url')+'.'+sig},user,env,denied),{status:409});
  assert.equal(youtubeProposal(transcript,sid,env),null);
  assert.ok(youtubeProposal('[00:04] Vous · '+transcript,user,env));
+ assert.ok(youtubeProposal('[00:23] Audio distant · source non séparée ·  Il faut commenter une vidéo YouTube de H-Company avec Bravo.',user,env));
+ assert.ok(youtubeProposal('[00:06] FIRMIRSA (Micro · source non séparée) ·  '+transcript,user,env));
  for(const source of ['Il ne faut pas commenter une vidéo YouTube de H Company avec Bravo', 'On pourrait commenter une vidéo YouTube de H Company avec Bravo', 'Il faut commenter une vidéo YouTube de H Company sans écrire Bravo']) assert.equal(youtubeProposal(source,user,env),null);
  await assert.rejects(executeTask({confirmed:true,approval:tasks[0].approval},user,{...env,MEETIN_YOUTUBE_PROFILE_ID:undefined},denied),{status:503,code:'youtube_setup'});
 });

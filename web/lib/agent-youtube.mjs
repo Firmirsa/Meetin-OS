@@ -14,10 +14,10 @@ function owner(user, env) {
 // Narrow, explicit opt-in demo command. Ordinary speech, questions and negations do not launch or propose this action.
 export function youtubeProposal(source, user, env) {
   if (!owner(user, env)) return null;
-  const quote = source.split(/[\n.!?]+/u).map(s => s.trim().replace(/^\[[^\]]+\]\s*[^·\n]*·\s*/u, '')).find(s =>
+  const quote = source.split(/[\n.!?]+/u).map(s => s.trim().replace(/^\[[^\]]+\]\s*(?:[^·\n]*·\s*)+/u, '')).find(s =>
     /^(?:il faut|nous allons|on va|je veux que l.agent)\b/iu.test(s) &&
     /\bcomment(?:er|e)\b/iu.test(s) && /\byou\s*tube\b/iu.test(s) &&
-    /\bh\s*company\b/iu.test(s) && /\bbravo\b/iu.test(s) &&
+    /\bh[\s-]*company\b/iu.test(s) && /\bbravo\b/iu.test(s) &&
     !/\b(?:pas|jamais|sans|si|peut-être|pourrait|voudrait|avant|après)\b/iu.test(s));
   if (!quote || quote.length > 1500) return null;
   return { action, executor: 'computer_use', destination: youtubeDestination,
