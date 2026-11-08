@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 // Cherche des tâches dans le texte définitif du direct. Ne lance jamais rien : chaque tâche attend une validation.
 @MainActor
@@ -23,30 +24,53 @@ final class TaskDetector {
     @ObservationIgnored private var loop: Task<Void, Never>?
     @ObservationIgnored private var lastSent = ""
     @ObservationIgnored private var running = false
+    @ObservationIgnored private var active = false
+    @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var observed = ""
 
     static let maxTranscript = 5_000
     static let maxKnown = 10
     static let maxKnownTask = 400
 
-    init(interval: Double = 15, text: @escaping () -> String, detect: @escaping (String, [KnownTask]) async throws -> [DetectedTask]) {
+    init(interval: Double = 0.35, text: @escaping () -> String, detect: @escaping (String, [KnownTask]) async throws -> [DetectedTask]) {
         self.interval = interval
         self.text = text
         self.detect = detect
     }
 
     func start() {
-        guard loop == nil else { return }
-        let interval = interval
+        guard !active else { return }
+        active = true
+        generation += 1
+        observe(generation)
+    }
+
+    private func observe(_ revision: Int) {
+        guard active, generation == revision, !isStopped else { return }
+        let current = withObservationTracking { text() } onChange: { [weak self] in
+            Task { @MainActor [weak self] in self?.observe(revision) }
+        }
+        guard current != observed else { return }
+        observed = current
+        schedule()
+    }
+
+    private func schedule() {
+        guard active, !running, !isStopped else { return }
+        loop?.cancel()
+        let revision = generation
         loop = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(interval))
-                guard !Task.isCancelled, let self, !self.isStopped else { return }
-                await self.tick()
-            }
+            guard let self else { return }
+            do { try await Task.sleep(for: .seconds(self.interval)) }
+            catch { return }
+            guard self.active, self.generation == revision else { return }
+            await self.tick()
         }
     }
 
     func stop() {
+        active = false
+        generation += 1
         loop?.cancel()
         loop = nil
     }
@@ -67,7 +91,11 @@ final class TaskDetector {
         let current = text()
         guard !current.isEmpty, current != lastSent else { return }
         running = true
-        defer { running = false }
+        defer {
+            running = false
+            // Une phrase arrivée pendant la requête repart ensuite, sans concurrence.
+            if text() != current { schedule() }
+        }
         do {
             let found = try await detect(Self.window(current), known())
             lastSent = current

@@ -1,5 +1,17 @@
 # Suivi Meetin-OS
 
+## Détection réactive préparée, 8 novembre 2026
+
+Correctif local ciblé : observation du texte définitif avec regroupement de 350 ms, remplaçant la boucle de 15 s. Un seul appel actif ; le texte arrivé pendant une requête est traité ensuite. Les corrections, empreintes anti-doublons et confirmation avant exécution restent inchangées. Les protections de révision de réunion existantes sont conservées. Devin CLI restant bloqué par la revue de transmission, ce correctif a été réalisé localement, sans nouvel envoi à Devin.
+
+Contrôle ciblé TaskDetectionSmoke réussi : premier déclenchement simulé mesuré à 0,356 s avec le délai par défaut, nouvelle phrase pendant une requête traitée ensuite, concurrence maximale de un, absence de rappel sur texte inchangé/provisoire et après arrêt, corrections et anti-doublons existants. Ce délai mesure uniquement le déclenchement local avec service simulé, pas Gladia ni Holo en conditions réelles. Compilation Mac et signature stricte réussies. Binaire préparé dans `/private/tmp/meetin-reactive-20261108/Meetin-OS.app`, non installé ; la copie Applications 0.1.6 (9) demeure inchangée. Les retouches UI restent dans le lot préparé en attente.
+
+## Retour de recette de Wael, 8 novembre 2026
+
+Wael confirme l’accueil sans erreur, l’accès à Intégrations et un essai d’enregistrement fonctionnel sur la version installée 0.1.6 (9). Cette validation ne couvre pas encore pause/reprise, les deux voix ou l’exécution de l’agent pendant un vrai appel. Il confirme explicitement qu’il n’y a **aucun écran bleu dans Meetin-OS** : l’interprétation concernait vraisemblablement une autre activité sur son ordinateur. Ce point est retiré des anomalies ; aucun diagnostic à lancer.
+
+Les retouches UI restent à préparer : logos officiels et états réels des intégrations, pictogrammes et cartes des offres réelles en Facturation, déconnexion exclusivement dans Compte. La pastille flottante est réservée à Samy. Retirer Pause/Terminer uniquement de l’Accueil, en conservant l’accès à la réunion et ses commandes d’arrêt. Aucune manipulation ni réinstallation pendant les essais de Wael. Le nouveau lot Devin CLI n’a pas démarré : le contrôle automatique a demandé une autorisation explicite de transmission du code, toujours en attente. La copie installée reste inchangée.
+
 ## Copie installée et recette utilisateur, 8 novembre 2026 à 10 h 38 (Paris)
 
 **Version actuelle dans Applications : Mac 0.1.6 build 9**, serveur `https://meetin-os-recette.vercel.app`, source `37aaf0c5fe18b39310cea3c802fb7ff40eca44b2`. Installation à 10 h 34, après constat d’absence de capture. Elle remplace le build 6 ; les builds 7 et 8 décrits plus bas étaient des étapes locales. Ancienne copie conservée dans `~/Library/Application Support/Meetin-OS/Build Backups/before-native-0.1.6-9.7t6ckngy/Meetin-OS.app`. SHA-256 du binaire installé : `ffd07c95216ca779b43e8ebee0bda3867e64b2d142d08b79dab488ca30032f3e`.

@@ -1,4 +1,7 @@
 import Foundation
+import Observation
+
+@MainActor @Observable final class DetectionText { var value = ""; var partial = "" }
 
 func detected(_ id: String, title: String, task: String = "Faire la tâche.", replaces: String? = nil, quote: String = "extrait") throws -> DetectedTask {
     var values: [String: Any] = [
@@ -122,6 +125,39 @@ struct TaskDetectionSmoke {
             _ = try await Actions.rewrite(original, context: String(repeating: "x", count: 601), prepare: { _, _, _ in fatalError("pas d'appel") })
             fatalError("contexte trop long refusé")
         } catch is AgentClient.Failure {}
+
+        let source = DetectionText()
+        var rapidCalls: [String] = []
+        var concurrent = 0
+        var maximum = 0
+        let reactive = TaskDetector(text: { source.value }) { value, _ in
+            concurrent += 1
+            maximum = max(maximum, concurrent)
+            rapidCalls.append(value)
+            try await Task.sleep(for: .milliseconds(120))
+            concurrent -= 1
+            return []
+        }
+        reactive.start()
+        source.partial = "hypothèse provisoire"
+        try await Task.sleep(for: .milliseconds(400))
+        precondition(rapidCalls.isEmpty, "aucun appel pour une hypothèse partielle")
+        let began = Date()
+        source.value = "Première phrase définitive"
+        while rapidCalls.isEmpty, Date().timeIntervalSince(began) < 1 {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        precondition(rapidCalls.count == 1, "déclenchement réactif sous une seconde")
+        print("Déclenchement local simulé : \(Date().timeIntervalSince(began)) s")
+        source.value += " puis une deuxième phrase"
+        try await Task.sleep(for: .milliseconds(700))
+        precondition(rapidCalls.count == 2 && maximum == 1, "texte reçu pendant appel traité ensuite sans concurrence")
+        try await Task.sleep(for: .milliseconds(100))
+        precondition(rapidCalls.count == 2, "aucun rappel sur texte inchangé")
+        reactive.stop()
+        source.value += " après arrêt"
+        try await Task.sleep(for: .milliseconds(60))
+        precondition(rapidCalls.count == 2, "observation arrêtée")
 
         print("Détection de tâches : tests réussis")
     }
