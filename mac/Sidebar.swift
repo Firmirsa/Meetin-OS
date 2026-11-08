@@ -3,7 +3,7 @@ import SwiftUI
 
 struct Sidebar: View {
     @Bindable var session: MeetingSession
-    @AppStorage("webWorkspaceURL") private var webWorkspaceURL = "http://localhost:3000"
+    @AppStorage("webWorkspaceURL") private var webWorkspaceURL = MeetinSite.defaultAddress
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {

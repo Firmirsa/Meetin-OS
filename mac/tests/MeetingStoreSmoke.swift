@@ -34,11 +34,17 @@ struct MeetingStoreSmoke {
             executor: .devin, destination: "Firmirsa/Meetin-OS", title: "Corriger l’export", task: "Corriger l’export.",
             quote: "extrait", clarifications: [], approval: "signature"
         )
+        var expired = review
+        expired.expiresAt = Date().timeIntervalSince1970 * 1_000 - 1_000
+        precondition(!review.isExpired, "ancien plan sans date toujours lisible")
+        precondition(expired.isExpired && expired.hasExpired(at: Date(timeIntervalSince1970: expired.expiresAt! / 1_000)), "expiration inclusive en millisecondes")
+        precondition(!expired.hasExpired(at: Date(timeIntervalSince1970: expired.expiresAt! / 1_000 - 1)), "plan encore valide avant son échéance")
         reloaded.update(first) {
             $0.proposals = [
                 TaskProposal(id: "a", review: review),
                 TaskProposal(id: "b", review: review, state: .ignored),
-                TaskProposal(id: "c", review: review, state: .launched, sessionURL: URL(string: "https://app.devin.ai/sessions/x"))
+                TaskProposal(id: "c", review: review, state: .launched, sessionURL: URL(string: "https://app.devin.ai/sessions/x")),
+                TaskProposal(id: "d", review: expired)
             ]
         }
         reloaded.saveNow()
@@ -46,6 +52,7 @@ struct MeetingStoreSmoke {
         precondition(withTasks?.pendingProposals == 1, "seules les tâches en attente comptent")
         precondition(withTasks?.proposals?[0].review.approval == "signature", "plan signé relu")
         precondition(withTasks?.proposals?[2].sessionURL?.host == "app.devin.ai", "lien de session relu")
+        precondition(withTasks?.proposals?[3].review.expiresAt == expired.expiresAt, "expiration persistée sans modifier le plan signé")
         precondition(reloaded.meetings.last?.pendingProposals == 0, "réunion sans tâche")
 
         let capture = folder.appendingPathComponent("capture", isDirectory: true)

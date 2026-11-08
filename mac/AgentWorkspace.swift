@@ -53,6 +53,30 @@ final class AgentWorkspaceState {
             }
         }
     }
+
+    func launch(_ review: AgentReview, using client: AgentClient) {
+        guard !busy else { return }
+        busy = true
+        error = ""
+        needsAccess = false
+        trelloSetupRequired = false
+        Task {
+            defer { busy = false }
+            do {
+                execution = try await client.launch(review)
+                preparation = nil
+            } catch {
+                let failure = error as? AgentClient.Failure
+                needsAccess = failure?.status == 401
+                trelloSetupRequired = failure?.code == "trello_setup"
+                // Une réponse incertaine peut cacher une session déjà créée : garder le même plan signé.
+                if let status = failure?.status, [400, 409, 410, 422].contains(status) {
+                    preparation = nil
+                }
+                self.error = error.localizedDescription
+            }
+        }
+    }
 }
 
 struct AgentWorkspace<Proposals: View>: View {
@@ -126,7 +150,9 @@ struct AgentWorkspace<Proposals: View>: View {
 
     private func reviewCard(_ review: AgentReview) -> some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text("À confirmer").font(.headline)
+            TimelineView(.periodic(from: .now, by: 1)) { _ in
+                Text(review.isExpired ? "Plan expiré" : "À confirmer").font(.headline)
+            }
             Text(review.title).font(.mtSans(17, weight: .semibold))
             Text(review.task).textSelection(.enabled)
             Text("\(review.executor.name) · \(review.destination)").foregroundStyle(Color.mtInk2)
@@ -163,21 +189,7 @@ struct AgentWorkspace<Proposals: View>: View {
     }
 
     private func launch(_ review: AgentReview) {
-        guard let client, !state.busy else { return }
-        state.busy = true
-        state.error = ""
-        Task {
-            defer { state.busy = false }
-            do {
-                state.execution = try await client.launch(review)
-                state.preparation = nil
-            } catch {
-                let failure = error as? AgentClient.Failure
-                state.needsAccess = failure?.status == 401
-                state.trelloSetupRequired = failure?.code == "trello_setup"
-                if !state.needsAccess && !state.trelloSetupRequired { state.preparation = nil }
-                state.error = error.localizedDescription
-            }
-        }
+        guard let client else { return }
+        state.launch(review, using: client)
     }
 }

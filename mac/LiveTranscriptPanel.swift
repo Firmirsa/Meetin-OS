@@ -11,6 +11,7 @@ struct LiveTranscriptPanel: View {
         switch live.state {
         case .connecting: "Connexion à Gladia…"
         case .live: "En direct"
+        case .partial(let track): "Direct partiel : une seule piste (\(track.label)). L’autre piste est indisponible. L’enregistrement continue."
         case .reconnecting: "Connexion perdue, nouvelle tentative. L’enregistrement continue."
         case .unauthorized: "Gladia a refusé la clé. L’enregistrement continue."
         case .ended: "Le direct s’est arrêté. L’enregistrement continue."
@@ -21,7 +22,7 @@ struct LiveTranscriptPanel: View {
     private var statusColor: Color {
         switch live.state {
         case .live: .mtAccent
-        case .connecting, .reconnecting, .ended: .mtWarn
+        case .connecting, .reconnecting, .ended, .partial: .mtWarn
         case .unauthorized, .failed: .mtRec
         }
     }
@@ -38,7 +39,7 @@ struct LiveTranscriptPanel: View {
                     Button("Modifier la clé", action: openSettings).buttonStyle(.link)
                 }
             }
-            if live.lostAudio, live.state == .live || live.state == .reconnecting {
+            if live.lostAudio {
                 Text("Une partie de l’audio n’a pas pu être envoyée pendant la coupure. Le fichier reste complet : « Transcrire » peut reprendre tout l’appel.")
                     .font(.mtSans(12))
                     .foregroundStyle(Color.mtWarn)

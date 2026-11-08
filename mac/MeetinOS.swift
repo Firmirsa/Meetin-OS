@@ -4,6 +4,7 @@ import SwiftUI
 
 @main
 struct MeetinOS: App {
+    @NSApplicationDelegateAdaptor(MeetinAppDelegate.self) private var appDelegate
     @State private var meeting = MeetingSession()
 
     var body: some Scene {
@@ -25,6 +26,36 @@ struct MeetinOS: App {
     }
 }
 
+// Quitter pendant un enregistrement arrête la réunion et l'enregistre avant la fermeture, dans une limite de temps.
+final class MeetinAppDelegate: NSObject, NSApplicationDelegate {
+    static weak var session: MeetingSession?
+    private static let stopLimit: TimeInterval = 30
+    private var quitting = false
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let session = Self.session, session.capture != nil else { return .terminateNow }
+        guard !quitting else { return .terminateLater }
+        quitting = true
+        if let current = session.capture, !session.busy {
+            session.busy = true
+            Task {
+                defer { session.busy = false }
+                do {
+                    try await CaptureView.stopRecording(current, session: session)
+                } catch { session.status = error.localizedDescription }
+            }
+        }
+        Task {
+            let deadline = Date().addingTimeInterval(Self.stopLimit)
+            while session.capture != nil, Date() < deadline {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
+}
+
 @MainActor
 @Observable
 final class MeetingSession {
@@ -40,6 +71,7 @@ final class MeetingSession {
     var detector: TaskDetector?
     var launchingProposals: Set<String> = []
     var showAgentTab = false
+    var notificationsDenied = false
     var openWindowAction: OpenWindowAction?
     var proposalIssues: [String: String] = [:]
     var agentAccessCode = ""
@@ -61,6 +93,7 @@ final class MeetingSession {
 
     init() {
         TaskNotifications.shared.attach(self)
+        MeetinAppDelegate.session = self
     }
 }
 
@@ -92,7 +125,7 @@ struct CaptureView: View {
     @Bindable var session: MeetingSession
     var isMeetingWindow = false
     @State private var integrationsRequest: IntegrationsRequest?
-    @AppStorage("webWorkspaceURL") private var webWorkspaceURL = "http://localhost:3000"
+    @AppStorage("webWorkspaceURL") private var webWorkspaceURL = MeetinSite.defaultAddress
     @State private var tab: MeetingTab = .transcription
 
     private var hasKey: Bool {
@@ -126,10 +159,13 @@ struct CaptureView: View {
                 Rectangle().fill(Color.mtLine).frame(height: 1)
             }
 
-            if isMeetingWindow || session.recording != nil {
-                Picker("Vue de la réunion", selection: $tab) {
-                    Text("Transcription").tag(MeetingTab.transcription)
-                    Text(session.pendingProposalCount > 0 ? "Agent (\(session.pendingProposalCount))" : "Agent").tag(MeetingTab.agent)
+            if isMeetingWindow || session.recording != nil || session.meetingID != nil {
+                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                    Picker("Vue de la réunion", selection: $tab) {
+                        Text("Transcription").tag(MeetingTab.transcription)
+                        Text(session.pendingProposalCount > 0 ? "Agent (\(session.pendingProposalCount))" : "Agent")
+                            .tag(MeetingTab.agent)
+                    }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -143,7 +179,7 @@ struct CaptureView: View {
                 .padding(.vertical, 12)
             }
 
-            if (isMeetingWindow || session.recording != nil) && tab == .agent {
+            if (isMeetingWindow || session.recording != nil || session.meetingID != nil) && tab == .agent {
                 agentPanel
             } else {
                 ScrollView {
@@ -230,6 +266,11 @@ struct CaptureView: View {
                         .foregroundStyle(Color.mtInk2)
                         .accessibilityAddTraits(.updatesFrequently)
                 }
+                if session.notificationsDenied {
+                    Text("Notifications désactivées dans les réglages macOS. Les alertes et les tâches restent visibles dans Meetin-OS.")
+                        .font(.mtSans(12))
+                        .foregroundStyle(Color.mtWarn)
+                }
                 if let help = session.permissionHelp, !session.busy {
                     Button(help.settingsLabel, systemImage: "arrow.up.right.square") {
                         NSWorkspace.shared.open(help.settingsURL)
@@ -254,7 +295,7 @@ struct CaptureView: View {
                         if session.capture == nil {
                             Button("Enregistrer", systemImage: "mic", action: toggleRecording)
                                 .buttonStyle(.mtPrimary)
-                                .disabled(session.agent.busy)
+                                .disabled(!session.canSwitchMeeting)
                         } else {
                             Button("Arrêter", systemImage: "stop.fill", action: toggleRecording)
                                 .buttonStyle(.mtGhost)
@@ -274,7 +315,7 @@ struct CaptureView: View {
         .toolbar {
             if isMeetingWindow, session.recording != nil, session.capture == nil {
                 Button("Nouvel enregistrement", systemImage: "plus", action: toggleRecording)
-                    .disabled(session.busy || session.agent.busy)
+                    .disabled(!session.canSwitchMeeting)
             }
         }
     }
@@ -300,30 +341,20 @@ struct CaptureView: View {
     }
 
     static func toggleRecording(session: MeetingSession, openWindow: OpenWindowAction) {
-        guard !session.busy, session.capture != nil || !session.agent.busy else { return }
+        guard !session.busy, session.capture != nil || session.canSwitchMeeting else { return }
         session.busy = true
         Task {
             defer { session.busy = false }
             do {
                 if let current = session.capture {
-                    defer { session.capture = nil }
-                    session.status = "Préparation du fichier audio…"
-                    let result: (mix: URL, tracks: AudioCapture.Tracks?, help: AudioPermissionHelp?)
-                    do {
-                        result = try await current.stop()
-                    } catch {
-                        await session.finishLive()
-                        throw error
-                    }
-                    await session.finishLive()
-                    session.recording = result.mix
-                    session.recordedTracks = result.tracks
-                    session.permissionHelp = result.help
-                    session.status = result.help.map { "Une piste a été conservée. \($0.localizedDescription)" }
-                        ?? "Enregistrement prêt · micro et audio système"
-                    await session.meetingDidStop()
+                    try await stopRecording(current, session: session)
                 } else {
                     let next = AudioCapture()
+                    next.onWarning = { [weak session, weak next] message in
+                        guard let session, let next, session.capture === next else { return }
+                        session.status = message
+                        LiveAlerts.postTask("Piste micro interrompue", message)
+                    }
                     let live = session.makeLive()
                     if let live {
                         next.onAudio = { track, buffer, hostTime in live.feed(track, buffer, hostTime: hostTime) }
@@ -351,6 +382,31 @@ struct CaptureView: View {
         }
     }
 
+    // Partagé par le bouton Arrêter et la fermeture de l'app. L'appelant réserve session.busy.
+    static func stopRecording(_ current: AudioCapture, session: MeetingSession) async throws {
+        defer { session.capture = nil }
+        session.status = "Préparation du fichier audio…"
+        let result: (mix: URL, tracks: AudioCapture.Tracks?, help: AudioPermissionHelp?)
+        do {
+            result = try await current.stop()
+        } catch {
+            await session.finishLive()
+            let recovered = current.recovery
+            session.recording = recovered.audio
+            session.recordedTracks = recovered.tracks
+            session.status = "Arrêt incomplet : \(error.localizedDescription) Les notes, le texte et les pistes disponibles sont conservés."
+            await session.meetingDidStop(recoveryFolder: current.folder)
+            return
+        }
+        await session.finishLive()
+        session.recording = result.mix
+        session.recordedTracks = result.tracks
+        session.permissionHelp = result.help
+        session.status = result.help.map { "Une piste a été conservée. \($0.localizedDescription)" }
+            ?? "Enregistrement prêt · micro et audio système"
+        await session.meetingDidStop()
+    }
+
     private func transcribe() {
         guard !session.busy, let recording = session.recording else { return }
         guard hasKey else {
@@ -358,7 +414,6 @@ struct CaptureView: View {
             return
         }
         session.busy = true
-        session.transcript = ""
         session.status = "Envoi et transcription en cours…"
         Task {
             defer { session.busy = false }

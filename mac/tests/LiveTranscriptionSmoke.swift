@@ -168,8 +168,13 @@ struct LiveTranscriptionSmoke {
         precondition(attempts.withLock { $0.contains { $0.sent > 0 } }, "tranche renvoyée après la reprise")
 
         // Serveur muet : finish() reste borné
-        let silent = LiveTranscription(finishTimeout: 0.3, createSession: { url }, connect: { _ in HangingSocket() })
+        let hangingConnections = Mutex(0)
+        let silent = LiveTranscription(finishTimeout: 0.3, createSession: { url }, connect: { _ in
+            hangingConnections.withLock { $0 += 1 }
+            return HangingSocket()
+        })
         silent.start()
+        await waitUntil("sessions muettes ouvertes") { hangingConnections.withLock { $0 } == 2 }
         let started = Date()
         await silent.finish()
         precondition(Date().timeIntervalSince(started) < 3, "finish() borné par le délai")
@@ -188,6 +193,80 @@ struct LiveTranscriptionSmoke {
         await waitUntil("panne") { if case .failed = down.state { true } else { false } }
         await down.finish()
         precondition(down.transcript.finalText.isEmpty, "rien à écrire si le direct n'a rien reçu")
+
+        // Création de session : succès après une panne, budget épuisé, arrêt et annulation.
+        let creationAttempts = Mutex(0)
+        let transient = LiveTranscription(retryDelay: 0.01, createSession: {
+            let attempt = creationAttempts.withLock { $0 += 1; return $0 }
+            if attempt <= 2 { throw URLError(.notConnectedToInternet) }
+            return url
+        }, connect: { _ in FakeSocket() })
+        transient.start()
+        for track in AudioTrack.allCases {
+            transient.feed(track, tone(rate: 48_000, channels: 1, frames: 9_600), hostTime: mach_absolute_time())
+        }
+        await waitUntil("ouverture après une panne") { transient.state == .live }
+        await transient.finish()
+        precondition(creationAttempts.withLock { $0 } == 4, "les sessions sont recréées seulement après une panne")
+
+        let failedAttempts = Mutex(0)
+        let neverEndingAudio = AsyncStream<Data>.makeStream()
+        let exhausted = GladiaLiveSession(audio: neverEndingAudio.stream, retryDelay: 0.01, createSession: {
+            failedAttempts.withLock { $0 += 1 }
+            throw URLError(.notConnectedToInternet)
+        }, connect: { _ in fatalError("aucune connexion sans session") }, events: { _ in })
+        await exhausted.run()
+        precondition(failedAttempts.withLock { $0 } == 3, "au plus deux relances de création")
+
+        let alreadyFinished = GladiaLiveSession(audio: neverEndingAudio.stream, audioFinished: { true }, createSession: {
+            fatalError("aucune création après la fin de l’audio")
+        }, connect: { _ in fatalError("aucune connexion") }, events: { _ in })
+        await alreadyFinished.run()
+        let aborted = GladiaLiveSession(audio: neverEndingAudio.stream, createSession: {
+            fatalError("aucune création après annulation")
+        }, connect: { _ in fatalError("aucune connexion") }, events: { _ in })
+        await aborted.abort()
+        await aborted.run()
+
+        // La fin de l'audio peut arriver pendant la requête de création de session.
+        let creationGate = Mutex<CheckedContinuation<URL, Never>?>(nil)
+        let audioEnded = Mutex(false)
+        let lateConnections = Mutex(0)
+        let lateSession = GladiaLiveSession(
+            audio: neverEndingAudio.stream, audioFinished: { audioEnded.withLock { $0 } },
+            createSession: {
+                await withCheckedContinuation { continuation in creationGate.withLock { $0 = continuation } }
+            }, connect: { _ in
+                lateConnections.withLock { $0 += 1 }
+                return FakeSocket()
+            }, events: { _ in }
+        )
+        let lateRun = Task { await lateSession.run() }
+        await waitUntil("création de session en attente") { creationGate.withLock { $0 != nil } }
+        audioEnded.withLock { $0 = true }
+        // Le flux est fermé aussi : un éventuel socket ouvert à tort ne bloque pas le test.
+        neverEndingAudio.continuation.finish()
+        creationGate.withLock { $0 }?.resume(returning: url)
+        await lateRun.value
+        precondition(lateConnections.withLock { $0 } == 0, "aucun socket si l’audio finit pendant la création de session")
+
+        // Quota simulé d'une seule session : l'autre piste reste visible et le texte est conservé.
+        let quotaCalls = Mutex(0)
+        let partial = LiveTranscription(retryDelay: 0.01, createSession: {
+            let attempt = quotaCalls.withLock { $0 += 1; return $0 }
+            if attempt > 1 { throw Gladia.RequestError.http(stage: "ouverture du direct", status: 429) }
+            return url
+        }, connect: { _ in FakeSocket(incoming: [message("quota", "Une seule piste disponible.", start: 0, final: true)]) })
+        var partialAlerts: [String] = []
+        partial.onProblem = { partialAlerts.append($0) }
+        partial.start()
+        for track in AudioTrack.allCases {
+            partial.feed(track, tone(rate: 48_000, channels: 1, frames: 9_600), hostTime: mach_absolute_time())
+        }
+        await waitUntil("direct partiel") { if case .partial = partial.state { true } else { false } }
+        precondition(partial.isIncomplete && partialAlerts.count == 1, "une panne de piste est signalée une fois")
+        await partial.finish()
+        precondition(partial.transcript.finalText.contains("Une seule piste disponible."), "la piste encore en direct est conservée")
 
         // Coupure courte : ni alerte ni texte incomplet. Coupure durable : une seule alerte.
         func outage(healsAfter failures: Int, delay: Double) -> LiveTranscription {

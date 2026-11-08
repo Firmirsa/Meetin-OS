@@ -4,6 +4,7 @@ import Foundation
 struct Gladia {
     let key: String
     var session: URLSession = .shared
+    var pollingRetryDelay: Double = 1
 
     enum RequestError: LocalizedError {
         case unauthorized
@@ -14,6 +15,10 @@ struct Gladia {
             switch self {
             case .unauthorized:
                 return "Gladia a refusé la clé API. Remplacez-la dans les réglages, puis relancez la transcription."
+            case .http(_, 429):
+                return "Gladia ne peut pas traiter cette demande pour le moment. Réessaie dans quelques instants."
+            case .http(_, 402):
+                return "La transcription est indisponible avec les crédits actuels du compte Gladia. Vérifie l’utilisation du compte."
             case let .http(stage, status):
                 return "Gladia · \(stage) impossible (HTTP \(status))."
             case let .invalidResponse(stage):
@@ -49,6 +54,12 @@ struct Gladia {
     }
 
     func transcribe(_ file: URL) async throws -> String {
+        if file.pathExtension.lowercased() != "m4a" {
+            let output = file.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".m4a")
+            defer { try? FileManager.default.removeItem(at: output) }
+            try await AudioCapture.exportAudio([(file, 0)], to: output)
+            return try await transcribe(output)
+        }
         let transcript = try await fetchTranscript(file)
         let segments = transcript.segments
         guard !segments.isEmpty else { return "Aucune parole reconnue." }
@@ -106,8 +117,25 @@ struct Gladia {
         guard job.result_url.scheme == "https", job.result_url.host == "api.gladia.io" else {
             throw CaptureError("URL de résultat Gladia inattendue.")
         }
+        var pollingRetries = 0
         for _ in 0..<90 {
-            let result: Result = try await request(job.result_url, stage: "récupération du résultat")
+            try Task.checkCancellation()
+            let result: Result
+            do {
+                result = try await request(job.result_url, stage: "récupération du résultat")
+            } catch {
+                let transient: Bool
+                switch error {
+                case let network as URLError: transient = network.code != .cancelled
+                case RequestError.http(_, let status): transient = status == 429 || (500..<600).contains(status)
+                default: transient = false
+                }
+                // Budget commun à tout le suivi du résultat. Aucun POST n'est relancé.
+                guard transient, pollingRetries < 2, !Task.isCancelled else { throw error }
+                pollingRetries += 1
+                try await Task.sleep(for: .seconds(pollingRetryDelay * Double(pollingRetries)))
+                continue
+            }
             switch result.status {
             case "done":
                 guard let transcript = result.result?.transcription else {

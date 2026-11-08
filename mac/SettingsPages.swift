@@ -43,11 +43,13 @@ private struct SettingsSection<Content: View>: View {
 }
 
 struct SettingsPage: View {
+    @Environment(\.scenePhase) private var scenePhase
     @Bindable var session: MeetingSession
     @AppStorage("detectZoomMeetings") private var detectZoomMeetings = false
     @AppStorage(MeetingSession.liveTranscriptionKey) private var liveTranscription = true
     @State private var draftKey = ""
     @State private var keyMessage = ""
+    @State private var accessibilityTrusted = ZoomMeetingDetector.accessibilityTrusted
 
     private var trimmedDraft: String { draftKey.trimmingCharacters(in: .whitespacesAndNewlines) }
 
@@ -87,6 +89,11 @@ struct SettingsPage: View {
                 Text("L’audio est envoyé en continu à Gladia pendant l’enregistrement. Si l’agent est connecté, le texte part aussi chez Holo (H Company) toutes les 15 s pour proposer des tâches. Rien n’est lancé sans ta validation.")
                     .font(.mtSans(13))
                     .foregroundStyle(Color.mtInk2)
+                if session.notificationsDenied {
+                    Text("Notifications désactivées : autorise Meetin-OS dans Réglages Système → Notifications pour recevoir les alertes.")
+                        .font(.mtSans(13))
+                        .foregroundStyle(Color.mtWarn)
+                }
             }
             SettingsSection(title: "Autorisations audio") {
                 Text("Au premier enregistrement, macOS peut demander l’accès au micro et à l’audio du système.")
@@ -101,6 +108,14 @@ struct SettingsPage: View {
             SettingsSection(title: "Détection Zoom") {
                 Toggle("Ouvrir la fenêtre quand je rejoins une réunion Zoom", isOn: $detectZoomMeetings)
                     .tint(Color.mtControlTint)
+                    .onChange(of: detectZoomMeetings) { wasEnabled, enabled in
+                        if !wasEnabled && enabled {
+                            accessibilityTrusted = ZoomMeetingDetector.requestAccessibility()
+                        }
+                    }
+                Text(accessibilityTrusted ? "Accessibilité autorisée." : "Accessibilité non autorisée : la détection Zoom reste inactive.")
+                    .font(.mtSans(13))
+                    .foregroundStyle(accessibilityTrusted ? Color.mtInk2 : Color.mtWarn)
                 if detectZoomMeetings {
                     Text("L’accès à l’accessibilité sert à détecter les fenêtres Zoom. L’enregistrement se lance manuellement.")
                         .foregroundStyle(Color.mtInk2)
@@ -111,6 +126,10 @@ struct SettingsPage: View {
                     .buttonStyle(.mtGhost)
                 }
             }
+        }
+        .onAppear { accessibilityTrusted = ZoomMeetingDetector.accessibilityTrusted }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { accessibilityTrusted = ZoomMeetingDetector.accessibilityTrusted }
         }
     }
 }
@@ -133,7 +152,7 @@ private extension SettingsPage {
 
 struct AccountPage: View {
     @Bindable var session: MeetingSession
-    @AppStorage("webWorkspaceURL") private var webWorkspaceURL = "http://localhost:3000"
+    @AppStorage("webWorkspaceURL") private var webWorkspaceURL = MeetinSite.defaultAddress
 
     var body: some View {
         SettingsScaffold(title: "Compte", session: session) {

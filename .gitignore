@@ -1,1 +1,3 @@
 mac/.build/
+.DS_Store
+/graphify-out/

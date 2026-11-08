@@ -28,7 +28,8 @@ final class TaskDetector {
     static let maxKnown = 10
     static let maxKnownTask = 400
 
-    init(interval: Double = 15, text: @escaping () -> String, detect: @escaping (String, [KnownTask]) async throws -> [DetectedTask]) {
+    init(interval: Double = 15, known: [Proposal] = [], text: @escaping () -> String, detect: @escaping (String, [KnownTask]) async throws -> [DetectedTask]) {
+        proposals = known
         self.interval = interval
         self.text = text
         self.detect = detect

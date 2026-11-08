@@ -207,6 +207,7 @@ struct IntegrationsView: View {
                 workspaceURL = client.baseURL.absoluteString
                 session.agentAccessCode = client.accessCode
                 session.agentAccess = access
+                session.resumeDetectionIfNeeded()
                 code = ""
                 if resume && access.planning {
                     dismiss()
@@ -226,6 +227,8 @@ struct IntegrationsView: View {
     }
 
     private func disconnect() {
+        session.detector?.stop()
+        session.detector = nil
         session.agentAccessCode = ""
         session.agentAccess = nil
         session.agent.invalidateReview()

@@ -9,6 +9,8 @@ struct TaskProposal: Codable, Identifiable {
     var review: AgentReview
     var state: State = .pending
     var sessionURL: URL?
+
+    var isPending: Bool { state == .pending && !review.isExpired }
 }
 
 struct MeetingRecord: Codable, Identifiable {
@@ -31,7 +33,7 @@ struct MeetingRecord: Codable, Identifiable {
     var transcriptIncomplete: Bool?
     var proposals: [TaskProposal]?
 
-    var pendingProposals: Int { proposals?.filter { $0.state == .pending }.count ?? 0 }
+    var pendingProposals: Int { proposals?.filter(\.isPending).count ?? 0 }
 }
 
 // Historique local : Application Support/Meetin-OS/meetings.json et un dossier audio par réunion.

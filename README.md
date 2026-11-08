@@ -179,7 +179,7 @@ La présentation du projet pour le jury, en 9 diapos (en anglais) : **[ouvrir le
 
 <br>
 
-Sur le site, clique sur **Installer sur Mac**, puis ouvre `Meetin-OS.pkg`. Ou compile depuis les sources avec Xcode :
+Sur le site, clique sur **Télécharger pour Mac**, puis ouvre `Meetin-OS.pkg`. Ou compile depuis les sources avec Xcode :
 
 ```bash
 git clone https://github.com/Firmirsa/Meetin-OS.git

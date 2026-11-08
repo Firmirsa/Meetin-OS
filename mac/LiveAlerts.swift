@@ -2,8 +2,17 @@ import UserNotifications
 
 // Notifications du direct : uniquement quand il ne marche pas.
 enum LiveAlerts {
-    static func requestPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    static func requestPermission(onStatus: @escaping @MainActor @Sendable (Bool) -> Void = { _ in }) {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
+            readPermission(onStatus)
+        }
+    }
+
+    static func readPermission(_ onStatus: @escaping @MainActor @Sendable (Bool) -> Void) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let denied = settings.authorizationStatus == .denied
+            Task { @MainActor in onStatus(denied) }
+        }
     }
 
     static func postTask(_ title: String, _ message: String) {

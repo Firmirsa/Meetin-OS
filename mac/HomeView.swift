@@ -210,7 +210,7 @@ struct HomeView: View {
                     }
                     .buttonStyle(RecordCapsuleStyle())
                     .keyboardShortcut("r", modifiers: .command)
-                    .disabled(session.busy || session.agent.busy)
+                    .disabled(!session.canSwitchMeeting)
                 } else {
                     Button("Arrêter", systemImage: "stop.fill", action: toggleRecording)
                         .buttonStyle(.mtGhost)

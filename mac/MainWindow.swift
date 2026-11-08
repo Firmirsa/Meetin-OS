@@ -6,9 +6,10 @@ enum MainRoute: Hashable {
 
 struct MainWindow: View {
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.scenePhase) private var scenePhase
     @Bindable var session: MeetingSession
     @AppStorage("detectZoomMeetings") private var detectZoomMeetings = false
-    @AppStorage("webWorkspaceURL") private var webWorkspaceURL = "http://localhost:3000"
+    @AppStorage("webWorkspaceURL") private var webWorkspaceURL = MeetinSite.defaultAddress
 
     // Ouverture à environ 80 % de la zone visible de l'écran.
     static func placement(in context: WindowPlacementContext) -> WindowPlacement {
@@ -35,6 +36,10 @@ struct MainWindow: View {
             session.openWindowAction = openWindow
         }
         .onDisappear { session.notebookCount -= 1 }
+        .task { session.refreshNotificationPermission() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { session.refreshNotificationPermission() }
+        }
         .onOpenURL { url in
             guard session.integrationsRequest == nil, let request = IntegrationsRequest.fromLink(url) else { return }
             session.integrationsRequest = request

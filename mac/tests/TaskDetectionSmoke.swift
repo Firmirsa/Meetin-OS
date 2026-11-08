@@ -75,6 +75,19 @@ struct TaskDetectionSmoke {
         await detector.tick()
         precondition(detector.isStopped && calls.count == count, "arrêt sur accès refusé")
 
+        // Détecteur relancé après une connexion : les cartes déjà là restent connues, sans nouvelle annonce
+        let existing = TaskDetector.Proposal(id: "a", review: try detected("a", title: "Envoyer le devis").review)
+        var seededKnown: [KnownTask] = []
+        var seededAnnounced = 0
+        let seeded = TaskDetector(known: [existing], text: { "[00:50] Micro · Le devis." }) { _, known in
+            seededKnown = known
+            return [try detected("z", title: "ENVOYER LE DEVIS")]
+        }
+        seeded.onNewProposal = { _ in seededAnnounced += 1 }
+        await seeded.tick()
+        precondition(seededKnown.first?.ref == "a", "cartes existantes envoyées comme connues")
+        precondition(seeded.proposals.count == 1 && seededAnnounced == 0, "pas de carte en double après reprise")
+
         // Fenêtre : lignes entières et limite du serveur
         let long = (0..<400).map { "[00:\($0)] Micro · Une phrase avec des accents éàç." }.joined(separator: "\n")
         let window = TaskDetector.window(long)

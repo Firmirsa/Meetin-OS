@@ -32,7 +32,9 @@ final class TaskNotifications: NSObject, UNUserNotificationCenterDelegate, @unch
     func post(_ proposal: TaskProposal) {
         let content = UNMutableNotificationContent()
         content.title = "À valider : \(proposal.review.title)"
-        content.body = "\(proposal.review.executor.name) · \(proposal.review.destination)"
+        let task = proposal.review.task.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        let preview = task.count > 240 ? String(task.prefix(239)) + "…" : task
+        content.body = "\(proposal.review.executor.name) · \(proposal.review.destination)\n\(preview)"
         content.sound = .default
         content.categoryIdentifier = Self.category
         content.userInfo = [Self.proposalKey: proposal.id, Self.approvalKey: proposal.review.approval]

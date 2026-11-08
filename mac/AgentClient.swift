@@ -21,6 +21,14 @@ struct AgentReview: Codable {
     let quote: String
     let clarifications: [AgentClarification]
     let approval: String
+    // Horodatage serveur en millisecondes. Absent dans les anciennes réunions.
+    var expiresAt: Double? = nil
+
+    var isExpired: Bool { hasExpired(at: Date()) }
+
+    func hasExpired(at date: Date) -> Bool {
+        expiresAt.map { $0 <= date.timeIntervalSince1970 * 1_000 } ?? false
+    }
 
     var usesTrello: Bool {
         executor == .computerUse && ["trello.com", "www.trello.com"].contains(URL(string: destination)?.host ?? "")

@@ -45,12 +45,14 @@ enum AudioTrack: String, CaseIterable, Hashable, Sendable {
 final class AudioCapture {
     // Copie de l'audio pour le direct, à renseigner avant start(). Ne doit jamais bloquer.
     var onAudio: ((AudioTrack, AVAudioPCMBuffer, UInt64) -> Void)?
+    var onWarning: (@MainActor @Sendable (String) -> Void)?
     private let engine = AVAudioEngine()
+    private var configurationObserver: NSObjectProtocol?
     private var inputTapInstalled = false
     private var systemTap: SystemAudioTap?
     private var micWriter: TrackWriter?
     private var systemWriter: TrackWriter?
-    private let folder: URL
+    let folder: URL
     let microphone: URL
     let system: URL
 
@@ -91,6 +93,15 @@ final class AudioCapture {
             }
             inputTapInstalled = true
             try engine.start()
+            let warning = onWarning
+            configurationObserver = NotificationCenter.default.addObserver(
+                forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
+            ) { _ in
+                // Le fichier a un format fixe : ne pas redémarrer avec celui du nouveau périphérique.
+                Task { @MainActor in
+                    warning?("Le périphérique audio a changé : la piste micro s’est arrêtée. L’audio de l’appel continue. Arrête puis relance l’enregistrement pour reprendre le micro.")
+                }
+            }
         } catch {
             stopInputs()
             throw error
@@ -107,8 +118,11 @@ final class AudioCapture {
     func stop() async throws -> (mix: URL, tracks: Tracks?, help: AudioPermissionHelp?) {
         guard systemTap != nil else { throw CaptureError("Aucun enregistrement en cours.") }
         stopInputs()
-        let mic = try micWriter?.finish()
-        let call = try systemWriter?.finish()
+        // Fermer les deux fichiers même si l'écriture de la première piste a échoué.
+        let micResult = Result { try micWriter?.finish() }
+        let callResult = Result { try systemWriter?.finish() }
+        let mic = try micResult.get()
+        let call = try callResult.get()
         let output = folder.appendingPathComponent("reunion.m4a")
 
         guard let mic else {
@@ -132,7 +146,32 @@ final class AudioCapture {
         return (output, tracks, nil)
     }
 
+    // Repli après une erreur d'écriture ou d'export. Les CAF restent des CAF.
+    var recovery: (audio: URL?, tracks: Tracks?) {
+        Self.recover(
+            microphone: microphone, system: system,
+            microphoneStart: micWriter?.startTime, systemStart: systemWriter?.startTime
+        )
+    }
+
+    static func recover(
+        microphone: URL, system: URL, microphoneStart: Double? = nil, systemStart: Double? = nil
+    ) -> (audio: URL?, tracks: Tracks?) {
+        let hasMic = ((try? AVAudioFile(forReading: microphone))?.length ?? 0) > 0
+        let hasCall = ((try? AVAudioFile(forReading: system))?.length ?? 0) > 0
+        let origin = min(microphoneStart ?? 0, systemStart ?? 0)
+        let tracks = hasMic && hasCall ? Tracks(
+            microphone: microphone, system: system,
+            microphoneOffset: (microphoneStart ?? 0) - origin, systemOffset: (systemStart ?? 0) - origin
+        ) : nil
+        return (hasMic ? microphone : (hasCall ? system : nil), tracks)
+    }
+
     private func stopInputs() {
+        if let configurationObserver {
+            NotificationCenter.default.removeObserver(configurationObserver)
+            self.configurationObserver = nil
+        }
         if inputTapInstalled {
             engine.stop()
             engine.inputNode.removeTap(onBus: 0)
@@ -175,6 +214,7 @@ final class AudioCapture {
         private var firstSample: Double?
         private var hasSignal: Bool
         private var failure: Error?
+        private var closed = false
 
         init(url: URL, checkSignal: Bool = false) {
             self.url = url
@@ -184,7 +224,8 @@ final class AudioCapture {
         func append(_ buffer: AVAudioPCMBuffer, hostTime: UInt64) {
             guard buffer.frameLength > 0 else { return }
             queue.sync {
-                guard failure == nil else { return }
+                // Un tampon tardif après finish() ne doit pas recréer, donc vider, le fichier.
+                guard failure == nil, !closed else { return }
                 do {
                     if file == nil {
                         let format = buffer.format
@@ -202,12 +243,14 @@ final class AudioCapture {
 
         func finish() throws -> (start: Double, hasSignal: Bool)? {
             try queue.sync {
-                defer { file = nil }
+                defer { file = nil; closed = true }
                 if let failure { throw failure }
                 guard let firstSample, let file, file.length > 0 else { return nil }
                 return (firstSample, hasSignal)
             }
         }
+
+        var startTime: Double? { queue.sync { firstSample } }
 
         private static func containsSignal(_ buffer: AVAudioPCMBuffer) -> Bool {
             guard let samples = buffer.floatChannelData else {

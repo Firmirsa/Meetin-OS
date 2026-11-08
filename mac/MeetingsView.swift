@@ -42,10 +42,12 @@ private struct MeetingRow: View {
                     Text(meta).font(.mtSans(12)).foregroundStyle(Color.mtInk2).lineLimit(1)
                 }
                 Spacer(minLength: 12)
-                MTPill(
-                    text: statusText,
-                    kind: record.pendingProposals > 0 || record.transcript.isEmpty || record.transcriptIncomplete == true ? .run : .wait
-                )
+                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                    MTPill(
+                        text: statusText,
+                        kind: record.pendingProposals > 0 || record.transcript.isEmpty || record.transcriptIncomplete == true ? .run : .wait
+                    )
+                }
                 Text(MeetingFormat.duration(record.duration))
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundStyle(Color.mtInk2)
@@ -163,7 +165,7 @@ struct MeetingDetailView: View {
                         CaptureView.toggleRecording(session: session, openWindow: openWindow)
                     }
                     .buttonStyle(MTCapsuleLinkStyle())
-                    .disabled(session.busy || session.agent.busy)
+                    .disabled(!session.canSwitchMeeting)
                 }
                 TextField("Titre de la réunion", text: titleBinding)
                     .textFieldStyle(.plain)

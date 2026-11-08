@@ -68,6 +68,7 @@ final class LiveAudioPipe: @unchecked Sendable {
     private let converter = LiveAudioConverter()
     private var pending = Data()
     private var sawFirstBuffer = false
+    private var finished = false
     private let onFirstBuffer: @Sendable (Double) -> Void
     private let onDrop: @Sendable () -> Void
 
@@ -81,6 +82,7 @@ final class LiveAudioPipe: @unchecked Sendable {
         guard let copy = LiveAudioConverter.copy(buffer) else { return }
         let seconds = AVAudioTime.seconds(forHostTime: hostTime)
         queue.async { [self] in
+            guard !finished else { return }
             if !sawFirstBuffer {
                 sawFirstBuffer = true
                 onFirstBuffer(seconds)
@@ -95,11 +97,14 @@ final class LiveAudioPipe: @unchecked Sendable {
 
     func finish() {
         queue.sync {
+            finished = true
             if !pending.isEmpty { yield(pending) }
             pending = Data()
             continuation.finish()
         }
     }
+
+    var isFinished: Bool { queue.sync { finished } }
 
     private func yield(_ data: Data) {
         if case .dropped = continuation.yield(data) { onDrop() }
@@ -221,6 +226,7 @@ actor GladiaLiveSession {
     private let createSession: @Sendable () async throws -> URL
     private let connect: @Sendable (URL) -> LiveSocket
     private let audio: AsyncStream<Data>
+    private let audioFinished: @Sendable () -> Bool
     private let events: @MainActor @Sendable (Event) -> Void
     private let retryDelay: Double
     private var socket: LiveSocket?
@@ -230,11 +236,13 @@ actor GladiaLiveSession {
     init(
         audio: AsyncStream<Data>,
         retryDelay: Double = 1,
+        audioFinished: @escaping @Sendable () -> Bool = { false },
         createSession: @escaping @Sendable () async throws -> URL,
         connect: @escaping @Sendable (URL) -> LiveSocket,
         events: @escaping @MainActor @Sendable (Event) -> Void
     ) {
         self.audio = audio
+        self.audioFinished = audioFinished
         self.retryDelay = retryDelay
         self.createSession = createSession
         self.connect = connect
@@ -252,16 +260,7 @@ actor GladiaLiveSession {
     }
 
     private func stream() async {
-        let url: URL
-        do {
-            url = try await createSession()
-        } catch Gladia.RequestError.unauthorized {
-            await events(.unauthorized)
-            return
-        } catch {
-            await events(.failed(error.localizedDescription))
-            return
-        }
+        guard let url = await openSession(), !aborted, !Task.isCancelled, !audioFinished() else { return }
 
         var iterator = audio.makeAsyncIterator()
         var unsent: Data?
@@ -307,6 +306,30 @@ actor GladiaLiveSession {
                 delay = min(delay * 2, 15)
             }
         }
+    }
+
+    private func openSession() async -> URL? {
+        // Trois tentatives au total : attentes de 1 puis 2 s par défaut.
+        for attempt in 0...2 {
+            guard !aborted, !Task.isCancelled, !audioFinished() else { return nil }
+            do {
+                return try await createSession()
+            } catch {
+                guard !aborted, !Task.isCancelled, !audioFinished() else { return nil }
+                if case Gladia.RequestError.unauthorized = error {
+                    await events(.unauthorized)
+                    return nil
+                }
+                guard attempt < 2 else {
+                    await events(.failed(error.localizedDescription))
+                    return nil
+                }
+                await events(.reconnecting)
+                do { try await Task.sleep(for: .seconds(retryDelay * Double(attempt + 1))) }
+                catch { return nil }
+            }
+        }
+        return nil
     }
 
     private func receiveAll(from socket: LiveSocket) async throws {
@@ -407,6 +430,7 @@ final class LiveTranscript {
 final class LiveTranscription {
     enum State: Equatable {
         case connecting, live, reconnecting, unauthorized, ended
+        case partial(AudioTrack)
         case failed(String)
     }
 
@@ -475,7 +499,8 @@ final class LiveTranscription {
         for track in AudioTrack.allCases {
             guard let pipe = pipes[track] else { continue }
             let session = GladiaLiveSession(
-                audio: pipe.stream, retryDelay: retryDelay, createSession: createSession, connect: connect
+                audio: pipe.stream, retryDelay: retryDelay, audioFinished: { pipe.isFinished },
+                createSession: createSession, connect: connect
             ) { [weak self] event in
                 self?.handle(event, track: track)
             }
@@ -518,14 +543,24 @@ final class LiveTranscription {
 
     private func update(_ value: State, track: AudioTrack) {
         trackStates[track] = value
-        let states = Array(trackStates.values)
+        let states = AudioTrack.allCases.map { trackStates[$0] ?? .connecting }
         reportProblems(states)
-        if states.contains(.unauthorized) {
+        let lostTrack = states.contains {
+            switch $0 {
+            case .unauthorized, .ended, .failed: true
+            default: false
+            }
+        }
+        if lostTrack, let liveTrack = AudioTrack.allCases.first(where: { trackStates[$0] == .live }) {
+            state = .partial(liveTrack)
+        } else if states.contains(.unauthorized) {
             state = .unauthorized
         } else if states.contains(.reconnecting) {
             state = .reconnecting
-        } else if states.contains(.live) {
+        } else if states.allSatisfy({ $0 == .live }) {
             state = .live
+        } else if states.contains(.connecting) {
+            state = .connecting
         } else if states.contains(.ended) {
             state = .ended
         } else if let failure = states.first(where: { if case .failed = $0 { true } else { false } }) {
@@ -541,7 +576,7 @@ final class LiveTranscription {
             alert("Gladia a refusé la clé. L’enregistrement continue.")
         } else if states.contains(where: { if case .failed = $0 { true } else { false } }) {
             isIncomplete = true
-            alert("Le direct n’a pas pu démarrer. L’enregistrement continue.")
+            alert("Une piste du direct n’a pas pu démarrer. L’enregistrement continue.")
         } else if states.contains(.ended) {
             isIncomplete = true
             alert("Le direct s’est arrêté. L’enregistrement continue.")

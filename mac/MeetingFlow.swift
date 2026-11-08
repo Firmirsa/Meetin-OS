@@ -8,7 +8,7 @@ extension MeetingSession {
     static let systemAudioStateKey = "systemAudioState"
 
     var currentMeeting: MeetingRecord? { store.meeting(id: meetingID) }
-    var canSwitchMeeting: Bool { capture == nil && !busy && !agent.busy }
+    var canSwitchMeeting: Bool { capture == nil && !busy && !agent.busy && launchingProposals.isEmpty }
 
     func showMain(_ target: MainRoute, openWindow: OpenWindowAction) {
         route = target
@@ -32,16 +32,25 @@ extension MeetingSession {
         return "La transcription sera disponible après l’arrêt de l’enregistrement et l’envoi à Gladia."
     }
 
-    var pendingProposalCount: Int { proposals.filter { $0.state == .pending }.count }
+    var pendingProposalCount: Int { proposals.filter(\.isPending).count }
+
+    func refreshNotificationPermission(request: Bool = false) {
+        let update: @MainActor @Sendable (Bool) -> Void = { [weak self] denied in
+            self?.notificationsDenied = denied
+        }
+        if request { LiveAlerts.requestPermission(onStatus: update) }
+        else { LiveAlerts.readPermission(update) }
+    }
 
     // Détection seulement si le direct tourne et si l'équipe a validé l'accès à l'agent.
     func startDetection(reading live: LiveTranscription) {
-        let address = UserDefaults.standard.string(forKey: "webWorkspaceURL") ?? "http://localhost:3000"
+        let address = UserDefaults.standard.string(forKey: "webWorkspaceURL") ?? MeetinSite.defaultAddress
         guard agentAccess?.planning == true, let base = AgentClient.serverURL(address) else { return }
         let client = AgentClient(baseURL: base, accessCode: agentAccessCode)
         let transcript = live.transcript
-        LiveAlerts.requestPermission()
-        let detector = TaskDetector(text: { transcript.confirmedText }) { text, known in
+        refreshNotificationPermission(request: true)
+        let existing = proposals.map { TaskDetector.Proposal(id: $0.id, review: $0.review) }
+        let detector = TaskDetector(known: existing, text: { transcript.confirmedText }) { text, known in
             try await client.detect(transcript: text, known: known)
         }
         detector.onNewProposal = { [weak self, weak detector] proposal in
@@ -59,6 +68,13 @@ extension MeetingSession {
         }
         self.detector = detector
         detector.start()
+    }
+
+    // Agent connecté pendant l'enregistrement : la détection démarre ou reprend, sans recréer les cartes déjà là.
+    func resumeDetectionIfNeeded() {
+        guard capture != nil, let live, detector == nil || detector?.isStopped == true else { return }
+        detector?.stop()
+        startDetection(reading: live)
     }
 
     // Le dernier passage se termine après l'ajout de la réunion : ses résultats y sont enregistrés.
@@ -88,7 +104,7 @@ extension MeetingSession {
     }
 
     var agentClient: AgentClient? {
-        let address = UserDefaults.standard.string(forKey: "webWorkspaceURL") ?? "http://localhost:3000"
+        let address = UserDefaults.standard.string(forKey: "webWorkspaceURL") ?? MeetinSite.defaultAddress
         guard agentAccess != nil, let base = AgentClient.serverURL(address) else { return nil }
         return AgentClient(baseURL: base, accessCode: agentAccessCode)
     }
@@ -96,7 +112,7 @@ extension MeetingSession {
     // Seul un clic lance une tâche : sur la carte ou dans sa notification.
     // Avec un contexte, Holo réécrit le plan et il part sans nouvelle relecture : choix produit, signalé dans le guide Mac.
     func launch(_ proposal: TaskProposal, using client: AgentClient, context: String? = nil, notify: Bool = false) {
-        guard !launchingProposals.contains(proposal.id), proposal.state == .pending else { return }
+        guard !busy, !launchingProposals.contains(proposal.id), proposal.state == .pending else { return }
         launchingProposals.insert(proposal.id)
         proposalIssues[proposal.id] = nil
         Task {
@@ -113,10 +129,15 @@ extension MeetingSession {
                     case .review(let updated):
                         review = updated
                         if let index = proposals.firstIndex(where: { $0.id == proposal.id }) { proposals[index].review = updated }
+                        if updated.executor != proposal.review.executor || updated.destination != proposal.review.destination {
+                            reportTaskIssue(proposal, "L’outil ou la destination a changé. Relis la tâche avant de confirmer.", notify: notify)
+                            return
+                        }
                     }
                 }
                 let execution = try await client.launch(review)
                 guard let index = proposals.firstIndex(where: { $0.id == proposal.id }) else { return }
+                proposals[index].review = review
                 proposals[index].state = .launched
                 proposals[index].sessionURL = execution.url
                 TaskNotifications.shared.remove(proposal.id)
@@ -179,7 +200,7 @@ extension MeetingSession {
 
     func makeLive() -> LiveTranscription? {
         guard liveTranscriptionEnabled, !trimmedKey.isEmpty else { return nil }
-        LiveAlerts.requestPermission()
+        refreshNotificationPermission(request: true)
         let live = LiveTranscription(key: trimmedKey)
         live.onProblem = { LiveAlerts.post($0) }
         return live
@@ -213,15 +234,15 @@ extension MeetingSession {
         route = .home
     }
 
-    func meetingDidStop() async {
-        guard let mix = recording else { return }
+    func meetingDidStop(recoveryFolder: URL? = nil) async {
+        guard let source = recoveryFolder ?? recording?.deletingLastPathComponent() else { return }
         let id = UUID()
         let started = startedAt ?? Date()
-        var audio = mix
+        var audio = recording
         var tracks = recordedTracks
         do {
-            let folder = try store.adoptRecording(from: mix.deletingLastPathComponent(), id: id)
-            audio = folder.appendingPathComponent(mix.lastPathComponent)
+            let folder = try store.adoptRecording(from: source, id: id)
+            audio = audio.map { folder.appendingPathComponent($0.lastPathComponent) }
             if let current = tracks {
                 tracks = AudioCapture.Tracks(
                     microphone: folder.appendingPathComponent(current.microphone.lastPathComponent),
@@ -237,13 +258,15 @@ extension MeetingSession {
         }
         if tracks != nil { UserDefaults.standard.set("ok", forKey: Self.systemAudioStateKey) }
 
-        let duration = await Self.audioDuration(audio) ?? Date().timeIntervalSince(started)
+        let audioLength: TimeInterval?
+        if let audio { audioLength = await Self.audioDuration(audio) } else { audioLength = nil }
+        let duration = audioLength ?? Date().timeIntervalSince(started)
         store.add(MeetingRecord(
             id: id,
             title: Self.defaultTitle(started, zoom: startedInZoom),
             date: started,
             duration: duration,
-            audioPath: audio.path,
+            audioPath: audio?.path ?? "",
             transcript: transcript,
             notes: notes,
             tracks: tracks.map {
@@ -263,7 +286,7 @@ extension MeetingSession {
         reportStoreError()
     }
 
-    // Une transcription relancée vide le texte affiché : la version enregistrée reste jusqu'au résultat.
+    // Un texte vide ne remplace jamais la transcription enregistrée.
     func syncMeeting() {
         guard let meetingID else { return }
         store.update(meetingID) {
@@ -286,7 +309,7 @@ extension MeetingSession {
     func open(_ record: MeetingRecord) {
         guard canSwitchMeeting else { return }
         meetingID = nil
-        recording = URL(fileURLWithPath: record.audioPath)
+        recording = record.audioPath.isEmpty ? nil : URL(fileURLWithPath: record.audioPath)
         recordedTracks = record.tracks.map {
             AudioCapture.Tracks(
                 microphone: URL(fileURLWithPath: $0.microphonePath),
@@ -303,9 +326,13 @@ extension MeetingSession {
         proposalIssues = [:]
         agent.newRecording()
         permissionHelp = nil
-        status = FileManager.default.fileExists(atPath: record.audioPath)
-            ? (record.transcript.isEmpty ? "Enregistrement prêt" : "Transcription prête")
-            : "Fichier audio introuvable : \(record.audioPath)"
+        if record.audioPath.isEmpty {
+            status = "Réunion conservée sans audio exploitable : les notes et le texte restent disponibles."
+        } else {
+            status = FileManager.default.fileExists(atPath: record.audioPath)
+                ? (record.transcript.isEmpty ? "Enregistrement prêt" : "Transcription prête")
+                : "Fichier audio introuvable : \(record.audioPath)"
+        }
         meetingID = record.id
         statusBelongsToMeeting = true
         route = .meetingDetail

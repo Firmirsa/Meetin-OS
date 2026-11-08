@@ -2,6 +2,19 @@ import AppKit
 import ApplicationServices
 
 struct ZoomMeetingDetector {
+    @MainActor private static var accessibilityPrompted = false
+
+    static var accessibilityTrusted: Bool { AXIsProcessTrusted() }
+
+    // Une demande au maximum par session de l'app, seulement après activation du réglage.
+    @MainActor static func requestAccessibility() -> Bool {
+        if accessibilityTrusted { return true }
+        guard !accessibilityPrompted else { return false }
+        accessibilityPrompted = true
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options)
+    }
+
     private(set) var inMeeting = false
     private var consecutiveAbsences = 0
 

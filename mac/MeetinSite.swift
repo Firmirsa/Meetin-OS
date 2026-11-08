@@ -2,6 +2,8 @@ import Foundation
 
 // Adresse du site : https partout, http uniquement en local.
 enum MeetinSite {
+    static let defaultAddress = "https://meetin-os.vercel.app"
+
     static func baseURL(_ raw: String) -> URL? {
         guard let base = URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)),
               let host = base.host, base.user == nil, base.password == nil,

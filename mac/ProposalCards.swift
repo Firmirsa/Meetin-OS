@@ -8,14 +8,25 @@ struct ProposalCards: View {
 
     private var visible: [TaskProposal] { session.proposals.filter { $0.state != .ignored } }
 
+    private var inactiveReason: String? {
+        guard session.capture != nil, session.detector == nil else { return nil }
+        if session.live == nil { return "Détection inactive : ajoute une clé Gladia et active le direct." }
+        return session.agentAccess?.planning == true ? nil : "Détection inactive : connecte l’agent dans Intégrations."
+    }
+
     var body: some View {
-        if !visible.isEmpty || session.detector?.lastError != nil {
+        if !visible.isEmpty || session.detector?.lastError != nil || inactiveReason != nil {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Tâches proposées").font(.mtSerif(28)).accessibilityAddTraits(.isHeader)
+                if let inactiveReason {
+                    Text(inactiveReason).font(.mtSans(13)).foregroundStyle(Color.mtInk2)
+                }
                 if let error = session.detector?.lastError {
                     Text("Détection interrompue : \(error)").font(.mtSans(13)).foregroundStyle(Color.mtWarn)
                 }
-                ForEach(visible) { card($0) }
+                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                    ForEach(visible) { card($0) }
+                }
             }
             .padding(.bottom, 12)
         }
@@ -27,8 +38,8 @@ struct ProposalCards: View {
                 Text(proposal.review.title).font(.mtSans(16, weight: .medium))
                 Spacer()
                 MTPill(
-                    text: proposal.state == .launched ? "Lancée" : "À valider",
-                    kind: proposal.state == .launched ? .ok : .run
+                    text: proposal.state == .launched ? "Lancée" : (proposal.review.isExpired ? "Plan expiré" : "À valider"),
+                    kind: proposal.state == .launched ? .ok : (proposal.review.isExpired ? .wait : .run)
                 )
             }
             Text(proposal.review.task).textSelection(.enabled)
@@ -62,7 +73,7 @@ struct ProposalCards: View {
             if let client {
                 Button("Confirmer et lancer") { session.launch(proposal, using: client) }
                     .buttonStyle(.mtGhost)
-                    .disabled(session.launchingProposals.contains(proposal.id))
+                    .disabled(session.busy || session.launchingProposals.contains(proposal.id))
             } else {
                 Button("Connecter l’agent") { showIntegrations(.agent) }.buttonStyle(.mtGhost)
             }
