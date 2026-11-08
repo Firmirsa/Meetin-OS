@@ -68,6 +68,13 @@ enum MeetingSignals {
         return titles.contains { meetingTitles.contains(normalized($0)) } ? .active("zoom") : .idle
     }
 
+    static func chromeURL(_ address: String) -> URL? {
+        if address.hasPrefix("meet.google.com/") {
+            return URL(string: "https://" + address)
+        }
+        return URL(string: address)
+    }
+
     static func meetRoom(_ url: URL) -> String? {
         guard url.scheme == "https", url.host == "meet.google.com", url.port == nil,
               url.user == nil, url.password == nil else { return nil }
@@ -75,6 +82,14 @@ enum MeetingSignals {
         let code = parts.count == 2 && parts.first == "meet" ? parts.last : (parts.count == 1 ? parts.first : nil)
         guard let code, code.range(of: #"^[a-z]{3}-[a-z]{4}-[a-z]{3}$"#, options: .regularExpression) != nil else { return nil }
         return String(code)
+    }
+
+    static func meetWindowRoom(_ title: String) -> String? {
+        let prefix = "Meet – "
+        guard title.hasPrefix(prefix) else { return nil }
+        let room = title.dropFirst(prefix.count).split(separator: " ").first
+        guard let room, let url = URL(string: "https://meet.google.com/" + room) else { return nil }
+        return meetRoom(url)
     }
 
     static func meetHangUp(_ labels: [String]) -> Bool {

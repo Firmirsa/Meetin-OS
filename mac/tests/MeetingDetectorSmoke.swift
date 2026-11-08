@@ -12,6 +12,10 @@ struct MeetingDetectorSmoke {
         }
         precondition(MeetingSignals.meetRoom(URL(string: "https://meet.google.com.evil.test/\(room)")!) == nil)
         precondition(MeetingSignals.meetRoom(URL(string: "https://meet.google.com/landing")!) == nil)
+        precondition(MeetingSignals.chromeURL("meet.google.com/meet/" + room).flatMap(MeetingSignals.meetRoom) == room)
+        precondition(MeetingSignals.chromeURL("meet.google.com.evil.test/" + room).flatMap(MeetingSignals.meetRoom) == nil)
+        precondition(MeetingSignals.meetWindowRoom("Meet – " + room) == room)
+        precondition(MeetingSignals.meetWindowRoom("Meet – Accueil") == nil)
         precondition(!MeetingSignals.meetHangUp(["Participer à la réunion", "Demander à participer"]))
         precondition(MeetingSignals.meetHangUp(["Quitter l’appel"]))
         precondition(MeetingSignals.meetHangUp(["Leave call"]))

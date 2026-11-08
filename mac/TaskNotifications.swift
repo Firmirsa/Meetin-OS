@@ -1,9 +1,11 @@
 import UserNotifications
+import OSLog
 
 // Délègue les actions des notifications de tâches et d’arrivée en réunion.
 final class TaskNotifications: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
     static let shared = TaskNotifications()
 
+    private static let logger = Logger(subsystem: "com.meetin-os.capture", category: "MeetingDetection")
     private static let category = "meetin.task"
     private static let confirm = "meetin.task.confirm"
     private static let context = "meetin.task.context"
@@ -63,7 +65,13 @@ final class TaskNotifications: NSObject, UNUserNotificationCenterDelegate, @unch
         content.userInfo = [Self.arrivalKey: arrival.id.uuidString]
         UNUserNotificationCenter.current().add(
             UNNotificationRequest(identifier: meetingNotificationID(arrival.id), content: content, trigger: nil)
-        )
+        ) { error in
+            if let error {
+                Self.logger.error("Arrival notification rejected: \(error.localizedDescription, privacy: .public)")
+            } else {
+                Self.logger.notice("Arrival notification accepted by macOS")
+            }
+        }
     }
 
     func removeMeetingArrival(_ id: UUID) {

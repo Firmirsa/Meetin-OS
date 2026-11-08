@@ -1,12 +1,15 @@
 import AppKit
 import ApplicationServices
+import OSLog
 
 // Les lectures AX peuvent attendre la réponse d’une autre app. Elles restent hors du thread d’interface.
 actor MeetingAccessibility {
+    private static let logger = Logger(subsystem: "com.meetin-os.capture", category: "MeetingDetection")
     private static let chrome = "com.google.Chrome"
     private static let enhancedUI = "AXEnhancedUserInterface" as CFString
     private var chromeElement: AXUIElement?
     private var chromePID: pid_t?
+    private var lastMeetScan: String?
 
     func readAll(trackedMeet: String?) -> [MeetingSource: MeetingPresence] {
         Dictionary(uniqueKeysWithValues: MeetingSource.allCases.map { ($0, read($0, trackedKey: trackedMeet)) })
@@ -33,9 +36,9 @@ actor MeetingAccessibility {
         NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first { !$0.isTerminated }
     }
 
-    private func element(_ application: NSRunningApplication) -> AXUIElement {
+    private func element(_ application: NSRunningApplication, timeout: Float = 0.12) -> AXUIElement {
         let app = AXUIElementCreateApplication(application.processIdentifier)
-        AXUIElementSetMessagingTimeout(app, 0.12)
+        AXUIElementSetMessagingTimeout(app, timeout)
         return app
     }
 
@@ -57,7 +60,7 @@ actor MeetingAccessibility {
             chromePID = nil
             return .idle
         }
-        let app = element(running)
+        let app = element(running, timeout: 0.35)
         if chromePID != running.processIdentifier {
             stop()
             chromePID = running.processIdentifier
@@ -65,18 +68,45 @@ actor MeetingAccessibility {
                 chromeElement = app
             }
         }
-        guard let windows = value(app, kAXWindowsAttribute) as? [AXUIElement] else { return .unknown }
+        let (status, rawWindows) = attribute(app, kAXWindowsAttribute)
+        guard var windows = rawWindows as? [AXUIElement] else {
+            reportMeetScan("Chrome windows unavailable (\(status.rawValue))")
+            return .unknown
+        }
+        for name in [kAXMainWindowAttribute, kAXFocusedWindowAttribute] {
+            let (status, window) = attribute(app, name)
+            if status == .success, let window, CFGetTypeID(window) == AXUIElementGetTypeID() {
+                let element = unsafeDowncast(window, to: AXUIElement.self)
+                windows.removeAll { CFEqual($0, element) }
+                windows.insert(element, at: 0)
+            }
+        }
+        var webAreas = 0
+        var meetAreas = 0
         var activeRoom: String?
         var sawTrackedPage = false
         var hiddenTrackedTab = false
         var uncertain = false
-        let deadline = ContinuousClock.now + .milliseconds(450)
-        for window in windows.prefix(12) {
+        let candidates = windows.prefix(12).map { window in
+            let title = value(window, kAXTitleAttribute) as? String ?? ""
+            let room = elementURL(window).flatMap(MeetingSignals.meetRoom)
+            return (window, room, room != nil || MeetingSignals.meetWindowRoom(title) != nil)
+        }
+        let preferred = candidates.filter { $0.2 }
+        let others = candidates.filter { !$0.2 }
+        let deadline = ContinuousClock.now + .milliseconds(2200)
+        for (window, verifiedWindowRoom, _) in preferred + others {
             let result = walk(window, limit: 220, deadline: deadline) { node, role in
                 if role == "AXWebArea" {
-                    guard let rawURL = value(node, kAXURLAttribute),
-                          let url = (rawURL as? URL) ?? (rawURL as? String).flatMap(URL.init(string:)),
-                          let room = MeetingSignals.meetRoom(url) else { return .skip }
+                    webAreas += 1
+                    let room: String?
+                    if let url = elementURL(node), url.absoluteString != "about:blank" {
+                        room = MeetingSignals.meetRoom(url)
+                    } else {
+                        room = verifiedWindowRoom
+                    }
+                    guard let room else { return .skip }
+                    meetAreas += 1
                     if room == trackedRoom { sawTrackedPage = true }
                     switch walk(node, limit: 650, deadline: deadline, visit: { child, childRole in
                         if childRole == "AXWebArea", !CFEqual(child, node) { return .skip }
@@ -95,11 +125,21 @@ actor MeetingAccessibility {
                    labels(node).contains(where: { $0.contains(trackedRoom) }) { hiddenTrackedTab = true }
                 return .descend
             }
-            if result == .match, let activeRoom { return .active(activeRoom) }
+            if result == .match, let activeRoom {
+                reportMeetScan("Active Meet controls detected")
+                return .active(activeRoom)
+            }
             if result == .incomplete { uncertain = true }
         }
         if let activeRoom { return .active(activeRoom) }
+        reportMeetScan("Chrome windows: \(windows.count), preferred: \(preferred.count), web areas: \(webAreas), Meet areas: \(meetAreas), incomplete: \(uncertain)")
         return uncertain || (hiddenTrackedTab && !sawTrackedPage) ? .unknown : .idle
+    }
+
+    private func reportMeetScan(_ summary: String) {
+        guard lastMeetScan != summary else { return }
+        lastMeetScan = summary
+        Self.logger.notice("\(summary, privacy: .public)")
     }
 
     private func whatsApp() -> MeetingPresence {
@@ -140,25 +180,26 @@ actor MeetingAccessibility {
                       visit: (AXUIElement, String) -> Visit) -> Scan {
         var nodes = [root]
         var index = 0
+        var incomplete = false
         while index < nodes.count {
             guard index < limit, ContinuousClock.now < deadline else { return .incomplete }
             let node = nodes[index]
             index += 1
             let (status, role) = attribute(node, kAXRoleAttribute)
-            if status == .cannotComplete { return .incomplete }
+            if status == .cannotComplete { incomplete = true }
             guard let role = role as? String else { continue }
             switch visit(node, role) {
             case .match: return .match
             case .skip: continue
             case .descend:
                 let (status, children) = attribute(node, kAXChildrenAttribute)
-                if status == .cannotComplete { return .incomplete }
+                if status == .cannotComplete { incomplete = true }
                 if let children = children as? [AXUIElement], nodes.count <= limit {
                     nodes.append(contentsOf: children.prefix(limit + 1 - nodes.count))
                 }
             }
         }
-        return .complete
+        return incomplete ? .incomplete : .complete
     }
 
     private func labels(_ node: AXUIElement) -> [String] {
@@ -166,6 +207,12 @@ actor MeetingAccessibility {
         var values: CFArray?
         guard AXUIElementCopyMultipleAttributeValues(node, names, [], &values) == .success else { return [] }
         return (values as? [Any] ?? []).compactMap { $0 as? String }
+    }
+
+    private func elementURL(_ node: AXUIElement) -> URL? {
+        let raw = value(node, kAXURLAttribute)
+        let address = (raw as? URL)?.absoluteString ?? (raw as? String)
+        return address.flatMap(MeetingSignals.chromeURL)
     }
 
     private func enabled(_ node: AXUIElement) -> Bool { (value(node, kAXEnabledAttribute) as? Bool) != false }
