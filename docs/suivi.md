@@ -1,5 +1,15 @@
 # Suivi Meetin-OS
 
+## Lecteur intégré et nom Google automatique, 8 novembre 2026
+
+Écouter ouvrait le M4A via NSWorkspace et donc Music. Les deux boutons utilisent désormais AVAudioPlayer dans le carnet : lecture/pause, progression et durée, arrêt au changement de réunion/fichier, démarrage de capture, navigation hors réunion et disparition de la vue. Finder reste séparé ; aucun autoplay. Lot lecteur préparé par un seul exécutant demandé par Wael, profil outil routage_code (Sol Medium), puis intégré/testé par le coordinateur ; aucun nouvel envoi Devin, dont le CLI reste bloqué.
+
+Le nom local provient des métadonnées de la session Google déjà acceptée, si présentes (`given_name`, `full_name`, `name`). Ces champs ne servent jamais à autoriser une action. Sinon repli macOS/Vous. Initialisation uniquement à une nouvelle réunion, sans remplacement des noms sauvegardés ou des affectations manuelles ; piste distante jamais attribuée automatiquement au compte local. Le panneau Participants est replié et facultatif. Aucun changement backend requis pour les sessions qui contiennent ces métadonnées.
+
+Contrôles : test AVAudioPlayer réel sur M4A synthétiques silencieux réussi (lecture/pause/reprise/progression/changement/fin/erreur), test profil Google/fallback/nom manuel/piste distante réussi. Build complet Mac 0.1.6 (13) et signature stricte réussis. Binaire `/private/tmp/meetin-player-profile-20261108/Meetin-OS.app` préparé, non installé ; Applications reste au build 10. Pas de recette visuelle de ce nouveau lot et aucune lecture des audios de Wael.
+
+État Linkup transmis par l’inspection dédiée : organisation Meetin-OS, solde 0,00 USD et aucune clé API dans default. Aucun secret existant à déposer. Bonus HACK42AIH de 25 USD à réclamer si éligible, puis clé à créer et déposer dans le bon Vault par une personne autorisée. Aucun paiement/auto-recharge. Le compte Supabase accessible ici ne voit toujours pas Meetin-OS.
+
 ## Linkup retiré du catalogue personnel, 8 novembre 2026
 
 À la demande de Wael, la carte Linkup est retirée d’Intégrations. La recherche explicite dans Agent reste présente ; son message d’indisponibilité précise que l’activation incombe à l’équipe et qu’aucune clé ni compte Linkup ne sont demandés aux utilisateurs. Le backend central est livré dans `ce9b145`. Aucun secret retrouvé/affiché par ce changement UI, aucun changement distant. Build Mac 0.1.6 (12) préparé, non installé ; Applications reste en 0.1.6 (10).

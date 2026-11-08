@@ -123,6 +123,27 @@ struct AccountClient: Sendable {
     }
 }
 
+// Profil d’affichage du jeton de session déjà accepté par le serveur.
+// Ces champs servent uniquement au nom local, jamais à autoriser une action.
+enum GoogleProfileName {
+    static func read(accessToken: String) -> String? {
+        let parts = accessToken.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[1].count < 16_384 else { return nil }
+        var payload = String(parts[1]).replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
+        guard let data = Data(base64Encoded: payload),
+              let claims = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let metadata = claims["user_metadata"] as? [String: Any] else { return nil }
+        for key in ["given_name", "full_name", "name"] {
+            guard let value = metadata[key] as? String else { continue }
+            let clean = value.components(separatedBy: .controlCharacters).joined(separator: " ")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !clean.isEmpty { return String(clean.prefix(100)) }
+        }
+        return nil
+    }
+}
+
 @MainActor @Observable
 final class HostedAccount {
     private struct Login: Codable {
@@ -133,6 +154,11 @@ final class HostedAccount {
     private var login: Login? = Store.load()
     private(set) var usage: AccountSummary?
     @ObservationIgnored private var refreshing: Task<AccountTokens, Error>?
+
+    func profileName(for server: URL?) -> String? {
+        guard let server, let login, login.server == server else { return nil }
+        return GoogleProfileName.read(accessToken: login.tokens.accessToken)
+    }
 
     func connected(to server: URL?) -> Bool { server != nil && login?.server == server }
 

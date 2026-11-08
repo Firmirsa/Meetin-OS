@@ -45,7 +45,7 @@ struct MeetingParticipants: Codable, Equatable {
            let person = people.first(where: { $0.id == assignment.participantID }) {
             return "\(person.name) (\(source.label))"
         }
-        if source.track == "microphone", source.speaker == nil,
+        if source.track == "microphone",
            let local = people.first(where: { $0.id == localParticipantID }) {
             return "\(local.name) (\(source.label))"
         }

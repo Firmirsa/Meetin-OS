@@ -338,7 +338,7 @@ extension MeetingSession {
             notes = ""
         }
         structuredLines = nil
-        participants = .newMeeting(localName: AudioTrack.microphone.label)
+        participants = .newMeeting(localName: account.profileName(for: accountClient?.baseURL) ?? AudioTrack.microphone.label)
         startedAt = Date()
         recordingSource = source ?? callDetector.arrivals.first?.source
         for arrival in callDetector.arrivals { TaskNotifications.shared.removeMeetingArrival(arrival.id) }

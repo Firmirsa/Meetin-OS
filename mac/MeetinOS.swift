@@ -145,6 +145,7 @@ struct CaptureView: View {
     @Environment(\.openWindow) private var openWindow
     @Bindable var session: MeetingSession
     var isMeetingWindow = false
+    @State private var audioPlayer = MeetingAudioPlayer()
     @State private var integrationsRequest: IntegrationsRequest?
     @State private var internalRoute: MainRoute?
     @AppStorage("webWorkspaceURL") private var webWorkspaceURL = MeetinSite.defaultAddress
@@ -183,6 +184,14 @@ struct CaptureView: View {
                 .background(Color.mtCanvas)
             }
         }
+        .onChange(of: session.meetingID) { audioPlayer.stop() }
+        .onChange(of: session.recording) { audioPlayer.stop() }
+        .onChange(of: session.capture != nil) { audioPlayer.stop() }
+        .onChange(of: internalRoute) { audioPlayer.stop() }
+        .onChange(of: session.route) { _, route in
+            if !isMeetingWindow && route != .meetingDetail { audioPlayer.stop() }
+        }
+        .onDisappear { audioPlayer.stop() }
     }
 
     private var meetingContent: some View {
@@ -323,14 +332,14 @@ struct CaptureView: View {
                 if let recording = session.recording, session.capture == nil {
                     ViewThatFits(in: .horizontal) {
                         HStack {
-                            Button("Écouter", systemImage: "play.circle") { NSWorkspace.shared.open(recording) }
+                            playbackButton(for: recording)
                             Button("Voir les pistes") { NSWorkspace.shared.activateFileViewerSelecting([recording]) }
                             Spacer(minLength: 8)
                             Button("Transcrire", systemImage: "text.alignleft", action: transcribe)
                         }
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
-                                Button("Écouter", systemImage: "play.circle") { NSWorkspace.shared.open(recording) }
+                                playbackButton(for: recording)
                                 Button("Voir les pistes") { NSWorkspace.shared.activateFileViewerSelecting([recording]) }
                             }
                             Button("Transcrire", systemImage: "text.alignleft", action: transcribe)
@@ -338,6 +347,7 @@ struct CaptureView: View {
                     }
                     .buttonStyle(WorkspaceButtonStyle())
                     .disabled(session.busy)
+                    MeetingAudioPlaybackStatus(player: audioPlayer)
                 }
             }
             .padding(.horizontal, 22)
@@ -350,6 +360,13 @@ struct CaptureView: View {
                 Button("Nouvel enregistrement", systemImage: "plus", action: toggleRecording)
                     .disabled(session.busy || session.agent.busy)
             }
+        }
+    }
+
+    private func playbackButton(for recording: URL) -> some View {
+        Button(audioPlayer.isPlaying ? "Pause" : "Écouter",
+               systemImage: audioPlayer.isPlaying ? "pause.circle" : "play.circle") {
+            audioPlayer.toggle(recording)
         }
     }
 

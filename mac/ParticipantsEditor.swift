@@ -10,10 +10,18 @@ struct ParticipantsEditor: View {
     }
 
     var body: some View {
+        DisclosureGroup("Participants · modifier les noms et les sources") {
+            editor
+        }
+        .font(.mtSans(14, weight: .medium))
+        .mtCard()
+    }
+
+    private var editor: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Participants").font(.mtSans(14, weight: .semibold))
                 .accessibilityAddTraits(.isHeader)
-            Text("Noms manuels, sans reconnaissance d’identité. Une source non séparée peut contenir plusieurs voix.")
+            Text("Le micro utilise le nom de ton profil Google lorsqu’il est disponible, sinon le nom de ce Mac. Tu peux modifier les noms ici. Aucune identité distante n’est reconnue automatiquement.")
                 .font(.mtSans(12)).foregroundStyle(Color.mtInk2)
             ForEach(session.participants?.people ?? []) { person in
                 HStack {
