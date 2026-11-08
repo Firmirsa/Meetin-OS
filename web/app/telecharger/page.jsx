@@ -51,6 +51,7 @@ export default async function DownloadPage({searchParams}) {
           </a>
           <p className="platform__note">{d.windows.note}</p>
           <p className="platform__file">{d.windows.file}</p>
+          <a href="https://github.com/Firmirsa/Meetin-OS/actions/runs/42471110020/artifacts/13613651474">{d.windows.test}</a>
         </li>
         <li className="platform mt-card" data-os="linux" data-soon="true">
           <span className="platform__tag platform__tag--soon">{d.soon}</span>

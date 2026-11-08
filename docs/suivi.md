@@ -1,10 +1,15 @@
-## 8 novembre 2026 · Installateur Windows de test 0.1.1
-
-Préparation sur `codex/google-agent` : reprise du nom de micro Windows de Samy (`1ff553c`), version 0.1.1 et script de packaging NSIS. Le workflow construit désormais son propre installateur avant de vérifier installation, ouverture et désinstallation, puis publie un artefact de test avec commit et SHA-256. Validation sur runner en attente ; aucun remplacement du téléchargement public 0.1.0. La capture réelle reste à tester sur PC.
-
-Mac : remplacement par le build 13 interrompu avant copie, car le SHA-256 du binaire préparé ne correspond pas au reçu. Le build installé précédent reste en place. Aucun remplacement pendant la réunion de Wael.
-
 # Suivi Meetin-OS
+
+## Livraison de démo, 8 novembre 2026 à 11 h 28 (Paris)
+
+Windows 0.1.1, source `e53e98b`, construit et contrôlé sur Windows Server 2022 : compilation sans erreur, Gladia simulé, installation, raccourci, version/commit installés, ouverture du carnet et désinstallation réussis. [Run terminé en 54 s](https://github.com/Firmirsa/Meetin-OS/actions/runs/42471110020), [artefact de test](https://github.com/Firmirsa/Meetin-OS/actions/runs/42471110020/artifacts/13613651474), 217 Ko, conservation 14 jours, connexion GitHub requise. Aucun essai de capture sur PC réel ni parité Mac revendiquée. Le téléchargement public reste 0.1.0 ; la page préparée le précise et propose séparément le test 0.1.1. Pas de fusion main ni déploiement du site effectué.
+
+Mac 0.1.6 (14), source `e53e98b`, installé dans Applications sur recette après accord explicite, accueil inactif observé et arrêt normal vérifié. Sauvegarde app et index : `~/Library/Application Support/Meetin-OS/Build Backups/before-build14-oe2aygo6`. Empreinte post-signature : `0f5c3b6e9722ae4db15f023de6cd18f3baa487383f292b04a2c959f988401ff1`. Build complet, signature stricte et test lecteur AVAudioPlayer sur audio synthétique silencieux réussis. Démarrage actuellement bloqué par SecItemCopyMatching et SecurityAgent : autorisation trousseau demandée à Wael, outil interdit sur cette fenêtre sécurisée. Pas encore de recette visuelle build 14. Build 13 écarté avant copie pour reçu incohérent ; build 10 avait rouvert avec compte et réunions présents après l’erreur de lecture d’outil -609 suivant Cmd+Q.
+
+Linkup : Wael indique désormais avoir créé/transmis la clé à Léni et son agent, avec le prompt migration Vault et déploiement recette. L’ancien constat « aucune clé » ci-dessous est historique. Accès Supabase Meetin-OS toujours absent ici ; test serveur réel en attente. Devin CLI est désormais autorisé pour le lot UI, déjà terminé localement, donc aucun renvoi du code nécessaire.
+
+Mise à jour intégrée : aucun updater ni flux de versions trouvé dans les clients. Un vrai bouton demande une publication par plateforme, vérification du paquet, téléchargement avec état réel et installation/relance différées pendant capture. Chantier séparé, aucun faux updater ajouté.
+
 
 ## Lecteur intégré et nom Google automatique, 8 novembre 2026
 
