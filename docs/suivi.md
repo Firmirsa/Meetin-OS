@@ -1,5 +1,17 @@
 # Suivi Meetin-OS
 
+## Copie installée et recette utilisateur, 8 novembre 2026 à 10 h 38 (Paris)
+
+**Version actuelle dans Applications : Mac 0.1.6 build 9**, serveur `https://meetin-os-recette.vercel.app`, source `37aaf0c5fe18b39310cea3c802fb7ff40eca44b2`. Installation à 10 h 34, après constat d’absence de capture. Elle remplace le build 6 ; les builds 7 et 8 décrits plus bas étaient des étapes locales. Ancienne copie conservée dans `~/Library/Application Support/Meetin-OS/Build Backups/before-native-0.1.6-9.7t6ckngy/Meetin-OS.app`. SHA-256 du binaire installé : `ffd07c95216ca779b43e8ebee0bda3867e64b2d142d08b79dab488ca30032f3e`.
+
+Implémentation : onglets Transcription / Agent / Résumé, commandes Enregistrer / Pause / Reprendre / Terminer, participants manuels pour les nouvelles lignes structurées du direct, pages natives Intégrations et Facturation et abonnement avec Retour à la réunion. Le lot de navigation a été exécuté par Devin CLI avec le modèle sélectionné `gpt-6-1-sol-low-priority` (Sol Low Fast), puis revu, intégré, compilé et installé par le coordinateur. Aucune modification du serveur ni paiement réel dans ce lot.
+
+Contrôles ciblés : compilation Mac et signature stricte réussies ; smoke du client de facturation réussi avec réponses simulées (Checkout/portail officiels, refus des URL dangereuses, accès expiré et Checkout indisponible). Recette visuelle par l’agent à 10 h 35–10 h 37 : compte Google conservé, trois réunions présentes, onglets visibles, aller-retour Réunion → Intégrations → Réunion puis Facturation → Réunion conservant la réunion et l’onglet Résumé. Empreinte du carnet inchangée et neuf fichiers audio toujours présents après installation et navigation. Reçus et sources archivées : `/private/tmp/meetin-demo-native-20261108`.
+
+Limites réelles : l’accueil affiche « Micro à autoriser » après ce nouveau build ; aucune capture lancée par l’agent. Pause/reprise n’a pas encore été recettée avec une voix réelle dans cette copie. La connexion Google existante est conservée ; le parcours de nouvelle connexion n’a pas été rejoué dans le build 9. La notification d’arrivée reste non validée en Meet réel. Stripe affiche explicitement que Premium n’est pas configuré et qu’aucun portail n’est disponible ; aucune réussite Checkout ne peut être annoncée. Trello et Calendar restent « À venir », Linkup non confirmé par la recette. Prompt de configuration Stripe TEST pour Léni : `/private/tmp/prompt-lenny-stripe-recette.md`.
+
+**Wael reprend la main pour sa propre recette guidée.** Aucun clic, démarrage d’enregistrement, arrêt, fermeture ou remplacement de sa session pendant son essai. Dernier écran laissé : réunion du 8 novembre à 10:24, onglet Agent, capture inactive. Son parcours prévu couvre réunion synthétique, pause/reprise, navigation sans perte, prénom participant, fermeture et réouverture. Les observations de l’agent ne constituent pas cette recette utilisateur. Aucun déploiement Vercel ni mise en production n’est annoncé.
+
 ## Priorité démo avant 11 h (Paris), 8 novembre 2026
 
 Wael vise une application filmable avant 11 h, puis vidéo et montage terminés avant 14 h. Ce jalon est une démo, pas une mise en production. Limiter les nouveaux contrôles au build et au parcours ciblé ; conserver les protections d’accès et de données. Le retour de Wael sur Intégrations et Facturation autorise la reprise des pushes ciblés. Ne pas remplacer l’app pendant une capture active.
