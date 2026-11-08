@@ -38,3 +38,5 @@ Parcours YouTube, 8 novembre vers 13h : la recette sert `codex/youtube-integrate
 - `MEETIN_YOUTUBE_PROFILE_ID` = `ff729e54-6fae-48c0-8198-0b11c427ed9c`, profil H par défaut du projet de cette clé. Il a été créé par une session H sans publication, ouverte sur youtube.com, sans cookie ni profil local copié.
 
 Wael s’est connecté lui-même à @Fraawdrinn dans l’Agent View. La session a ensuite été fermée et le profil enregistré (521 Ko, mis à jour à 13:03). Aucune publication n’a été lancée. Le parcours complet depuis le Mac reste à tester par Codex.
+
+Vers 13h10, à la demande de Lenny, `MEETIN_YOUTUBE_DEMO_USER_ID` pointe sur son compte Supabase (firmirsa77) au lieu de celui de Wael. La recette a été redéployée sur `0a9f614`. Le profil H et la connexion @Fraawdrinn sont inchangés. La démo se lance donc depuis l’app connectée avec le compte Google de Lenny.
