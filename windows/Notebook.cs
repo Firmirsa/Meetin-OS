@@ -148,6 +148,7 @@ internal sealed class Notebook : Form
             status.Text = tracks.Count == 2 ? "Deux pistes enregistrées." : "Pistes disponibles : " + tracks.Count + ".";
             if (result.Warnings.Count > 0) status.Text += " " + string.Join(" ", result.Warnings);
             tabs.SelectedTab = transcriptionTab;
+            if (result.MicrophoneDenied) OfferMicrophoneSettings();
         }
         catch (Exception error) { status.Text = error.Message; }
         finally
@@ -243,6 +244,16 @@ internal sealed class Notebook : Form
     private static Uri? SiteUri(string? address) => Uri.TryCreate(address, UriKind.Absolute, out var uri) &&
         string.IsNullOrEmpty(uri.UserInfo) && !string.IsNullOrEmpty(uri.Host) &&
         (uri.Scheme == Uri.UriSchemeHttps || (uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback)) ? uri : null;
+
+    private void OfferMicrophoneSettings()
+    {
+        var answer = MessageBox.Show(this,
+            "Windows bloque l’accès au micro pour les applications de bureau : micro.wav n’a pas été enregistré, seul appel.wav l’est.\n\n" +
+            "Dans Paramètres > Confidentialité > Microphone, active « Autoriser l’accès au microphone sur cet appareil » et « Autoriser les applications de bureau à accéder à votre microphone », puis relance l’enregistrement.\n\n" +
+            "Ouvrir ces paramètres maintenant ?",
+            "Micro refusé par Windows", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+        if (answer == DialogResult.Yes) Open("ms-settings:privacy-microphone");
+    }
 
     private void Open(string path)
     {
