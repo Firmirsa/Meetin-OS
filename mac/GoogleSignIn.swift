@@ -43,12 +43,14 @@ private final class GoogleBrowserSession: NSObject, ASWebAuthenticationPresentat
     private func open(_ url: URL) async throws -> URL {
         return try await withCheckedThrowingContinuation { continuation in
             pendingCallback = continuation
-            let session = ASWebAuthenticationSession(url: url, callback: .customScheme(Self.scheme)) { [weak self] url, error in
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: Self.scheme) { [weak self] url, error in
                 let result = url.map { Result<URL, Error>.success($0) } ?? .failure(error ?? CancellationError())
                 Task { @MainActor in self?.finish(result) }
             }
             session.presentationContextProvider = self
             browser = session
+            NSApp.activate()
+            window.makeKeyAndOrderFront(nil)
             if !session.start() {
                 finish(.failure(AccountClient.Failure(message: "Impossible d’ouvrir la connexion Google.")))
             }
@@ -104,7 +106,8 @@ struct GoogleSignInButton: View {
 
     private func connect() {
         guard !busy else { return }
-        guard let client, let window = NSApp.keyWindow else {
+        let window = NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first { $0.isVisible && $0.canBecomeKey }
+        guard let client, let window else {
             issue = "La connexion Meetin-OS est indisponible."
             return
         }
