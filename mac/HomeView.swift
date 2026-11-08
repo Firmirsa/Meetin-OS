@@ -169,16 +169,6 @@ struct HomeView: View {
 
     private var actionBar: some View {
         VStack(spacing: 10) {
-            if session.status != "Prêt à enregistrer", !session.statusBelongsToMeeting {
-                HStack(spacing: 7) {
-                    if session.busy { ProgressView().controlSize(.small) }
-                    Text(session.status)
-                        .font(.mtSans(13))
-                        .foregroundStyle(Color.mtInk2)
-                        .multilineTextAlignment(.center)
-                        .accessibilityAddTraits(.updatesFrequently)
-                }
-            }
             if let help = session.permissionHelp, !session.busy {
                 Button(help.settingsLabel, systemImage: "arrow.up.right.square") {
                     NSWorkspace.shared.open(help.settingsURL)
@@ -192,27 +182,9 @@ struct HomeView: View {
                     }
                     .buttonStyle(.mtGhost)
                 }
-                if session.capture == nil {
-                    Button(action: toggleRecording) {
-                        HStack(spacing: 10) {
-                            ZStack {
-                                Circle().fill(Color.mtOnAccent).frame(width: 14, height: 14)
-                                Circle().fill(Color.mtAccent).frame(width: 5, height: 5)
-                            }
-                            .accessibilityHidden(true)
-                            Text("Commencer à enregistrer")
-                            Text("⌘R").font(.mtSans(11)).opacity(0.6).accessibilityHidden(true)
-                        }
-                    }
-                    .buttonStyle(RecordCapsuleStyle())
-                    .keyboardShortcut("r", modifiers: .command)
-                    .disabled(session.busy || session.agent.busy)
-                } else {
-                    Button("Arrêter", systemImage: "stop.fill", action: toggleRecording)
-                        .buttonStyle(.mtGhost)
-                        .disabled(session.busy)
-                }
             }
+            MeetingCaptureControls(session: session, recordOrFinish: toggleRecording)
+                .frame(maxWidth: 440)
         }
         .frame(maxWidth: .infinity)
     }
@@ -252,21 +224,6 @@ private struct HeroHighlight: View {
                     withAnimation(.timingCurve(0.65, 0, 0.35, 1, duration: 0.68).delay(0.35)) { swept = true }
                 }
             }
-    }
-}
-
-private struct RecordCapsuleStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.mtSans(15, weight: .medium))
-            .foregroundStyle(Color.mtOnAccent)
-            .padding(.horizontal, 26)
-            .frame(height: 48)
-            .background(configuration.isPressed ? Color.mtAccentHover : Color.mtAccent, in: Capsule())
-            .opacity(isEnabled ? 1 : 0.55)
-            .contentShape(Capsule())
     }
 }
 

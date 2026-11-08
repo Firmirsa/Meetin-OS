@@ -3,6 +3,7 @@ import SwiftUI
 struct WelcomeView: View {
     let account: HostedAccount
     let client: AccountClient?
+    let openNotebook: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
     @State private var drift = false
@@ -16,26 +17,47 @@ struct WelcomeView: View {
                 .allowsHitTesting(false)
 
             VStack(spacing: 18) {
-                MTLogo(size: 94)
+                MTLogo(size: 72)
                     .padding(.bottom, 3)
                     .offset(y: drift ? -4 : 3)
                 Text("Meetin-OS")
-                    .font(.mtSerif(62))
+                    .font(.mtSerif(52))
                     .accessibilityAddTraits(.isHeader)
-                Text("Transcris tes réunions et valide les actions à suivre.")
+                Text("Ton carnet de réunion, avec ou sans compte.")
                     .font(.mtSans(16))
                     .foregroundStyle(Color.mtInk2)
                     .multilineTextAlignment(.center)
-                GoogleSignInButton(account: account, client: client)
-                    .padding(.top, 14)
+                VStack(alignment: .leading, spacing: 12) {
+                    step("1", "Enregistre sur ce Mac et prends des notes.")
+                    step("2", "Connecte Google si tu veux transcrire ou préparer des tâches.")
+                    step("3", "Relis chaque action avant de la lancer.")
+                }
+                .padding(.vertical, 10)
+                Button("Ouvrir mon carnet", systemImage: "book.closed", action: openNotebook)
+                    .buttonStyle(WorkspaceButtonStyle(prominent: true))
+                    .keyboardShortcut("o", modifiers: .command)
+                GoogleSignInButton(account: account, client: client, onConnected: openNotebook)
+                Text("Google est facultatif pour les notes et l’audio local.\nLes connexions aux autres outils se font plus tard.")
+                    .font(.mtSans(12))
+                    .foregroundStyle(Color.mtInk2)
+                    .multilineTextAlignment(.center)
             }
             .padding(36)
             .opacity(reduceMotion || appeared ? 1 : 0)
-            .offset(y: reduceMotion || appeared ? 0 : 14)
+            .offset(x: reduceMotion || appeared ? 0 : 10)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear(perform: animate)
         .onChange(of: reduceMotion) { animate() }
+    }
+
+    private func step(_ number: String, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text(number).font(.mtSans(12, weight: .semibold))
+                .frame(width: 24, height: 24)
+                .background(Color.mtAccentTint, in: Circle())
+            Text(text).font(.mtSans(14)).padding(.top, 2)
+        }
     }
 
     private func animate() {
@@ -44,7 +66,7 @@ struct WelcomeView: View {
             transaction.disablesAnimations = true
             withTransaction(transaction) { appeared = true; drift = false }
         } else {
-            withAnimation(.easeOut(duration: 0.42)) { appeared = true }
+            withAnimation(.easeOut(duration: 0.20)) { appeared = true }
             withAnimation(.easeInOut(duration: 6).repeatForever(autoreverses: true)) { drift = true }
         }
     }

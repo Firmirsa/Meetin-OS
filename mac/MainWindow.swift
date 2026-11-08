@@ -9,6 +9,8 @@ struct MainWindow: View {
     @Bindable var session: MeetingSession
     @AppStorage("detectZoomMeetings") private var detectCalls = true
     @AppStorage("webWorkspaceURL") private var webWorkspaceURL = MeetinSite.defaultAddress
+    @AppStorage("nativeOnboardingCompleted") private var onboardingCompleted = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var client: AccountClient? { MeetinSite.baseURL(webWorkspaceURL).map { AccountClient(baseURL: $0) } }
     private var signedIn: Bool { session.account.connected(to: client?.baseURL) }
 
@@ -19,12 +21,20 @@ struct MainWindow: View {
     }
 
     var body: some View {
-        Group {
-            if signedIn {
-                notebook
-            } else {
-                WelcomeView(account: session.account, client: client)
+        ZStack {
+            notebook
+                .disabled(!onboardingCompleted && !signedIn)
+                .accessibilityHidden(!onboardingCompleted && !signedIn)
+            if !onboardingCompleted && !signedIn {
+                WelcomeView(account: session.account, client: client) {
+                    onboardingCompleted = true
+                }
+                .transition(.opacity.combined(with: .offset(x: reduceMotion ? 0 : -10)))
             }
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: onboardingCompleted || signedIn)
+        .onChange(of: signedIn, initial: true) { _, connected in
+            if connected { onboardingCompleted = true }
         }
         .frame(minWidth: 940, minHeight: 620)
         .meetinNight()

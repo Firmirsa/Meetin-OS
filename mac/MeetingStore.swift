@@ -31,6 +31,8 @@ struct MeetingRecord: Codable, Identifiable {
     var source: String?
     var transcriptIncomplete: Bool?
     var proposals: [TaskProposal]?
+    var participants: MeetingParticipants?
+    var structuredLines: [StructuredTranscriptLine]?
 
     var pendingProposals: Int { proposals?.filter { $0.state == .pending }.count ?? 0 }
 }

@@ -70,7 +70,7 @@ struct AgentWorkspace<Proposals: View>: View {
                 LinkupResearch(client: client, available: access?.linkup)
                 Text("Tâche à exécuter").font(.mtSerif(36)).accessibilityAddTraits(.isHeader)
                 if client == nil {
-                    Text("Vous pouvez préparer votre demande ici. L’accès de l’équipe sera demandé au moment d’utiliser l’agent.")
+                    Text("Tu peux rédiger ta demande ici. Google sera demandé pour préparer une tâche, sans perdre ton brouillon.")
                         .font(.callout).foregroundStyle(Color.mtInk2)
                 }
                 TextField("Demande", text: $state.request, axis: .vertical)
@@ -144,8 +144,8 @@ struct AgentWorkspace<Proposals: View>: View {
             ForEach(Array(review.clarifications.enumerated()), id: \.offset) { _, turn in
                 Text("\(turn.question) \(turn.answer)").font(.callout)
             }
-            if review.usesTrello && (access?.trello == false || state.trelloSetupRequired) {
-                Text("Votre équipe doit relier Trello. La proposition reste disponible ici.")
+            if review.usesTrello {
+                Text("La connexion personnelle Trello n’est pas encore disponible. La proposition reste ici, sans lancement.")
                     .font(.callout).foregroundStyle(Color.mtInk2)
                 Button("Voir l’accès Trello") { showIntegrations(.catalog) }.buttonStyle(.mtPrimary)
             } else if review.executor == .devin && access?.devin == false {

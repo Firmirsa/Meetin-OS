@@ -149,6 +149,9 @@ enum GladiaLive {
         let text: String
         let start: Double
         let isFinal: Bool
+        var speaker: Int? = nil
+        var sessionID: String? = nil
+        var connectionScope: String? = nil
     }
 
     private struct Envelope: Decodable { let type: String }
@@ -157,12 +160,14 @@ enum GladiaLive {
             struct Utterance: Decodable {
                 let text: String
                 let start: Double
+                let speaker: Int?
             }
             let id: String
             let is_final: Bool
             let utterance: Utterance
         }
         let data: Details
+        let session_id: String?
     }
 
     static func parse(_ text: String) -> Transcript? {
@@ -171,7 +176,8 @@ enum GladiaLive {
               let message = try? JSONDecoder().decode(Message.self, from: data) else { return nil }
         return Transcript(
             id: message.data.id, text: message.data.utterance.text,
-            start: message.data.utterance.start, isFinal: message.data.is_final
+            start: message.data.utterance.start, isFinal: message.data.is_final,
+            speaker: message.data.utterance.speaker.flatMap { $0 >= 0 ? $0 : nil }, sessionID: message.session_id
         )
     }
 }
@@ -192,6 +198,7 @@ actor GladiaLiveSession {
     private let audio: AsyncStream<Data>
     private let events: @MainActor @Sendable (Event) -> Void
     private let retryDelay: Double
+    private let sourceScope = UUID().uuidString
     private var socket: LiveSocket?
     private var aborted = false
     private var serverClosed = false
@@ -289,8 +296,10 @@ actor GladiaLiveSession {
         while let text = try await socket.receive() {
             if let transcript = GladiaLive.parse(text) {
                 await events(.transcript(.init(
-                    id: "\(connection)-\(transcript.id)", text: transcript.text,
-                    start: transcript.start + offset, isFinal: transcript.isFinal
+                    id: "\(connection)-\(transcript.sessionID ?? "unknown")-\(transcript.id)", text: transcript.text,
+                    start: transcript.start + offset, isFinal: transcript.isFinal,
+                    speaker: transcript.speaker, sessionID: transcript.sessionID,
+                    connectionScope: "\(sourceScope):\(connection)"
                 )))
             } else if let relay = try? JSONDecoder().decode(RelayMessage.self, from: Data(text.utf8)),
                       ["meetinos_limit", "meetinos_error"].contains(relay.type) {
@@ -314,8 +323,12 @@ final class LiveTranscript {
         let track: AudioTrack
         let text: String
         let isFinal: Bool
+        let source: TranscriptSource
 
         var formatted: String { Gladia.line(at: time, label: track.label, text: text) }
+        var structured: StructuredTranscriptLine {
+            .init(id: id, time: time, source: source, text: text)
+        }
     }
 
     private struct Key: Hashable {
@@ -355,7 +368,12 @@ final class LiveTranscript {
         let all = utterances.map { key, value in
             Line(
                 id: "\(key.segment)-\(key.track.rawValue)-\(key.id)", segment: key.segment,
-                time: value.start + offset(key.track, segment: key.segment), track: key.track, text: value.text, isFinal: value.isFinal
+                time: value.start + offset(key.track, segment: key.segment), track: key.track, text: value.text, isFinal: value.isFinal,
+                source: TranscriptSource(
+                    track: key.track.rawValue, segment: key.segment,
+                    session: "\(value.connectionScope ?? "local"):\(value.sessionID ?? "unknown")",
+                    speaker: value.speaker
+                )
             )
         }
         .sorted { ($0.time, $0.id) < ($1.time, $1.id) }

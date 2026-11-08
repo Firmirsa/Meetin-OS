@@ -46,6 +46,10 @@ struct ProposalCards: View {
             if let issue = session.proposalIssues[proposal.id] {
                 Text(issue).font(.mtSans(13)).foregroundStyle(Color.mtWarn).textSelection(.enabled)
             }
+            if proposal.state == .pending, proposal.review.usesTrello {
+                Text("Connexion personnelle Trello à venir. Cette proposition est conservée, sans lancement depuis cette carte.")
+                    .font(.mtSans(13)).foregroundStyle(Color.mtInk2)
+            }
             if proposal.state == .launched {
                 if let execution = proposal.execution {
                     AgentExecutionView(execution: execution, client: client, connect: { showIntegrations(.agent) }) { result in
@@ -67,7 +71,7 @@ struct ProposalCards: View {
 
     private func actions(_ proposal: TaskProposal) -> some View {
         HStack(spacing: 8) {
-            if proposal.review.usesTrello && session.agentAccess?.trello == false {
+            if proposal.review.usesTrello {
                 Button("Voir l’accès Trello") { showIntegrations(.catalog) }.buttonStyle(.mtGhost)
             } else if let client {
                 Button("Confirmer et lancer") { session.launch(proposal, using: client) }

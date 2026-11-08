@@ -102,7 +102,7 @@ struct MeetingsView: View {
                         .disabled(!session.canSwitchMeeting)
                 }
                 if session.capture != nil {
-                    Text("Enregistrement en cours. Arrête-le pour rouvrir une réunion.")
+                    Text("Une capture est ouverte, en cours ou en pause. Termine-la pour rouvrir une réunion.")
                         .font(.mtSans(13))
                         .foregroundStyle(Color.mtInk2)
                 }
@@ -163,7 +163,7 @@ struct MeetingDetailView: View {
                         CaptureView.toggleRecording(session: session, openWindow: openWindow)
                     }
                     .buttonStyle(MTCapsuleLinkStyle())
-                    .disabled(session.busy || session.agent.busy)
+                    .disabled(session.capture != nil || session.busy || session.agent.busy)
                 }
                 TextField("Titre de la réunion", text: titleBinding)
                     .textFieldStyle(.plain)

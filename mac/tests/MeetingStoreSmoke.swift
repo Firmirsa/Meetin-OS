@@ -21,13 +21,36 @@ struct MeetingStoreSmoke {
         precondition(store.recent().first?.title == "r0", "la plus récente en premier")
 
         let first = store.meetings[0].id
-        store.update(first) { $0.transcript = "Bonjour."; $0.notes = "Décision" }
+        store.update(first) {
+            $0.transcript = "Bonjour."
+            $0.notes = "Décision"
+            $0.tracks = .init(
+                microphonePath: "/tmp/micro.caf", systemPath: "/tmp/appel.caf",
+                microphoneOffset: 0.25, systemOffset: 0.5
+            )
+        }
         store.saveNow()
 
         let reloaded = MeetingStore(folder: folder)
         precondition(reloaded.meetings.count == 7, "historique relu après relance")
         precondition(reloaded.meeting(id: first)?.transcript == "Bonjour.", "transcription relue")
         precondition(reloaded.meeting(id: first)?.notes == "Décision", "notes relues")
+        let originalAudioPath = reloaded.meeting(id: first)?.audioPath
+        reloaded.update(first) { $0.notes = "Résumé personnel\nDécision : garder le carnet local." }
+        reloaded.saveNow()
+        let withSummary = MeetingStore(folder: folder).meeting(id: first)
+        precondition(withSummary?.notes == "Résumé personnel\nDécision : garder le carnet local.", "résumé local relu dans les notes existantes")
+        precondition(withSummary?.audioPath == originalAudioPath, "éditer le résumé conserve le chemin audio historique")
+        precondition(withSummary?.tracks?.microphonePath == "/tmp/micro.caf", "piste micro historique conservée")
+        precondition(withSummary?.tracks?.systemPath == "/tmp/appel.caf", "piste système historique conservée")
+        precondition(withSummary?.tracks?.microphoneOffset == 0.25, "décalage micro conservé")
+        precondition(withSummary?.tracks?.systemOffset == 0.5, "décalage système conservé")
+
+        // Aucun nouveau champ requis : un ancien carnet sans « summary » reste lisible.
+        let legacyFile = folder.appendingPathComponent("meetings.json")
+        let legacyJSON = try JSONSerialization.jsonObject(with: Data(contentsOf: legacyFile)) as! [[String: Any]]
+        precondition(legacyJSON.allSatisfy { $0["summary"] == nil }, "format historique sans champ résumé supplémentaire")
+        precondition(MeetingStore(folder: folder).meetings.count == 7, "ancien format relu sans migration")
 
         // Tâches proposées : relues après relance, et ancien fichier sans ce champ toujours lisible
         let review = AgentReview(
@@ -55,6 +78,32 @@ struct MeetingStoreSmoke {
         precondition(withTasks?.proposals?[2].execution == nil, "ancienne tâche lancée toujours lisible")
         precondition(withTasks?.proposals?[3].execution?.trelloResult?.verifiedURL?.absoluteString == "https://trello.com/c/card1234",
                      "lien de la fiche vérifiée relu après relance")
+        let originalNotes = reloaded.meeting(id: first)?.notes
+        var participants = MeetingParticipants.newMeeting(localName: "Vous")
+        let source = TranscriptSource(track: "system", segment: 0, session: "fixture", speaker: 0)
+        let person = MeetingParticipant(id: UUID(), name: "Léni")
+        participants.people.append(person)
+        participants.assign(person.id, to: source)
+        let lines = [StructuredTranscriptLine(id: "line", time: 1, source: source, text: "extrait")]
+        reloaded.update(first) {
+            $0.participants = participants
+            $0.structuredLines = lines
+            $0.transcript = participants.render(lines)
+        }
+        reloaded.saveNow()
+        participants.people[1].name = "Autre nom"
+        reloaded.update(first) {
+            $0.participants = participants
+            $0.transcript = participants.render($0.structuredLines ?? [])
+        }
+        reloaded.saveNow()
+        let renamed = MeetingStore(folder: folder).meeting(id: first)
+        precondition(renamed?.participants == participants && renamed?.structuredLines == lines)
+        precondition(renamed?.transcript.contains("Autre nom") == true)
+        precondition(renamed?.proposals?[0].review.approval == "signature")
+        precondition(renamed?.proposals?[0].review.quote == "extrait")
+        precondition(renamed?.audioPath == originalAudioPath && renamed?.notes == originalNotes)
+        precondition(reloaded.meetings.last?.participants == nil && reloaded.meetings.last?.structuredLines == nil)
         precondition(reloaded.meetings.last?.pendingProposals == 0, "réunion sans tâche")
 
         let capture = folder.appendingPathComponent("capture", isDirectory: true)

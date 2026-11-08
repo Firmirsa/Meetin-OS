@@ -51,7 +51,7 @@ Le test audio local utilise des pistes synthétiques et simule les réponses de 
 ```sh
 mkdir -p mac/.build
 swiftc -parse-as-library -target "$(uname -m)-apple-macos15.0" \
-  mac/Capture.swift mac/HostedAccount.swift mac/Gladia.swift mac/LiveTranscription.swift mac/tests/GladiaSmoke.swift -o mac/.build/gladia-smoke
+  mac/MeetingParticipants.swift mac/Capture.swift mac/HostedAccount.swift mac/Gladia.swift mac/LiveTranscription.swift mac/tests/GladiaSmoke.swift -o mac/.build/gladia-smoke
 mac/.build/gladia-smoke
 ```
 
@@ -59,7 +59,7 @@ Le test de l’historique local s’exécute sans audio :
 
 ```sh
 swiftc -parse-as-library -target "$(uname -m)-apple-macos15.0" \
-  mac/AgentClient.swift mac/MeetingStore.swift mac/MeetinSite.swift mac/tests/MeetingStoreSmoke.swift -o mac/.build/store-smoke
+  mac/MeetingParticipants.swift mac/AgentClient.swift mac/MeetingStore.swift mac/MeetinSite.swift mac/tests/MeetingStoreSmoke.swift -o mac/.build/store-smoke
 mac/.build/store-smoke
 ```
 
@@ -67,7 +67,7 @@ La détection et les actions de notification se testent avec des réponses simul
 
 ```sh
 swiftc -parse-as-library -target "$(uname -m)-apple-macos15.0" \
-  mac/AgentClient.swift mac/MeetingStore.swift mac/TaskDetection.swift mac/TaskActions.swift mac/tests/TaskDetectionSmoke.swift -o mac/.build/detect-smoke
+  mac/MeetingParticipants.swift mac/AgentClient.swift mac/MeetingStore.swift mac/TaskDetection.swift mac/TaskActions.swift mac/tests/TaskDetectionSmoke.swift -o mac/.build/detect-smoke
 mac/.build/detect-smoke
 ```
 
@@ -77,7 +77,7 @@ Le test du direct utilise une connexion simulée :
 
 ```sh
 swiftc -parse-as-library -target "$(uname -m)-apple-macos15.0" \
-  mac/Capture.swift mac/HostedAccount.swift mac/Gladia.swift mac/LiveTranscription.swift mac/tests/LiveTranscriptionSmoke.swift -o mac/.build/live-smoke
+  mac/MeetingParticipants.swift mac/Capture.swift mac/HostedAccount.swift mac/Gladia.swift mac/LiveTranscription.swift mac/tests/LiveTranscriptionSmoke.swift -o mac/.build/live-smoke
 mac/.build/live-smoke
 ```
 

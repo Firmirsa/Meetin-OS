@@ -65,6 +65,24 @@ final class MeetingSession {
     var status = "Prêt à enregistrer"
     var permissionHelp: AudioPermissionHelp? { didSet { noteSystemAudioPermission() } }
     var transcript = "" { didSet { syncMeeting() } }
+    var participants: MeetingParticipants? { didSet { participantNamesChanged() } }
+    var structuredLines: [StructuredTranscriptLine]?
+
+    var participantLines: [StructuredTranscriptLine] {
+        live?.transcript.lines.map(\.structured) ?? structuredLines ?? []
+    }
+
+    var displayedTranscript: String {
+        guard let participants, live != nil || structuredLines != nil else { return transcript }
+        return participants.render(participantLines)
+    }
+
+    func participantNamesChanged() {
+        if let participants, let structuredLines {
+            transcript = participants.render(structuredLines)
+        }
+        syncMeeting()
+    }
     var notes = "" { didSet { syncMeeting() } }
     let store = MeetingStore()
     var route: MainRoute = .home
@@ -104,14 +122,14 @@ private struct MeetingWindow: View {
 }
 
 struct CaptureView: View {
-    private enum MeetingTab: Hashable { case transcription, agent }
-
     @Environment(\.openWindow) private var openWindow
     @Bindable var session: MeetingSession
     var isMeetingWindow = false
     @State private var integrationsRequest: IntegrationsRequest?
     @AppStorage("webWorkspaceURL") private var webWorkspaceURL = MeetinSite.defaultAddress
-    @State private var tab: MeetingTab = .transcription
+    @SceneStorage("meetingWorkspaceTab") private var selectedTab = MeetingWorkspaceTab.transcription.rawValue
+
+    private var tab: MeetingWorkspaceTab { MeetingWorkspaceTab(rawValue: selectedTab) ?? .transcription }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -141,30 +159,53 @@ struct CaptureView: View {
             }
 
             if isMeetingWindow || session.recording != nil {
-                Picker("Vue de la réunion", selection: $tab) {
-                    Text("Transcription").tag(MeetingTab.transcription)
-                    Text(session.pendingProposalCount > 0 ? "Agent (\(session.pendingProposalCount))" : "Agent").tag(MeetingTab.agent)
+                HStack(spacing: 0) {
+                    ForEach(MeetingWorkspaceTab.allCases, id: \.self) { item in
+                        Button {
+                            selectedTab = item.rawValue
+                        } label: {
+                            VStack(spacing: 9) {
+                                Text(item == .agent && session.pendingProposalCount > 0
+                                     ? "Agent (\(session.pendingProposalCount))" : item.title)
+                                    .font(.mtSans(13, weight: tab == item ? .semibold : .regular))
+                                    .foregroundStyle(tab == item ? Color.mtInk : Color.mtInk2)
+                                    .frame(maxWidth: .infinity)
+                                Rectangle().fill(tab == item ? Color.mtAccent : Color.mtLine).frame(height: 2)
+                            }
+                            .padding(.top, 10)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(tab == item ? .isSelected : [])
+                        .accessibilityLabel(item.title)
+                        .accessibilityValue(item == .agent ? "\(session.pendingProposalCount) tâche(s) à valider" : "")
+                    }
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .tint(Color.mtControlTint)
+                .accessibilityLabel("Vue de la réunion")
                 .onChange(of: session.showAgentTab, initial: true) {
                     guard session.showAgentTab else { return }
-                    tab = .agent
+                    selectedTab = MeetingWorkspaceTab.agent.rawValue
                     session.showAgentTab = false
                 }
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
             }
 
-            if (isMeetingWindow || session.recording != nil) && tab == .agent {
+            ZStack {
                 agentPanel
-            } else {
+                    .modifier(MeetingPaneVisibility(visible: tab == .agent))
+                MeetingSummaryView(notes: $session.notes, savedMeeting: session.meetingID != nil,
+                                   saveError: session.store.lastError)
+                    .modifier(MeetingPaneVisibility(visible: tab == .summary))
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
+                        if session.participants != nil {
+                            ParticipantsEditor(session: session)
+                        }
                         if let live = session.live {
                             Text("Transcription").font(.headline).accessibilityAddTraits(.isHeader)
-                            LiveTranscriptPanel(live: live) {
+                            LiveTranscriptPanel(live: live, paused: session.captureState == .paused,
+                                                participants: session.participants) {
                                 session.showMain(.account, openWindow: openWindow)
                             }
                         } else if isMeetingWindow {
@@ -175,44 +216,25 @@ struct CaptureView: View {
                             Text("Le fil de la réunion.")
                                 .font(.mtSerif(42))
                                 .accessibilityAddTraits(.isHeader)
-                            Text("Prenez des notes pendant l’appel, puis retrouvez la transcription ici.")
+                            Text("Retrouve le texte ici et garde tes décisions dans Résumé.")
                                 .foregroundStyle(Color.mtInk2)
                         }
-                        Text("Notes").font(.headline).accessibilityAddTraits(.isHeader)
-                        ZStack(alignment: .topLeading) {
-                            TextEditor(text: $session.notes)
-                                .font(.body)
-                                .scrollContentBackground(.hidden)
-                                .accessibilityLabel("Notes de réunion")
-                            if session.notes.isEmpty {
-                                Text("Points clés, décisions, questions…")
-                                    .foregroundStyle(Color.mtInk2)
-                                    .padding(.leading, 5)
-                                    .padding(.top, 1)
-                                    .allowsHitTesting(false)
-                                    .accessibilityHidden(true)
-                            }
-                        }
-                        .frame(minHeight: 116)
-                        .padding(10)
-                        .background(Color.mtSurface, in: RoundedRectangle(cornerRadius: MTRadius.card))
-
                         if isMeetingWindow && session.live == nil && session.transcript.isEmpty {
                             Text(session.liveWaitingMessage)
                                 .foregroundStyle(Color.mtInk2)
                         }
-                        if !session.transcript.isEmpty {
+                        if !session.displayedTranscript.isEmpty && session.live == nil {
                             Rectangle().fill(Color.mtLine).frame(height: 1)
                             HStack {
                                 Text("Transcription").font(.headline).accessibilityAddTraits(.isHeader)
                                 Spacer()
                                 Button("Copier") {
                                     NSPasteboard.general.clearContents()
-                                    NSPasteboard.general.setString(session.transcript, forType: .string)
+                                    NSPasteboard.general.setString(session.displayedTranscript, forType: .string)
                                 }
                                 .accessibilityLabel("Copier la transcription")
                             }
-                            Text(session.transcript)
+                            Text(session.displayedTranscript)
                                 .font(.mtSans(14))
                                 .lineSpacing(6)
                                 .textSelection(.enabled)
@@ -225,57 +247,38 @@ struct CaptureView: View {
                     .padding(.vertical, 24)
                     .frame(maxWidth: .infinity)
                 }
+                .modifier(MeetingPaneVisibility(visible: tab == .transcription))
             }
 
             Rectangle().fill(Color.mtLine).frame(height: 1)
 
             VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 7) {
-                    if session.busy {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Circle()
-                            .fill(session.capture == nil ? Color.mtInk2 : Color.mtRec)
-                            .frame(width: 7, height: 7)
-                            .accessibilityHidden(true)
-                    }
-                    Text(session.status)
-                        .font(.callout)
-                        .foregroundStyle(Color.mtInk2)
-                        .accessibilityAddTraits(.updatesFrequently)
-                }
+                MeetingCaptureControls(session: session, recordOrFinish: toggleRecording)
                 if let help = session.permissionHelp, !session.busy {
                     Button(help.settingsLabel, systemImage: "arrow.up.right.square") {
                         NSWorkspace.shared.open(help.settingsURL)
                     }
                     .buttonStyle(.link)
                 }
-                HStack {
-                    if let recording = session.recording, session.capture == nil {
-                        Button("Écouter", systemImage: "play.circle") { NSWorkspace.shared.open(recording) }
-                        Button("Voir les pistes") { NSWorkspace.shared.activateFileViewerSelecting([recording]) }
-                    }
-                    Spacer()
-                    if session.recording != nil {
-                        if tab == .agent {
+                if let recording = session.recording, session.capture == nil {
+                    ViewThatFits(in: .horizontal) {
+                        HStack {
+                            Button("Écouter", systemImage: "play.circle") { NSWorkspace.shared.open(recording) }
+                            Button("Voir les pistes") { NSWorkspace.shared.activateFileViewerSelecting([recording]) }
+                            Spacer(minLength: 8)
                             Button("Transcrire", systemImage: "text.alignleft", action: transcribe)
-                                .buttonStyle(.mtGhost)
-                        } else {
-                            Button("Transcrire", systemImage: "text.alignleft", action: transcribe)
-                                .buttonStyle(.mtPrimary)
                         }
-                    } else {
-                        if session.capture == nil {
-                            Button("Enregistrer", systemImage: "mic", action: toggleRecording)
-                                .buttonStyle(.mtPrimary)
-                                .disabled(session.agent.busy)
-                        } else {
-                            Button("Arrêter", systemImage: "stop.fill", action: toggleRecording)
-                                .buttonStyle(.mtGhost)
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Button("Écouter", systemImage: "play.circle") { NSWorkspace.shared.open(recording) }
+                                Button("Voir les pistes") { NSWorkspace.shared.activateFileViewerSelecting([recording]) }
+                            }
+                            Button("Transcrire", systemImage: "text.alignleft", action: transcribe)
                         }
                     }
+                    .buttonStyle(WorkspaceButtonStyle())
+                    .disabled(session.busy)
                 }
-                .disabled(session.busy)
             }
             .padding(.horizontal, 22)
             .padding(.vertical, 14)
@@ -313,7 +316,6 @@ struct CaptureView: View {
     }
 
     static func toggleRecording(session: MeetingSession, openWindow: OpenWindowAction, source: MeetingSource? = nil) {
-        guard session.capture != nil || session.accountConnected else { return }
         guard !session.busy, session.capture != nil || (!session.agent.busy && session.launchingProposals.isEmpty) else { return }
         session.busy = true
         Task {
@@ -391,11 +393,14 @@ struct CaptureView: View {
                     throw CaptureError("Ton quota audio restant est trop petit pour cet enregistrement. Consulte ton plan dans Compte.")
                 }
                 let gladia = Gladia(client: client, token: { try await account.token(client) })
+                let result: String
                 if let tracks {
-                    session.transcript = try await gladia.transcribe(tracks: tracks)
+                    result = try await gladia.transcribe(tracks: tracks)
                 } else {
-                    session.transcript = try await gladia.transcribe(recording)
+                    result = try await gladia.transcribe(recording)
                 }
+                session.structuredLines = nil
+                session.transcript = result
                 session.transcriptIncomplete = false
                 session.status = "Transcription prête"
             } catch let error as AccountClient.Failure where error.status == 401 {

@@ -30,6 +30,8 @@ struct HostedAccountView: View {
 
     private var usage: some View {
         VStack(alignment: .leading, spacing: 9) {
+            Label("Google connecté", systemImage: "checkmark.circle")
+                .foregroundStyle(Color.mtInk)
             if let plan = session.account.usage {
                 LabeledContent("E-mail", value: plan.email)
                 LabeledContent("Plan", value: plan.planName)
@@ -40,6 +42,9 @@ struct HostedAccountView: View {
                 if plan.canManageBilling {
                     Button("Gérer l’abonnement") { openBilling(manage: true) }.buttonStyle(.mtGhost).disabled(busy)
                 }
+            } else {
+                Text("L’identité et le quota n’ont pas encore été actualisés.")
+                    .font(.mtSans(13)).foregroundStyle(Color.mtInk2)
             }
             HStack {
                 Button("Actualiser le quota", action: refresh).buttonStyle(.mtGhost).disabled(busy)
@@ -50,6 +55,8 @@ struct HostedAccountView: View {
                 }.buttonStyle(.mtGhost)
                     .disabled(busy || session.busy || session.capture != nil)
             }
+            Text("La déconnexion conserve les réunions et les brouillons sur ce Mac.")
+                .font(.mtSans(12)).foregroundStyle(Color.mtInk2)
         }
     }
 

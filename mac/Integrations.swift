@@ -59,27 +59,25 @@ struct IntegrationsView: View {
     }
 
     private var catalog: some View {
-        let trello = session.agent.trelloSetupRequired ? false : session.agentAccess?.trello
         return VStack(alignment: .leading, spacing: 12) {
             Text("Intégrations").font(.title2.bold()).accessibilityAddTraits(.isHeader)
-            Text(session.agentAccess == nil
-                 ? "Vérifiez les outils disponibles pour votre compte Google."
-                 : "Votre compte Google donne accès à l’agent.")
+            Text(session.accountConnected
+                 ? session.account.usage.map { "Compte Google : \($0.email)" } ?? "Google connecté. Actualise le compte pour afficher ton identité."
+                 : "Aucun compte connecté. Le carnet et l’audio local restent disponibles.")
                 .foregroundStyle(Color.mtInk2)
             if session.agentAccess?.planning == false {
                 Text("Votre équipe doit activer l’agent sur son serveur. Vous pouvez continuer à utiliser le carnet.")
                     .font(.callout).foregroundStyle(Color.mtInk2)
             }
-            toolRow("Gladia", purpose: "Transcrire un enregistrement", status: session.accountConnected ? "Compte connecté" : "Compte requis") {
-                Button(session.accountConnected ? "Voir le compte" : "Se connecter") { show(.gladia) }
+            toolRow("Google Meetin-OS", purpose: "Compte, quota de transcription et accès à l’agent", status: session.accountConnected ? "Connecté" : "Facultatif") {
+                Button(session.accountConnected ? "Gérer" : "Connecter") { show(.gladia) }
             }
-            toolRow("Trello", purpose: "Créer une fiche après votre confirmation", status: toolStatus(trello)) { EmptyView() }
-            toolRow("Google Calendar", purpose: "Retrouver les réunions prévues", status: "À venir") { EmptyView() }
-            toolRow("Devin", purpose: "Confier une tâche de code", status: toolStatus(session.agentAccess?.devin)) { EmptyView() }
-            if session.agentAccess?.planning == true && trello == false {
-                Text("Demandez à votre équipe de relier son tableau Trello, puis vérifiez les accès ici.")
-                    .font(.callout).foregroundStyle(Color.mtInk2)
-            }
+            toolRow("Trello", purpose: "Connexion personnelle non disponible dans cette version", status: "À venir") { EmptyView() }
+            toolRow("Google Calendar", purpose: "Google Meetin-OS ne connecte pas ton agenda", status: "À venir") { EmptyView() }
+            toolRow("Devin", purpose: "Service de code via le serveur, pas un compte personnel relié ici", status: toolStatus(session.agentAccess?.devin)) { EmptyView() }
+            toolRow("Linkup", purpose: "Recherche publique facultative, envoyée uniquement après clic", status: toolStatus(session.agentAccess?.linkup)) { EmptyView() }
+            Text("Aucune clé d’équipe à saisir. Trello et Calendar attendent leur propre parcours de consentement.")
+                .font(.callout).foregroundStyle(Color.mtInk2)
             HStack {
                 Button("Fermer") { dismiss() }.keyboardShortcut(.cancelAction).disabled(checking)
                 Spacer()
@@ -139,8 +137,9 @@ struct IntegrationsView: View {
     }
 
     private func toolStatus(_ configured: Bool?) -> String {
-        guard let configured else { return "Option agent" }
-        return configured ? "Configuré" : "À relier par l’équipe"
+        guard session.accountConnected else { return "Google requis" }
+        guard let configured else { return "Non vérifié" }
+        return configured ? "Disponible" : "Indisponible"
     }
 
     private func show(_ next: IntegrationsPage) {

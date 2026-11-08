@@ -1,5 +1,17 @@
 # Suivi Meetin-OS
 
+## Priorité démo avant 11 h (Paris), 8 novembre 2026
+
+Wael vise une application filmable avant 11 h, puis vidéo et montage terminés avant 14 h. Ce jalon est une démo, pas une mise en production. Limiter les nouveaux contrôles au build et au parcours ciblé ; conserver les protections d’accès et de données. Le retour de Wael sur Intégrations et Facturation autorise la reprise des pushes ciblés. Ne pas remplacer l’app pendant une capture active.
+
+Le build combiné UX + Samy est prêt dans `/private/tmp/meetin-demo-ux-samy-20261108` : Mac 0.1.6 build 7, recette, compilation et signature vérifiées, source archivée sans secrets. SHA-256 de l’exécutable : `7e21d08394559f4278d0f03c15eeacd2f26c387e65929c72f193720495cee012`. Pas encore installé : la copie Applications de l’essai reste celle décrite plus bas. La disponibilité de Wael pour fermer l’app et remplacer cette copie a été demandée pendant la préparation.
+
+Une nouvelle mission participants a été lancée dans une copie isolée via Devin CLI avec `gpt-6-1-sol-low-priority` (Sol Low Fast), disponible dans le catalogue du compte. Le tarif affiché du mode Fast est doublé par rapport au standard, pas multiplié par 1,5 ; le surcoût a été autorisé. Périmètre : participants par réunion, affectations manuelles et identifiants de voix/source réellement disponibles, persistance rétrocompatible. Aucun nouveau traitement audio distant ni reconnaissance d’identité. Trello/Calendar OAuth restent dépendants de leurs clients et consentements personnels, sans faux état connecté.
+
+Le lot participants est terminé dans la session Devin `gray-raptorex` (Sol Low Fast), intégré et compilé en Mac 0.1.6 build 8. Les contrôles ciblés de conservation des notes/audio, sérialisation et affectations distinctes passent. Le build reste local, non installé ; pas encore de recette visuelle. Les noms et affectations concernent les lignes structurées du direct ; une retranscription différée garde le parcours texte existant, et les anciens carnets ne sont pas réinterprétés. L’artefact et ses sources sont dans `/private/tmp/meetin-demo-participants-20261108`, empreinte binaire `ed565f002c757993f8411f09476a27a6851fc432a4a316128b213449e4d6b239`.
+
+Retour de Wael : Intégrations doit être une page interne, Facturation doit ouvrir sa propre page avec retour à la réunion. Défaut reproduit : le bouton sélectionne Compte et la recette n’affiche aucun Checkout. Son essai réel de 39 s apparaît transcrit dans l’historique ; micro et audio système affichés autorisés, aucune capture active lors du contrôle. Nouveau lot natif confié à Devin en Sol Low Fast, sans modification serveur ni paiement réel. Le flag serveur `checkoutAvailable` est faux tant que les trois réglages Stripe nécessaires ne sont pas tous présents.
+
 ## Priorité Mac confirmée par Wael, 8 novembre 2026
 
 Le parcours natif prend la priorité sur l’agentique : onboarding court, carnet rapidement accessible, connexions personnelles avec états réels, fenêtre réunion avec Transcription / Agent / Résumé. **Pause suspend l’audio et la transcription ; Reprendre continue la même réunion.** Les notes, segments et brouillons sont conservés ; Terminer reste une action distincte. Aucun enregistrement de la conversation en cours n’est autorisé pour tester ce lot.
@@ -8,13 +20,21 @@ Pause/reprise a été intégrée localement après le lot `routage_complexe`. Le
 
 À la demande de Wael, le lot UX est exécuté via le CLI officiel Devin `3000.12.28`, modèle demandé et accepté `gpt-6-1-sol-medium`, sur une copie isolée sans secrets. Mission réellement lancée : onboarding, onglets Transcription / Agent / Résumé, boutons et branchement Pause/Reprendre. Le coordinateur conserve revue, intégration, build et livraison. Les participants persistants puis les vrais consentements OAuth personnels Trello et Calendar suivent ; ces connexions ne doivent pas être remplacées par un parcours factice. La branche `samy/nom-utilisateur-transcription` doit être prise en compte avant le lot participants. Aucun service externe ni migration distante n’a été modifié pour ces nouveaux lots.
 
+## Recette figée demandée par Wael, 8 novembre 2026
+
+Wael demande de tester les deux premiers lots avant tout prochain push, puis précise d’inclure le correctif Mac de Samy. Les pushes restent en attente de son retour. Source de la copie de test : `git archive 60bdc3b` (incluant `646052b`) + port Mac du commit `1ff553c` de `samy/nom-utilisateur-transcription`, avec `https://meetin-os-recette.vercel.app`. Le port conserve le nom complet macOS ou « Vous » à la place de « Micro » en direct et différé. Seuls les contextes du test Gladia et du README ont été adaptés au compte Google hébergé. Windows n’est pas intégré ni validé ici. Aucun changement UX de Devin dans cette copie. Le moteur pause/reprise est présent, mais pas ses nouveaux boutons. Linkup attend une mise à jour serveur distincte.
+
+Installation vérifiée le 8 novembre à 09:21 UTC : Mac 0.1.5 build 6, base `60bdc3b` + correctif Mac de Samy `1ff553c`, dans `/Applications/Meetin-OS.app`. Compilation, signature stricte et smoke tests Gladia/direct réussis sur la copie isolée ; aucune capture réelle. SHA-256 de l’exécutable installé : `b474b479b395458872e9cf0b2fbfdaa8c73579b4b889922cc4fc2b5e014c6fa0`. Provenance embarquée dans `Contents/Resources/BuildSource.json`, reçu dans `/private/tmp/meetin-test-samy-1ff553c-20261108/installation-receipt.json`. Ancien bundle : `/Users/wael/Library/Application Support/Meetin-OS/Build Backups/before-samy-1ff553c-20261108.cumbpzcy/Meetin-OS.app`. Après relance, accueil, compte connecté et deux réunions existantes observés ; l’écran indique encore « Micro à autoriser ». Aucun nouveau push ni déploiement. Wael reprend la recette.
+
+Le lot UX Devin est terminé dans la session CLI `field-eucalyptus`. Le coordinateur a intégré le patch localement et fait passer la compilation Mac 0.1.6 build 7 ainsi que le test MeetingStore hors du sandbox du CLI. Cet artefact reste local dans `/private/tmp/meetin-ux-20261108`, non installé et non poussé. La recette visuelle, les participants et les consentements personnels Trello/Calendar restent à faire. Aucun nouveau lot n’est lancé pendant l’essai de Wael.
+
 ## Livraisons Git incrémentales, 8 novembre 2026
 
 Wael autorise les commits et pushes ciblés sur la branche de travail après contrôle. Pas de fusion, force-push ni autorisation de déploiement supplémentaire.
 
 Premier push réussi : `codex/google-agent`, `646052b`, précédé de `1cab806`. Le correctif Google de Léni `b1ebc3b` a été récupéré sans perdre les changements locaux. Livraison : ouverture Google native, dédoublonnage exact, question publique Linkup après clic explicite, blocage du profil Trello global pour les comptes Google. Une copie du contenu exact de l’index a passé la compilation Mac, le smoke Swift de détection et les 22 tests Node avant le push. Pas de test Linkup réel ni de connexion Trello personnelle livrée. Le serveur de recette doit être mis à jour pour exposer le nouveau parcours Linkup. Un push ne prouve pas un déploiement Vercel.
 
-La copie actuellement installée dans Applications reste celle décrite ci-dessous. Les nouveaux lots Mac seront recompilés et réinstallés après leur intégration.
+Deuxième push réussi : `60bdc3b`, moteur pause/reprise et tests synthétiques, compilation complète réussie. Les boutons UX restent dans le travail local. La copie destinée à Applications pour l’essai part de ce commit et inclut le port Mac de Samy demandé ensuite ; sa provenance exacte est conservée dans le bundle et vérifiée à l’installation.
 
 ## Recette et préparation de démo, 8 novembre 2026
 

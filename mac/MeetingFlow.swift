@@ -318,7 +318,8 @@ extension MeetingSession {
         guard let live else { return }
         status = "Finalisation de la transcription…"
         await finishCaptureSegment()
-        let text = live.transcript.finalText
+        structuredLines = live.transcript.lines.map(\.structured)
+        let text = participants?.render(structuredLines ?? []) ?? live.transcript.finalText
         if !text.isEmpty { transcript = text }
         self.live = nil
         finishDetection()
@@ -332,6 +333,8 @@ extension MeetingSession {
             meetingID = nil
             notes = ""
         }
+        structuredLines = nil
+        participants = .newMeeting(localName: AudioTrack.microphone.label)
         startedAt = Date()
         recordingSource = source ?? callDetector.arrivals.first?.source
         for arrival in callDetector.arrivals { TaskNotifications.shared.removeMeetingArrival(arrival.id) }
@@ -383,7 +386,9 @@ extension MeetingSession {
             },
             source: recordingSource?.rawValue,
             transcriptIncomplete: transcriptIncomplete ? true : nil,
-            proposals: proposals.isEmpty ? nil : proposals
+            proposals: proposals.isEmpty ? nil : proposals,
+            participants: participants,
+            structuredLines: structuredLines
         ))
         meetingID = id
         startedAt = nil
@@ -400,6 +405,8 @@ extension MeetingSession {
             $0.notes = notes
             $0.transcriptIncomplete = transcriptIncomplete ? true : nil
             $0.proposals = proposals.isEmpty ? nil : proposals
+            $0.participants = participants
+            $0.structuredLines = structuredLines
         }
     }
 
@@ -415,6 +422,9 @@ extension MeetingSession {
     func open(_ record: MeetingRecord) {
         guard canSwitchMeeting else { return }
         meetingID = nil
+        structuredLines = nil
+        participants = record.participants
+        structuredLines = record.structuredLines
         recording = URL(fileURLWithPath: record.audioPath)
         recordedTracks = record.tracks.map {
             AudioCapture.Tracks(
