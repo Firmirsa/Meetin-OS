@@ -31,7 +31,7 @@ private final class GoogleBrowserSession: NSObject, ASWebAuthenticationPresentat
         let parts = URLComponents(url: callback, resolvingAgainstBaseURL: false)
         let codes = parts?.queryItems?.filter { $0.name == "code" } ?? []
         guard parts?.scheme == Self.scheme, parts?.host == "callback", parts?.user == nil,
-              parts?.password == nil, parts?.port == nil, parts?.fragment == nil,
+              parts?.password == nil, parts?.port == nil, (parts?.fragment ?? "").isEmpty,
               let path = parts?.path, path.isEmpty || path == "/",
               codes.count == 1, let code = codes[0].value, UUID(uuidString: code) != nil,
               parts?.queryItems?.contains(where: { $0.name == "error" }) != true else {
