@@ -41,6 +41,15 @@ internal sealed partial class Notebook
     private List<AgentClarification> clarifications = new();
     private AgentExecution? execution;
     private bool agentBusy;
+    private Label? agentPageTitle;
+    private FlowLayoutPanel? agentPageContent;
+
+    // Dans la fiche, l’onglet Agent n’a ni titre « Agent » ni grandes marges, comme sur Mac.
+    private void EmbedAgentPage(bool embedded)
+    {
+        if (agentPageTitle != null) agentPageTitle.Visible = !embedded;
+        if (agentPageContent != null) agentPageContent.Padding = embedded ? new Padding(0, 0, 0, 20) : new Padding(48, 40, 48, 40);
+    }
     private string? executionUrl;
 
     private AgentClient? Client => agentAccess != null && agentCode.Length > 0 && AgentClient.ServerUri(agentSite.AbsoluteUri) is { } server ? new AgentClient(server, agentCode) : null;
@@ -131,7 +140,9 @@ internal sealed partial class Notebook
     {
         var scroll = ScrollPane();
         var content = Column(48, 40, 48, 40);
-        content.Controls.Add(new Label { Text = "Agent", Font = Night.Serif(30f), ForeColor = Night.Ink, AutoSize = true, Margin = new Padding(0, 0, 0, 18) });
+        agentPageTitle = new Label { Text = "Agent", Font = Night.Serif(30f), ForeColor = Night.Ink, AutoSize = true, Margin = new Padding(0, 0, 0, 18) };
+        agentPageContent = content;
+        content.Controls.Add(agentPageTitle);
         content.Controls.Add(detectorError);
         content.Controls.Add(proposalsHost);
         content.Controls.Add(new Label { Text = "Tâche à exécuter", Font = Night.Serif(22f), ForeColor = Night.Ink, AutoSize = true, Margin = new Padding(0, 10, 0, 10) });

@@ -174,6 +174,37 @@ internal sealed class Capsule : Button
 
 internal enum PillKind { Ok, Run, Wait, Rec }
 
+internal sealed class SidebarPanel : Panel
+{
+    public static readonly Color Fill = ColorTranslator.FromHtml("#131915");
+    public readonly Panel Inner = new() { Dock = DockStyle.Fill, BackColor = Fill, Margin = new Padding(0) };
+
+    public SidebarPanel()
+    {
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+        BackColor = Night.Canvas;
+        Padding = new Padding(9, 9, 1, 9);
+        Controls.Add(Inner);
+        Inner.Resize += (_, _) => Clip();
+    }
+
+    private void Clip()
+    {
+        using var path = Night.Rounded(new Rectangle(0, 0, Inner.Width, Inner.Height), 12);
+        Inner.Region = new Region(path);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        e.Graphics.Clear(BackColor);
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        var r = new Rectangle(Padding.Left - 1, Padding.Top - 1, Inner.Width + 1, Inner.Height + 1);
+        using var path = Night.Rounded(r, 12);
+        using var pen = new Pen(Color.FromArgb(36, Night.Ink));
+        e.Graphics.DrawPath(pen, path);
+    }
+}
+
 internal sealed class Pill : Label
 {
     public PillKind Kind { get; set; }
@@ -185,7 +216,7 @@ internal sealed class Pill : Label
         Font = Night.Sans(8.5f, true);
         AutoSize = false;
         Height = 24;
-        Width = TextRenderer.MeasureText(text, Font).Width + 26;
+        Width = TextRenderer.MeasureText(text, Font).Width + 20;
         Margin = new Padding(0);
         SetStyle(ControlStyles.SupportsTransparentBackColor, true);
         BackColor = Color.Transparent;
@@ -195,7 +226,7 @@ internal sealed class Pill : Label
     {
         Kind = kind;
         Text = text;
-        Width = TextRenderer.MeasureText(text, Font).Width + 26;
+        Width = TextRenderer.MeasureText(text, Font).Width + 20;
         Invalidate();
     }
 
@@ -203,18 +234,16 @@ internal sealed class Pill : Label
     {
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        var (back, fore, dot) = Kind switch
+        var (back, fore) = Kind switch
         {
-            PillKind.Ok => (Night.AccentTint, Night.Accent, Night.Accent),
-            PillKind.Run => (Night.Well, Night.Ink, Night.Warn),
-            PillKind.Rec => (Color.FromArgb(60, Night.Rec), Night.Rec, Night.Rec),
-            _ => (Night.Well, Night.Ink2, Night.Ink2)
+            PillKind.Ok or PillKind.Run => (Night.AccentTint, Night.Accent),
+            PillKind.Rec => (ColorTranslator.FromHtml("#3A1F1A"), Night.Rec),
+            _ => (Night.Well, Night.Ink2)
         };
+        using (var clear = new SolidBrush(Parent?.BackColor ?? Night.Canvas)) g.FillRectangle(clear, ClientRectangle);
         using var path = Night.Rounded(new Rectangle(0, 0, Width - 1, Height - 1), Height / 2);
         using (var b = new SolidBrush(back)) g.FillPath(b, path);
-        using (var pen = new Pen(Night.Line)) g.DrawPath(pen, path);
-        using (var d = new SolidBrush(dot)) g.FillEllipse(d, 9, Height / 2 - 3, 6, 6);
-        TextRenderer.DrawText(g, Text, Font, new Rectangle(18, 0, Width - 18, Height), fore, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.NoPadding);
+        TextRenderer.DrawText(g, Text, Font, new Rectangle(0, 0, Width, Height), fore, TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPadding);
     }
 }
 
@@ -491,7 +520,7 @@ internal sealed class MeetingRow : Control
         using var mono = Night.Mono(9f);
         using var pillFont = Night.Sans(8.5f, true);
         var status = record.Transcribed ? "Transcrite" : "À transcrire";
-        var pillWidth = TextRenderer.MeasureText(status, pillFont).Width + 26;
+        var pillWidth = TextRenderer.MeasureText(status, pillFont).Width + 20;
         var durationText = MeetingStore.DurationText(record.Duration);
         var durationWidth = Math.Max(TextRenderer.MeasureText(durationText, mono).Width, 52);
         TextRenderer.DrawText(g, "⋯", title, new Rectangle(Width - MenuZone, 0, MenuZone - 8, Height), Night.Ink2, TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPadding);
@@ -500,19 +529,15 @@ internal sealed class MeetingRow : Control
         right -= durationWidth + 16;
         var pill = new Rectangle(right - pillWidth, Height / 2 - 12, pillWidth, 24);
         g.SmoothingMode = SmoothingMode.AntiAlias;
+        // Comme MTPill sur Mac : « À transcrire » en citron sur fond teinté, « Transcrite » en gris.
         using (var path = Night.Rounded(pill, 12))
-        {
-            using var b = new SolidBrush(record.Transcribed ? Night.AccentTint : Night.Well);
+        using (var b = new SolidBrush(record.Transcribed ? Night.Well : Night.AccentTint))
             g.FillPath(b, path);
-            using var pen = new Pen(Night.Line);
-            g.DrawPath(pen, path);
-        }
-        using (var d = new SolidBrush(record.Transcribed ? Night.Accent : Night.Warn)) g.FillEllipse(d, pill.X + 9, pill.Y + 9, 6, 6);
-        TextRenderer.DrawText(g, status, pillFont, new Rectangle(pill.X + 18, pill.Y, pill.Width - 18, pill.Height), record.Transcribed ? Night.Accent : Night.Ink, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.NoPadding);
+        TextRenderer.DrawText(g, status, pillFont, pill, record.Transcribed ? Night.Ink2 : Night.Accent, TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPadding);
         right -= pillWidth + 16;
         var textWidth = right - 18;
         TextRenderer.DrawText(g, record.Title, title, new Rectangle(18, 11, textWidth, 20), Night.Ink, TextFormatFlags.Left | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
-        var metaText = MeetingStore.Day(record.Date) + " · " + MeetingStore.Time(record.Date) + " · " + record.Source;
+        var metaText = MeetingStore.Day(record.Date) + " · " + MeetingStore.Time(record.Date) + (record.Source == "Windows" ? "" : " · " + record.Source);
         TextRenderer.DrawText(g, metaText, meta, new Rectangle(18, 32, textWidth, 18), Night.Ink2, TextFormatFlags.Left | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
     }
 }
@@ -521,7 +546,7 @@ internal sealed partial class Notebook : Form
 {
     private readonly Capsule record = new("Commencer à enregistrer", CapsuleKind.Record);
     private readonly Capsule import = new("Ouvrir un enregistrement", CapsuleKind.Ghost, "\uE8B7");
-    private readonly Capsule transcribe = new("Transcrire avec Gladia", CapsuleKind.Primary);
+    private readonly Capsule transcribe = new("Transcrire", CapsuleKind.Primary, "\uE8A4");
     private readonly Capsule folder = new("Voir les pistes", CapsuleKind.Ghost, "\uE8B7");
     private readonly Capsule copy = new("Copier la transcription", CapsuleKind.Ghost, "\uE8C8");
     private readonly Capsule saveKey = new("Enregistrer la clé", CapsuleKind.Primary);
@@ -540,7 +565,13 @@ internal sealed partial class Notebook : Form
     private readonly Pill keyPill = new("Aucune clé", PillKind.Wait);
     private readonly Label status = new() { AutoSize = true, ForeColor = Night.Ink2, Margin = new Padding(0, 0, 0, 8), MaximumSize = new Size(900, 0) };
     private readonly Label keyMessage = new() { AutoSize = true, ForeColor = Night.Ink2, Font = Night.Sans(9.5f), Margin = new Padding(0, 6, 0, 0) };
-    private readonly Label detailTitle = new() { AutoSize = true, Font = Night.Serif(30), ForeColor = Night.Ink, Margin = new Padding(0, 0, 0, 4) };
+    private readonly TextBox detailTitle = new() { BorderStyle = BorderStyle.None, Font = Night.Serif(25.5f), ForeColor = Night.Ink, BackColor = Night.Canvas, Margin = new Padding(0, 4, 0, 4) };
+    private readonly Label detailStatus = new() { AutoSize = true, ForeColor = Night.Ink2, Font = Night.Sans(9.5f), Margin = new Padding(4, 0, 0, 0), Text = "Enregistrement prêt" };
+    private readonly Label tabTranscript = SegmentLabel("Transcription");
+    private readonly Label tabAgent = SegmentLabel("Agent");
+    private readonly Capsule listen = new("Écouter", CapsuleKind.Ghost, "\uE768");
+    private Panel? detailBody;
+    private Control? detailTranscriptView;
     private readonly Label detailMeta = new() { AutoSize = true, ForeColor = Night.Ink2, Margin = new Padding(0, 0, 0, 18) };
     private readonly Label micDot = Dot();
     private readonly Label audioDot = Dot();
@@ -663,7 +694,7 @@ internal sealed partial class Notebook : Form
 
     private Control Sidebar()
     {
-        var side = new TableLayoutPanel { Dock = DockStyle.Fill, BackColor = Night.Veil, ColumnCount = 1, RowCount = 5, Padding = new Padding(12, 18, 12, 16) };
+        var side = new TableLayoutPanel { Dock = DockStyle.Fill, BackColor = SidebarPanel.Fill, ColumnCount = 1, RowCount = 5, Padding = new Padding(12, 18, 12, 16), Margin = new Padding(0) };
         side.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         side.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         side.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -679,7 +710,6 @@ internal sealed partial class Notebook : Form
         var top = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, FlowDirection = FlowDirection.TopDown, WrapContents = false, Margin = new Padding(0) };
         top.Controls.Add(Nav("Accueil", "\uE80F"));
         top.Controls.Add(Nav("Réunions", "\uE7C3"));
-        top.Controls.Add(Nav("Agent", "\uE99A"));
         side.Controls.Add(top, 0, 1);
 
         var section = new Label { Text = "COMPTE", Font = Night.Sans(8f, true), ForeColor = Night.Ink2, AutoSize = true, Margin = new Padding(10, 0, 0, 6) };
@@ -688,16 +718,19 @@ internal sealed partial class Notebook : Form
         bottom.Controls.Add(Nav("Intégrations", "\uE71B"));
         bottom.Controls.Add(Nav("Paramètres", "\uE713"));
         bottom.Controls.Add(Nav("Compte", "\uE77B"));
-        var billing = new Capsule("Facturation et abonnement", CapsuleKind.Nav, "\uE8C7") { Width = 226 };
+        var billing = new Capsule("Facturation et abonnement", CapsuleKind.Nav, "\uE8C7") { Width = 210 };
         billing.Click += (_, _) => Open(new Uri(agentSite, "/abonnement").AbsoluteUri);
         bottom.Controls.Add(billing);
         side.Controls.Add(bottom, 0, 4);
-        return side;
+        // Comme macOS 26 : la barre latérale flotte, séparée du bord par 8 px, coins arrondis.
+        var floating = new SidebarPanel { Dock = DockStyle.Fill };
+        floating.Inner.Controls.Add(side);
+        return floating;
     }
 
     private Capsule Nav(string name, string glyph)
     {
-        var button = new Capsule(name, CapsuleKind.Nav, glyph) { Width = 226 };
+        var button = new Capsule(name, CapsuleKind.Nav, glyph) { Width = 210 };
         button.Click += (_, _) => ShowPage(name);
         navByName[name] = button;
         return button;
@@ -789,39 +822,134 @@ internal sealed partial class Notebook : Form
         return scroll;
     }
 
+    // Fiche réunion comme MeetingDetailView sur Mac : colonne de 620 centrée, titre modifiable, onglets Transcription | Agent, barre du bas.
     private Control DetailPage()
     {
-        var page = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 3, BackColor = Night.Canvas, Padding = new Padding(48, 32, 48, 24) };
-        page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        page.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        page.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var page = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, BackColor = Night.Canvas, Margin = new Padding(0), Padding = new Padding(0) };
         page.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        var back = new LinkLabel { Text = "‹  Réunions", AutoSize = true, LinkColor = Night.Ink2, ActiveLinkColor = Night.Accent, LinkBehavior = LinkBehavior.HoverUnderline, Margin = new Padding(0, 0, 0, 10) };
-        back.LinkClicked += (_, _) => ShowPage("Réunions");
-        var head = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, FlowDirection = FlowDirection.TopDown, WrapContents = false, Margin = new Padding(0) };
-        head.Controls.Add(back);
-        head.Controls.Add(detailTitle);
-        head.Controls.Add(detailMeta);
-        page.Controls.Add(head, 0, 0);
-        page.SetColumnSpan(head, 2);
-        var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true, Margin = new Padding(0, 0, 0, 18) };
-        actions.Controls.Add(transcribe);
-        actions.Controls.Add(folder);
-        actions.Controls.Add(copy);
-        actions.Controls.Add(agentButton);
-        actions.Controls.Add(showMeeting);
-        actions.Controls.Add(newRecording);
-        actions.Controls.Add(renameMeeting);
-        actions.Controls.Add(deleteMeeting);
-        actions.Controls.Add(incompletePill);
-        page.Controls.Add(actions, 0, 1);
-        page.SetColumnSpan(actions, 2);
-        notesCard.Margin = new Padding(0, 0, 10, 0);
-        transcriptCard.Margin = new Padding(10, 0, 0, 0);
-        page.Controls.Add(notesCard, 0, 2);
-        page.Controls.Add(transcriptCard, 1, 2);
+        page.RowStyles.Add(new RowStyle(SizeType.Absolute, 1));
+        page.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        var host = new Panel { Dock = DockStyle.Fill, BackColor = Night.Canvas, Margin = new Padding(0) };
+        var col = new TableLayoutPanel { ColumnCount = 1, RowCount = 5, BackColor = Night.Canvas, Margin = new Padding(0) };
+        for (var i = 0; i < 4; i++) col.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        col.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var top = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, Margin = new Padding(0, 0, 0, 6) };
+        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        var back = new LinkLabel { Text = "‹  Réunions", AutoSize = true, LinkColor = Night.Ink2, ActiveLinkColor = Night.Accent, LinkBehavior = LinkBehavior.HoverUnderline, Font = Night.Sans(9.5f), Margin = new Padding(0, 8, 0, 0) };
+        back.LinkClicked += (_, _) => { CommitTitle(); ShowPage("Réunions"); };
+        top.Controls.Add(back, 0, 0);
+        var right = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
+        right.Controls.Add(showMeeting);
+        right.Controls.Add(newRecording);
+        top.Controls.Add(right, 1, 0);
+        col.Controls.Add(top, 0, 0);
+
+        detailTitle.Dock = DockStyle.Top;
+        detailTitle.Leave += (_, _) => CommitTitle();
+        detailTitle.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; CommitTitle(); host.Focus(); } };
+        col.Controls.Add(detailTitle, 0, 1);
+        var metaRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
+        detailMeta.Margin = new Padding(0, 4, 10, 0);
+        metaRow.Controls.Add(detailMeta);
+        metaRow.Controls.Add(incompletePill);
+        col.Controls.Add(metaRow, 0, 2);
+        var segments = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.Top, Margin = new Padding(0, 14, 0, 18), BackColor = Night.Surface, Padding = new Padding(2) };
+        segments.Controls.Add(tabTranscript);
+        segments.Controls.Add(tabAgent);
+        tabTranscript.Click += (_, _) => SelectDetailTab(false);
+        tabAgent.Click += (_, _) => SelectDetailTab(true);
+        col.Controls.Add(segments, 0, 3);
+
+        detailBody = new Panel { Dock = DockStyle.Fill, BackColor = Night.Canvas, Margin = new Padding(0) };
+        var view = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, BackColor = Night.Canvas, Margin = new Padding(0) };
+        view.RowStyles.Add(new RowStyle(SizeType.Absolute, 170));
+        view.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        notesCard.Margin = new Padding(0, 0, 0, 14);
+        transcriptCard.Margin = new Padding(0, 0, 0, 12);
+        view.Controls.Add(notesCard, 0, 0);
+        view.Controls.Add(transcriptCard, 0, 1);
+        detailTranscriptView = view;
+        detailBody.Controls.Add(view);
+        col.Controls.Add(detailBody, 0, 4);
+        host.Controls.Add(col);
+        void Place()
+        {
+            var s = host.DeviceDpi / 96f;
+            var w = (int)Math.Min(620 * s, Math.Max(300, host.ClientSize.Width - 56 * s));
+            var y = (int)(28 * s);
+            col.Bounds = new Rectangle((host.ClientSize.Width - w) / 2, y, w, Math.Max(100, host.ClientSize.Height - y));
+        }
+        host.Resize += (_, _) => Place();
+        host.VisibleChanged += (_, _) => Place();
+        page.Controls.Add(host, 0, 0);
+        page.Controls.Add(new Panel { Dock = DockStyle.Fill, BackColor = Night.Line, Margin = new Padding(0) }, 0, 1);
+
+        var bar = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, RowCount = 2, Padding = new Padding(22, 12, 22, 14), BackColor = Night.Canvas, Margin = new Padding(0) };
+        bar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        bar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        var statusRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 8) };
+        statusRow.Controls.Add(new Label { Text = "●", AutoSize = true, ForeColor = Night.Ink2, Font = Night.Sans(7f), Margin = new Padding(0, 3, 0, 0) });
+        statusRow.Controls.Add(detailStatus);
+        bar.Controls.Add(statusRow, 0, 0);
+        bar.SetColumnSpan(statusRow, 2);
+        var left = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
+        listen.Click += (_, _) => { if (tracks.Count > 0) Open(tracks[0].Path); };
+        left.Controls.Add(listen);
+        left.Controls.Add(folder);
+        left.Controls.Add(copy);
+        left.Controls.Add(deleteMeeting);
+        bar.Controls.Add(left, 0, 1);
+        transcribe.Margin = new Padding(0);
+        bar.Controls.Add(transcribe, 1, 1);
+        page.Controls.Add(bar, 0, 2);
         return page;
+    }
+
+    private static Label SegmentLabel(string text) => new()
+    {
+        Text = text, AutoSize = false, Size = new Size(124, 28), TextAlign = ContentAlignment.MiddleCenter,
+        ForeColor = Night.Ink, BackColor = Night.Surface, Font = Night.Sans(9.5f, true), Margin = new Padding(0), Cursor = Cursors.Hand
+    };
+
+    private static readonly Color Olive = ColorTranslator.FromHtml("#5C6B0F");
+
+    private void SelectDetailTab(bool agent)
+    {
+        if (detailBody == null || detailTranscriptView == null || !pageByName.TryGetValue("Agent", out var agentPage)) return;
+        tabTranscript.BackColor = agent ? Night.Surface : Olive;
+        tabAgent.BackColor = agent ? Olive : Night.Surface;
+        if (agent)
+        {
+            RefreshAgentPage();
+            if (agentPage.Parent != detailBody) { agentPage.Parent = detailBody; agentPage.Dock = DockStyle.Fill; }
+            EmbedAgentPage(true);
+            agentPage.Visible = true;
+            agentPage.BringToFront();
+            detailTranscriptView.Visible = false;
+        }
+        else
+        {
+            detailTranscriptView.Visible = true;
+            if (agentPage.Parent == detailBody) agentPage.Visible = false;
+        }
+    }
+
+    // Le titre se renomme en place, comme le champ de titre de la fiche Mac.
+    private void CommitTitle()
+    {
+        if (current == null) return;
+        var text = detailTitle.Text.Trim();
+        if (text == current.Title) return;
+        try
+        {
+            if (text.Length == 0 || !MeetingStore.Rename(current, text)) { detailTitle.Text = current.Title; return; }
+        }
+        catch (Exception ex) { SetStatus("Titre non enregistré : " + ex.Message); detailTitle.Text = current.Title; return; }
+        current = MeetingStore.FromFolder(current.Folder) ?? current;
+        RefreshMeetings();
     }
 
     private Control SettingsPage()
@@ -920,10 +1048,14 @@ internal sealed partial class Notebook : Form
 
     private void ShowPage(string name)
     {
+        // Sur Mac, l’Agent est un onglet de la fiche réunion : sans réunion ouverte, la page Agent reste seule.
+        if (name == "Agent" && current != null) { ShowPage("Détail"); SelectDetailTab(true); return; }
+        if (name == "Agent" && pageByName.TryGetValue("Agent", out var agentPage) && agentPage.Parent != pages) { agentPage.Parent = pages; agentPage.Dock = DockStyle.Fill; EmbedAgentPage(false); }
         if (name == "Accueil" || name == "Réunions") RefreshMeetings();
         if (name == "Agent") RefreshAgentPage();
         if (name == "Intégrations") RefreshIntegrationsPage();
         foreach (var pair in pageByName) pair.Value.Visible = pair.Key == name;
+        if (name == "Détail") SelectDetailTab(false);
         foreach (var pair in navByName)
         {
             pair.Value.Selected = pair.Key == name || (name == "Détail" && pair.Key == "Réunions");
@@ -981,6 +1113,7 @@ internal sealed partial class Notebook : Form
         transcriptIncomplete = File.Exists(Path.Combine(item.Folder, "incomplete.txt"));
         incompletePill.Visible = transcriptIncomplete;
         detailTitle.Text = item.Title;
+        detailStatus.Text = transcript.TextLength > 0 ? "Transcription prête" : "Enregistrement prêt";
         detailMeta.Text = MeetingStore.Day(item.Date) + " · " + MeetingStore.Time(item.Date) + " · " + MeetingStore.DurationText(item.Duration) + " · " + item.Tracks.Count + (item.Tracks.Count > 1 ? " pistes" : " piste");
         ShowPage("Détail");
         RefreshActions();
