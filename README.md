@@ -21,6 +21,7 @@
   <a href="https://meetin-os-recette.vercel.app/"><b>Site</b></a> &nbsp;·&nbsp;
   <a href="https://meetin-os-recette.vercel.app/telecharger"><b>Télécharger</b></a> &nbsp;·&nbsp;
   <a href="#exemples-de-tâches"><b>Exemples</b></a> &nbsp;·&nbsp;
+  <a href="docs/pitch/meetin-os-jury.pdf"><b>Présentation</b></a> &nbsp;·&nbsp;
   <a href="#démarrer"><b>Démarrer</b></a>
 </p>
 
@@ -34,7 +35,7 @@
 
 ## Le problème
 
-Dans une réunion, on dit « je m’en occupe » ou « finalement, Karim le fait mardi »… puis tout le monde repart, et la moitié de ces engagements se perd.
+Dans une réunion, on dit « je m’en occupe » ou « finalement, Karim le fait mardi »… puis tout le monde repart, et ces engagements se perdent.
 
 ## La solution
 
@@ -81,6 +82,23 @@ Ce qu’on dit en réunion, et ce que Meetin-OS en fait après un clic sur **Con
 | *« On devrait commander des pizzas. »* | — | La carte arrive, on clique **Ignorer** : sans validation, rien ne part. |
 
 > 💡 La réunion peut mélanger les langues : une phrase en français au milieu d’un appel en anglais devient une tâche comme les autres.
+
+## Présentation
+
+La présentation du projet pour le jury, en 9 diapos (en anglais) : **[ouvrir le PDF](docs/pitch/meetin-os-jury.pdf)**.
+
+<table>
+  <tr>
+    <td width="33%"><a href="docs/pitch/meetin-os-jury.pdf"><img src="docs/pitch/slide-01-cover.png" alt="Diapo 1 : From the call to the validated task"></a></td>
+    <td width="33%"><a href="docs/pitch/meetin-os-jury.pdf"><img src="docs/pitch/slide-04-flow.png" alt="Diapo 4 : How it works"></a></td>
+    <td width="33%"><a href="docs/pitch/meetin-os-jury.pdf"><img src="docs/pitch/slide-06-examples.png" alt="Diapo 6 : One sentence. One click. Done."></a></td>
+  </tr>
+  <tr>
+    <td><a href="docs/pitch/meetin-os-jury.pdf"><img src="docs/pitch/slide-05-control.png" alt="Diapo 5 : The agent never acts alone"></a></td>
+    <td><a href="docs/pitch/meetin-os-jury.pdf"><img src="docs/pitch/slide-07-partners.png" alt="Diapo 7 : Built with"></a></td>
+    <td><a href="docs/pitch/meetin-os-jury.pdf"><img src="docs/pitch/slide-08-proof.png" alt="Diapo 8 : Tested for real"></a></td>
+  </tr>
+</table>
 
 ## Aperçu
 
