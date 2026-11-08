@@ -212,8 +212,7 @@ struct HomeView: View {
                     .keyboardShortcut("r", modifiers: .command)
                     .disabled(session.busy || session.agent.busy)
                 } else {
-                    Button("Arrêter", systemImage: "stop.fill", action: toggleRecording)
-                        .buttonStyle(.mtGhost)
+                    LiveRecordingBar(level: session.recordingLevel, onStop: toggleRecording)
                         .disabled(session.busy)
                 }
             }
