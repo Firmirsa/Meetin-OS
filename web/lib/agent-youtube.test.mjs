@@ -47,6 +47,11 @@ test('persistent claim prevents concurrent or regenerated proposals from posting
  const status=answer=>async()=>Response.json({id:sid,status:{status:'completed',outcome:'success'},latest_answer:answer});
  const blocked=await youtubeExecutionStatus(run,user,env,status({outcome:'comments_disabled'}));
  assert.equal(blocked.status,'unverified'); assert.match(blocked.message,/désactivés/);
+ // Real H answer of 8 November: no outcome, account "not logged in".
+ const signedOut=await youtubeExecutionStatus(run,user,env,status({account:'not logged in',channel:'@HCompanyOfficial',comment:'Bravo !',verified:false,comment_url:''}));
+ assert.equal(signedOut.status,'unverified'); assert.match(signedOut.message,/pas connecté au compte YouTube/);
+ const unclear=await youtubeExecutionStatus(run,user,env,status({account:'@Fraawdrinn',channel:'@HCompanyOfficial',comment:'Bravo !',verified:false,comment_url:''}));
+ assert.match(unclear.message,/n’a pas confirmé/);
  const answer={verified:true,outcome:'published',channel:'@HCompanyOfficial',account:'@Fraawdrinn',comment:'Bravo !',comment_url:'https://www.youtube.com/watch?v=abcdefghijk&lc=Ugx123'};
  assert.equal((await youtubeExecutionStatus(run,user,env,status(answer))).status,'verified');
  for(const bad of [{account:'@Other'},{channel:'@Other'},{comment:'Other'},{comment_url:'https://evil.example/watch?v=abcdefghijk&lc=Ugx123'},{comment_url:'https://www.youtube.com/watch?v=abcdefghijk'}]) assert.equal((await youtubeExecutionStatus(run,user,env,status({...answer,...bad}))).status,'unverified');

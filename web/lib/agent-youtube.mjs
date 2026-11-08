@@ -97,9 +97,12 @@ export async function youtubeStatus(receipt, user, env, fetcher) {
   if (state === 'completed' && session.status.outcome === 'success' && a?.verified === true &&
       ['published','already_present'].includes(a.outcome) && a.channel === '@HCompanyOfficial' && a.account === '@Fraawdrinn' &&
       a.comment === comment && commentURL(a.comment_url)) return {status:'verified', commentUrl:commentURL(a.comment_url)};
+  // H may omit outcome: an unverified answer from another or no account means the browser was not signed in.
+  const loginRequired = a?.outcome === 'login_required' ||
+    (!a?.outcome && a && a.verified !== true && a.account !== '@Fraawdrinn');
   if (['completed','failed','timed_out','interrupted'].includes(state)) return {status:'unverified', message:
+    loginRequired ? 'Le navigateur H n’est pas connecté au compte YouTube attendu. Aucun commentaire publié.' :
     a?.outcome === 'comments_disabled' ? 'Les vidéos officielles vérifiées ont leurs commentaires désactivés. Aucun commentaire publié.' :
-    a?.outcome === 'login_required' ? 'Le navigateur H n’est pas connecté au compte YouTube attendu. Aucun commentaire publié.' :
     'H n’a pas confirmé le commentaire. Vérifiez la session ; ne relancez pas la publication.'};
   throw new ApiError(502,'État de session H indisponible.');
 }
