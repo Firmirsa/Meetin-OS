@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="brand/logo/app-icon.svg" alt="Logo Meetin-OS" width="96">
+  <img src="brand/logo/app-icon.svg" alt="Logo Meetin-OS" width="88">
 </p>
 
 <h1 align="center">Meetin-OS</h1>
@@ -7,62 +7,80 @@
 <p align="center">
   <b>De l’appel à la tâche validée.</b><br>
   Meetin-OS écoute ta réunion, repère les engagements pris à voix haute<br>
-  et les confie à un agent IA — seulement après ta validation.
+  et les confie à un agent IA, seulement après ta validation.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/macOS-15%2B-14201C?style=flat-square&logo=apple&logoColor=white" alt="macOS 15+">
-  <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-14201C?style=flat-square&logo=windows&logoColor=white" alt="Windows 10 et 11">
-  <img src="https://img.shields.io/badge/Next.js-site%20%26%20serveur-14201C?style=flat-square&logo=nextdotjs&logoColor=white" alt="Next.js">
-  <img src="https://img.shields.io/badge/Gladia-transcription-CFE86B?style=flat-square&labelColor=14201C" alt="Gladia">
   <img src="https://img.shields.io/badge/H%20Company-Holo%20%C2%B7%20Computer%20Use-CFE86B?style=flat-square&labelColor=14201C" alt="H Company">
+  <img src="https://img.shields.io/badge/Gladia-transcription-CFE86B?style=flat-square&labelColor=14201C" alt="Gladia">
   <img src="https://img.shields.io/badge/Devin-code-CFE86B?style=flat-square&labelColor=14201C" alt="Devin">
-  <img src="https://img.shields.io/badge/Stripe-mode%20test-CFE86B?style=flat-square&labelColor=14201C" alt="Stripe en mode test">
+  <img src="https://img.shields.io/badge/Stripe-abonnement-CFE86B?style=flat-square&labelColor=14201C" alt="Stripe">
 </p>
 
 <p align="center">
-  <a href="https://meetin-os-recette.vercel.app/"><b>Site</b></a> ·
-  <a href="https://meetin-os-recette.vercel.app/telecharger"><b>Télécharger</b></a> ·
-  <a href="docs/suivi.md"><b>Suivi du projet</b></a> ·
+  <a href="https://meetin-os-recette.vercel.app/"><b>Site</b></a> &nbsp;·&nbsp;
+  <a href="https://meetin-os-recette.vercel.app/telecharger"><b>Télécharger</b></a> &nbsp;·&nbsp;
+  <a href="#exemples-de-tâches"><b>Exemples</b></a> &nbsp;·&nbsp;
   <a href="#démarrer"><b>Démarrer</b></a>
 </p>
 
+<br>
+
 <p align="center">
-  <img src="docs/images/site-accueil.png" alt="Page d’accueil du site Meetin-OS : De l’appel à la tâche validée, avec l’aperçu du carnet de réunion" width="900">
+  <img src="docs/images/site-accueil.png" alt="Page d’accueil du site Meetin-OS : De l’appel à la tâche validée, avec l’aperçu du carnet de réunion" width="880">
 </p>
 
----
+<br>
 
-## En bref
+## Le problème
 
-Dans une réunion, on dit souvent « je m’en occupe » ou « finalement, Karim le fait mardi »… puis tout le monde repart, et la moitié des engagements se perd.
+Dans une réunion, on dit « je m’en occupe » ou « finalement, Karim le fait mardi »… puis tout le monde repart, et la moitié de ces engagements se perd.
 
-- 🎙️ **Il écoute.** Meetin-OS enregistre ton micro et le son de l’appel sur deux pistes, et la transcription s’écrit en direct.
-- 🧠 **Il repère les tâches.** Toutes les 15 secondes, Holo (H Company) lit le texte et propose des tâches, chacune avec la **phrase exacte** qui la justifie.
-- ✅ **Tu valides.** Rien ne part sans un clic sur **Confirmer et lancer**.
-- 🤖 **L’agent exécute.** Devin écrit le code et ouvre une pull request ; H Computer Use clique dans le tableau Trello comme un humain.
+## La solution
 
-> Projet du **H Company × 42AI Computer Use Agents Hackathon**, les 7 et 8 novembre 2026 à Paris, par **Wael** (app Mac et intégration), **Lenny** (marque) et **Samy** (front).
+<table>
+  <tr>
+    <td align="center" width="25%">🎙️<br><b>Il écoute</b><br><sub>Ton micro et le son de l’appel, sur deux pistes. La transcription s’écrit en direct.</sub></td>
+    <td align="center" width="25%">🧠<br><b>Il repère</b><br><sub>Holo lit la réunion toutes les 15 s et propose les tâches, avec la phrase exacte qui les justifie.</sub></td>
+    <td align="center" width="25%">✅<br><b>Tu valides</b><br><sub>Rien ne part sans ton clic sur <b>Confirmer et lancer</b>.</sub></td>
+    <td align="center" width="25%">🤖<br><b>L’agent agit</b><br><sub>Devin écrit le code. H Computer Use clique dans tes outils web comme un humain.</sub></td>
+  </tr>
+</table>
 
 ## Comment ça marche
 
 ```mermaid
 flowchart LR
-    A["🎙️ Réunion<br/>micro + son de l’appel"] --> B["Gladia<br/>transcription en direct"]
-    B --> C["Holo · H Company<br/>repère les tâches"]
-    C --> D["Carte « À valider »<br/>+ citation exacte"]
-    D -->|Confirmer et lancer| E{"Quel agent ?"}
-    E -->|code| F["Devin<br/>pull request à relire"]
-    E -->|outil web| G["H Computer Use<br/>fiche dans Trello"]
-    F --> H["Lien de suivi<br/>dans l’app"]
-    G --> H
+    A["🎙️ Réunion"] --> B["Gladia<br/>transcription"]
+    B --> C["Holo<br/>repère la tâche"]
+    C --> D["Carte à valider<br/>+ citation"]
+    D -->|"✅ Confirmer"| E{"Agent"}
+    E -->|code| F["Devin<br/>pull request"]
+    E -->|outil web| G["H Computer Use<br/>fiche Trello"]
 ```
 
-1. **Capturer.** L’app Mac enregistre deux pistes séparées : ta voix (micro) et celle des autres (son de l’appel). On sait ainsi qui a dit quoi.
-2. **Transcrire.** Gladia écrit le texte en direct, en français et en anglais, avec l’heure de chaque phrase.
-3. **Repérer.** Le serveur envoie le texte à Holo, qui propose au plus 3 tâches. Une tâche dont la citation n’existe pas mot pour mot dans la transcription est rejetée. Si quelqu’un se corrige, la carte est mise à jour au lieu d’être dupliquée.
-4. **Valider.** Tu relis la carte, sa destination et la citation, puis tu confirmes. La validation est signée par le serveur et reste valable 15 minutes.
-5. **Exécuter.** Devin travaille sur une branche et ouvre une pull request ; H Computer Use fait une seule création ou modification de fiche dans le tableau de test (25 étapes, 2 minutes au maximum).
+1. **Capturer.** Deux pistes séparées, ta voix et celle des autres : on sait qui a dit quoi.
+2. **Transcrire.** Gladia écrit le texte en direct, en français comme en anglais, avec l’heure de chaque phrase.
+3. **Repérer.** Holo propose les tâches. Chaque carte cite mot pour mot la phrase d’origine, et si quelqu’un se corrige, la carte suit.
+4. **Valider.** Tu relis la carte, puis tu confirmes. La validation est signée par le serveur.
+5. **Exécuter.** L’agent choisi fait la tâche, et tu suis son avancement depuis l’app.
+
+## Exemples de tâches
+
+Ce qu’on dit en réunion, et ce que Meetin-OS en fait après un clic sur **Confirmer**.
+
+| 🗣️ En réunion, quelqu’un dit… | Agent | ✨ Après « Confirmer » |
+|---|:---:|---|
+| « Le bouton Télécharger est trop petit sur mobile, il faut le corriger. » | **Devin** | Corrige la page et ouvre une pull request prête à relire. |
+| « La page de téléchargement doit aussi exister en espagnol. » | **Devin** | Traduit la page et ajoute la langue au site. |
+| « Avant vendredi, il faut un test sur l’export des réunions. » | **Devin** | Écrit le test, le lance et propose le changement en pull request. |
+| « On passe l’offre équipe à 20 € par mois. » | **Devin** | Met à jour la page tarifs et l’offre Stripe en mode test. |
+| « Lenny prend le pitch… non, finalement c’est Wael, pour mardi. » | **H Computer Use** | Crée la fiche Trello pour **Wael**, échéance mardi : le changement d’avis est compris. |
+| « La démo est terminée, on peut la passer en Fait. » | **H Computer Use** | Ouvre le tableau, retrouve la fiche et la déplace dans **Fait**. |
+| « Karim, tu relances le client Atlas pour le devis. » | **H Computer Use** | Crée la fiche « Relancer Atlas » au nom de Karim, avec la citation de la réunion. |
+| *« On devrait commander des pizzas. »* | — | La carte arrive, on clique **Ignorer** : sans validation, rien ne part. |
+
+> 💡 La réunion peut mélanger les langues : une phrase en français au milieu d’un appel en anglais devient une tâche comme les autres.
 
 ## Aperçu
 
@@ -72,54 +90,78 @@ flowchart LR
       <img src="docs/images/app-revue-agent.png" alt="Carte d’engagement proposé avec la citation surlignée, et suivi de l’agent avec les valeurs relues sur la fiche">
     </td>
     <td>
-      <b>La carte d’engagement et le suivi de l’agent</b><br><br>
-      L’engagement « Envoyer le devis à Atlas » arrive avec la phrase qui le justifie, surlignée. Après validation, on suit les étapes de l’agent et les valeurs relues sur la fiche.<br><br>
-      <sub>Maquette des écrans de la marque (<a href="brand/components/preview.html"><code>brand/components/preview.html</code></a>).</sub>
+      <b>La carte et le suivi de l’agent</b><br><br>
+      L’engagement « Envoyer le devis à Atlas » arrive avec sa phrase surlignée. Après validation, on suit chaque étape de l’agent et les valeurs relues sur la fiche.
     </td>
   </tr>
   <tr>
     <td colspan="2" align="center">
-      <img src="brand/animations/son-qui-bouge.gif" alt="Barre d’enregistrement animée : chrono, barres de niveau sonore, boutons Pause et Arrêter" width="760"><br>
-      <sub>La barre d’enregistrement : le chrono et les barres de niveau qui suivent la voix.</sub>
+      <img src="brand/animations/son-qui-bouge.gif" alt="Barre d’enregistrement animée : chrono, barres de niveau sonore, boutons Pause et Arrêter" width="720"><br>
+      <sub>La barre d’enregistrement : le chrono et les barres qui suivent la voix.</sub>
     </td>
   </tr>
   <tr>
     <td width="60%">
-      <img src="docs/images/agent-en-action.jpg" alt="L’agent parcourt la liste des participants du hackathon, à côté de la carte Meetin-OS Lancée">
+      <img src="docs/images/agent-en-action.jpg" alt="L’agent parcourt la liste des participants du hackathon, à côté de la carte Meetin-OS">
     </td>
     <td>
       <b>L’agent en action</b><br><br>
-      À gauche, l’agent travaille dans le navigateur. À droite, la carte Meetin-OS « Launched » et la session H Computer Use, avec ses étapes, sa réflexion et ses actions.<br><br>
-      <sub>Extrait de la vidéo démo (mise en scène pour le hackathon).</sub>
+      À gauche, l’agent travaille dans le navigateur. À droite, la carte Meetin-OS et la session H Computer Use, avec ses étapes et ses actions.<br><br>
+      <sub>Extrait de notre vidéo démo.</sub>
     </td>
   </tr>
 </table>
 
 ## Fonctionnalités
 
-| | Mac | Windows |
-|---|:---:|:---:|
-| Enregistrement deux pistes (micro + appel) | ✅ | ✅ |
-| Carnet de notes pendant l’appel | ✅ | ✅ |
-| Transcription Gladia après l’appel | ✅ | ✅ |
-| Transcription en direct | ✅ | — |
-| Tâches proposées pendant l’appel, avec notification | ✅ | — |
-| Onglet **Agent** : Devin et H Computer Use | ✅ | — |
-| Historique des réunions | ✅ | — |
-| Ouverture automatique en rejoignant un appel Zoom | ✅ | — |
+<table>
+  <tr>
+    <td width="50%">🎧 <b>Enregistrement deux pistes</b><br><sub>Micro et son de l’appel, séparés et réécoutables.</sub></td>
+    <td width="50%">📝 <b>Carnet de notes</b><br><sub>Tes notes prises pendant l’appel, à côté de la transcription.</sub></td>
+  </tr>
+  <tr>
+    <td>⚡ <b>Transcription en direct</b><br><sub>Gladia, en français et en anglais, horodatée.</sub></td>
+    <td>🔔 <b>Tâches en temps réel</b><br><sub>Une carte et une notification dès qu’un engagement est pris.</sub></td>
+  </tr>
+  <tr>
+    <td>🤖 <b>Onglet Agent</b><br><sub>Devin pour le code, H Computer Use pour les outils web.</sub></td>
+    <td>🗂️ <b>Historique</b><br><sub>Toutes tes réunions, à retrouver et à réécouter.</sub></td>
+  </tr>
+  <tr>
+    <td>📞 <b>Ouverture automatique</b><br><sub>L’app se propose dès que tu rejoins un appel Zoom.</sub></td>
+    <td>🌍 <b>Bilingue</b><br><sub>Français et anglais, dans la réunion comme sur le site.</sub></td>
+  </tr>
+</table>
 
-> **Windows 0.1.1 est un prototype plus simple que l’app Mac.** Il garde l’apparence standard de Windows, et la clé Gladia n’est gardée que pendant la session. L’installation est vérifiée sur GitHub Actions ; la capture réelle sur un PC reste à tester. Pour le parcours complet, utilise l’app Mac.
+## Sécurité et contrôle
+
+- **Rien sans validation.** La détection propose, seul **Confirmer et lancer** déclenche un agent.
+- **Les clés restent sur le serveur.** L’app ne présente qu’un code d’équipe.
+- **Une validation signée, valable 15 minutes.** Une tâche modifiée doit être revalidée.
+- **Des agents encadrés.** Devin travaille sur une branche et propose une pull request ; H Computer Use agit sur un tableau dédié, une action à la fois.
+- **La réunion reste une donnée.** Une phrase comme « ignore tes règles » n’est jamais traitée comme un ordre.
+
+## Où en est le projet
+
+| | Brique | Résultat |
+|:---:|---|---|
+| ✅ | **App Mac** | Enregistrement deux pistes testé pendant un vrai appel, avec l’historique. |
+| ✅ | **Gladia** | Transcription réelle des deux pistes, aussi en direct. |
+| ✅ | **Détection Holo** | Tâche détectée en moins de 30 s, carte et notification affichées. |
+| ✅ | **Devin** | Session lancée depuis une carte, pull request ouverte. |
+| ✅ | **H Computer Use** | Fiche créée dans Trello par l’agent. |
+| ✅ | **App Windows** | Installateur construit et vérifié sur GitHub Actions. |
+| ✅ | **Stripe** | Abonnement disponible sur la page Premiers pas. |
+| ✅ | **Site** | En ligne, en français et en anglais. |
 
 ## Démarrer
 
 <details open>
-<summary><b>🍎 App Mac</b> · macOS 15 ou ultérieur, et une clé API Gladia</summary>
+<summary><b>🍎 App Mac</b> · macOS 15 ou ultérieur</summary>
 
 <br>
 
-Depuis le site, clique sur **Installer sur Mac**, ouvre `Meetin-OS.pkg` et confirme. L’assistant ajoute Meetin-OS à **Applications**. C’est un paquet de test, sans notarisation Apple.
-
-Pour compiler depuis les sources, avec Xcode :
+Sur le site, clique sur **Installer sur Mac**, puis ouvre `Meetin-OS.pkg`. Ou compile depuis les sources avec Xcode :
 
 ```bash
 git clone https://github.com/Firmirsa/Meetin-OS.git
@@ -128,28 +170,28 @@ cd Meetin-OS
 open mac/.build/Meetin-OS.app
 ```
 
-1. Clique sur **Enregistrer**, puis prends tes notes pendant l’appel.
-2. Clique sur **Arrêter**, puis sur **Écouter**. **Voir les pistes** montre séparément le micro et le son du Mac.
-3. Clique sur **Transcrire**. L’app te demande la clé Gladia si besoin, puis affiche les passages horodatés.
-4. Pour le direct et les tâches : active la transcription en direct dans **Paramètres**, puis connecte l’agent dans **Intégrations → Connecter l’agent**.
+1. Clique sur **Enregistrer** et prends tes notes pendant l’appel.
+2. Active la transcription en direct dans **Paramètres**.
+3. Connecte l’agent dans **Intégrations → Connecter l’agent**.
+4. Valide les cartes qui arrivent, et suis l’agent dans l’onglet **Agent**.
 
-Le [guide macOS](mac/README.md) détaille les permissions, les fichiers audio et la configuration.
+Plus de détails dans le [guide macOS](mac/README.md).
 
 </details>
 
 <details>
-<summary><b>💻 App Windows</b> · Windows 10 ou 11 (x64)</summary>
+<summary><b>💻 App Windows</b> · Windows 10 ou 11</summary>
 
 <br>
 
-Clique sur **Installer sur Windows** depuis le site, puis ouvre `Meetin-OS-Windows.exe`. L’assistant installe le carnet pour ton compte et crée le raccourci **Meetin-OS** dans Démarrer. L’installateur n’est pas signé : Windows peut afficher une alerte.
+Sur le site, clique sur **Installer sur Windows**, puis ouvre `Meetin-OS-Windows.exe`. Le raccourci **Meetin-OS** apparaît dans le menu Démarrer.
 
-Le [guide Windows](windows/README.md) décrit la capture des deux pistes et la construction de l’installateur.
+Plus de détails dans le [guide Windows](windows/README.md).
 
 </details>
 
 <details>
-<summary><b>🌐 Site et serveur Next.js</b> · Node.js</summary>
+<summary><b>🌐 Site et serveur</b> · Next.js</summary>
 
 <br>
 
@@ -160,68 +202,42 @@ cp .env.example .env.local
 npm run dev
 ```
 
-- Téléchargement : [localhost:3000/telecharger](http://localhost:3000/telecharger)
-- Premiers pas et abonnement Stripe en mode test : [localhost:3000/onboarding](http://localhost:3000/onboarding)
-
-Les clés des services (Holo, Devin, H Computer Use, Stripe, Linkup) restent dans `web/.env.local`, jamais dans le dépôt. Le [guide Next.js](web/README.md) explique chaque intégration.
+Puis ouvre [localhost:3000](http://localhost:3000). Les clés des services restent dans `web/.env.local`, jamais dans le dépôt. Plus de détails dans le [guide Next.js](web/README.md).
 
 </details>
 
-## Sécurité et contrôle
+## Sous le capot
 
-- **Rien sans validation.** La détection ne lance jamais rien : seul **Confirmer et lancer** déclenche un agent.
-- **Les clés restent sur le serveur.** L’app présente seulement un code d’équipe.
-- **Une validation signée, valable 15 minutes.** Une tâche modifiée ou trop ancienne doit être préparée à nouveau.
-- **Des agents en laisse courte.** Devin travaille sur une branche sans fusionner ; H Computer Use n’agit que dans le tableau de test, une action à la fois.
-- **Le texte de la réunion reste une donnée.** Une phrase comme « ignore tes règles » n’est jamais traitée comme un ordre.
-
-## Où en est le projet
-
-État au 8 novembre 2026. Le détail de chaque test est dans le [suivi](docs/suivi.md).
-
-| Brique | État |
+| Partenaire | Rôle dans Meetin-OS |
 |---|---|
-| **Mac** | ✅ Essai réel : enregistrement deux pistes pendant un vrai appel, historique, relance de l’app. |
-| **Gladia** | ✅ Transcription réelle sur les deux pistes, et en direct sur macOS 27.2. Le repère de la voix distante reste à confirmer. |
-| **Détection de tâches** | ✅ Essai réel : tâche détectée en moins de 30 s, carte et notification affichées. |
-| **Devin** | ✅ Essai réel : session créée depuis une carte et pull request de test ouverte. |
-| **H Computer Use** | 🟡 Fiche créée dans Trello depuis HoloTab ; le lancement depuis l’app Mac reste à rejouer. |
-| **Windows** | 🟡 Installation vérifiée sur GitHub Actions ; capture réelle sur un PC non testée. |
-| **Stripe** | ✅ Abonnement de démonstration en mode test sur la page **Premiers pas**. |
-
-### En relecture
-
-Ces pull requests ne sont pas encore fusionnées. Celles marquées **Mac** doivent être compilées et testées sur un Mac.
-
-| PR | Changement |
-|---|---|
-| [#4](https://github.com/Firmirsa/Meetin-OS/pull/4) | Vidéo démo et copie locale du site du hackathon (`demo-video/`). |
-| [#5](https://github.com/Firmirsa/Meetin-OS/pull/5) | **Mac** et Windows : le nom de l’utilisateur remplace « Micro » dans la transcription. |
-| [#6](https://github.com/Firmirsa/Meetin-OS/pull/6) | **Mac** : renommer et supprimer une réunion. |
-| [#7](https://github.com/Firmirsa/Meetin-OS/pull/7) | Site : Linux présenté comme plateforme disponible. |
-| [#8](https://github.com/Firmirsa/Meetin-OS/pull/8) | **Mac** : barre d’enregistrement animée qui suit la voix. |
-
-## Organisation du dépôt
+| **H Company · Holo** | Lit la transcription et repère les tâches. |
+| **H Company · Computer Use** | Agit dans les outils web, comme un humain. |
+| **Gladia** | Transcrit la réunion en direct. |
+| **Devin** | Écrit le code et ouvre les pull requests. |
+| **Stripe** | Gère l’abonnement. |
 
 ```text
 Meetin-OS/
-├── mac/        App Mac (Swift, SwiftUI) : capture, transcription, onglet Agent
-├── windows/    App Windows (C#, .NET) : carnet, capture, Gladia
-├── web/        Site et serveur Next.js : téléchargement, premiers pas, routes de l’agent
-├── brand/      Marque : couleurs, polices, logo, composants, animations
-└── docs/       Suivi, plan, contrat front-agent, fiche du hackathon
+├── mac/        App Mac (Swift, SwiftUI)
+├── windows/    App Windows (C#, .NET)
+├── web/        Site et serveur Next.js, routes de l’agent
+├── brand/      Couleurs, polices, logo, composants, animations
+└── docs/       Suivi, contrat front-agent, fiche du hackathon
 ```
 
-## Documentation
+## L’équipe
 
-- [Suivi du projet](docs/suivi.md) · État des tests et prochaines actions.
-- [Guide macOS](mac/README.md) · Installation, capture et transcription.
-- [Guide Windows](windows/README.md) · Installation, capture et compilation.
-- [Guide Next.js](web/README.md) · Premiers pas et intégrations serveur.
-- [Marque](brand/README.md) · Palette, typographie et composants.
-- [Plan d’exécution](docs/plan-hackathon.md) · Répartition et scénario.
-- [Fiche du hackathon](docs/hackathon.md) · Règles, barème et ressources partenaires.
+Projet créé pour le **H Company × 42AI Computer Use Agents Hackathon**, les 7 et 8 novembre 2026 à Paris.
+
+| | |
+|---|---|
+| **Wael** | App Mac et intégration des agents |
+| **Lenny** | Marque et design |
+| **Samy** | Site et front |
+
+<br>
 
 <p align="center">
-  <sub>Fait à Paris par Wael, Lenny et Samy · H Company × 42AI Computer Use Agents Hackathon · novembre 2026</sub>
+  <img src="brand/logo/app-icon.svg" alt="" width="32"><br>
+  <sub>Meetin-OS · De l’appel à la tâche validée</sub>
 </p>
