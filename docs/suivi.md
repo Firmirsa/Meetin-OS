@@ -15,3 +15,18 @@ Dernier point : 7 novembre 2026. La [bêta 0.1.0](https://github.com/Firmirsa/Me
 | Recette H Computer Use · Trello | Le 7 novembre, après confirmation de Wael, HoloTab en mode supervisé a créé « Relire le guide » dans À faire sur le tableau Meetin-OS Démo, depuis Chrome connecté à Trello. Vérification dans Trello : une seule fiche dans la liste, puis ouverture de cette fiche. | Rejouer la création depuis l’app Mac avec un profil H Platform connecté au tableau de test. |
 | Premiers pas · Mac et web | Mac 0.1.3 propose le carnet sans compte et un écran Intégrations. Le 7 novembre, test local avec réponses simulées du code refusé, de la préparation reprise après connexion et de la proposition Trello conservée jusqu’à la vérification des accès. Le site présente les outils facultatifs en français et en anglais. | Relier le profil H de démo au tableau Trello et rejouer le parcours avec les accès réels. |
 | Site et démo · Lenny et équipe | Le site Next.js contient les téléchargements, les premiers pas et Stripe Checkout en mode test. L’installateur Mac 0.1.3 est dans le dépôt. | Vérifier la version servie par Vercel et répéter le parcours avec les comptes de test. |
+
+Le 8 novembre, recette visuelle du lot d’interface sur macOS 27.3 avec Mac 0.1.6 compilé sur `codex/google-agent` (`1a4f566`, qui contient `644ba8a`), serveur de recette au même commit. Vérifié à l’écran :
+- Intégrations : logos et états réels (Google connecté, Trello et Calendar à venir, Devin et H disponibles).
+- Facturation : offres Gratuit et Premium, plan actuel « Votre offre », boutons avec pictogrammes. « Se déconnecter » n’apparaît que dans Compte.
+- Enregistrement réel avec voix de synthèse : transcription en direct et barre audio. Pause : minuteur figé, phrase dite pendant la pause absente. Reprendre dans la même réunion, puis Terminer : réunion enregistrée.
+- Navigation vers Intégrations et Facturation pendant la pause, retour sans perte.
+- Une tâche de code dictée devient une proposition Devin « À valider » en quelques secondes, sans lancement automatique.
+- Historique : renommage conservé, réunion rouverte, suppression de la seule réunion de test après confirmation.
+
+Défauts mineurs relevés :
+- Au lancement, l’app n’ouvre aucune fenêtre ; il faut cliquer sur l’icône du Dock.
+- En pause, l’onglet Agent affiche le texte brut « Détection interrompue : cancelled ».
+- Une erreur de transcription (« CFURL » pour « safe URL ») passe dans la tâche.
+- La voix diffusée par les haut-parleurs est classée « Audio distant ».
+- Premium affiche « Souscription indisponible » : Stripe n’est pas configuré sur la recette.
