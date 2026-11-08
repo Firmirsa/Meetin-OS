@@ -11,7 +11,7 @@ const language_config = {languages: ['fr', 'en'], code_switching: true};
 export const custom_vocabulary_config = {
   default_intensity: 0.5,
   vocabulary: [
-    {value: 'Lenny', pronunciations: ['Léni', 'Lény', 'Lenni', "L'ENIA"]},
+    {value: 'Lenny', intensity: 0.7, pronunciations: ['Leni', 'Léni', 'Lény', 'Leny', 'Lenni', 'Lennie', "L'ENIA", "L'Enia"]},
     {value: 'Wael', pronunciations: ['Waël', 'Wail', 'Waelle']},
     'Samy',
     {value: 'H Company', pronunciations: ['H compagnie', 'Ash Company', 'Hache company', 'H-Company']},
