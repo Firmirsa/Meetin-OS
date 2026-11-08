@@ -22,5 +22,6 @@
     <Reference Include="System.Windows.Forms" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
     <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+    <None Include="Fonts\*.ttf;Fonts\*.txt" CopyToOutputDirectory="PreserveNewest" LinkBase="Fonts" />
   </ItemGroup>
 </Project>

@@ -16,7 +16,7 @@ using Microsoft.Win32;
 namespace MeetinOS;
 
 // Thème nuit de l’app Mac (mac/NightTheme.swift, web/theme-nuit.css) : fond encre, verre fumé, citron.
-// EB Garamond et Figtree ne sont pas embarquées : Georgia et Segoe UI sont les polices de repli du site.
+// EB Garamond (titres) et Figtree (interface) sont embarquées comme sur Mac (brand/fonts) ; Georgia et Segoe UI restent le repli.
 internal static class Night
 {
     public static readonly Color Canvas = ColorTranslator.FromHtml("#0F1613");
@@ -36,8 +36,10 @@ internal static class Night
     public const int CardRadius = 14;
     public const int InputRadius = 10;
 
-    public static Font Serif(float size) => new("Georgia", size, GraphicsUnit.Point);
-    public static Font Sans(float size, bool medium = false) => new(medium ? "Segoe UI Semibold" : "Segoe UI", size, GraphicsUnit.Point);
+    public static Font Serif(float size) => BrandFonts.Create(BrandFonts.Serif, "Georgia", size * BrandFonts.SerifScale, FontStyle.Regular);
+    public static Font Sans(float size, bool medium = false) => medium
+        ? BrandFonts.Create(BrandFonts.SansMedium, "Segoe UI Semibold", size, FontStyle.Regular)
+        : BrandFonts.Create(BrandFonts.Sans, "Segoe UI", size, FontStyle.Regular);
     public static Font Mono(float size) => new("Consolas", size, GraphicsUnit.Point);
     public static Font Icons(float size) => new("Segoe MDL2 Assets", size, GraphicsUnit.Point);
 
@@ -1430,9 +1432,17 @@ internal sealed partial class Notebook : Form
 
     private static Panel ScrollPane() => new() { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Night.Canvas };
 
-    // Largeur utile d’une page : celle visible du volet, moins les marges et la barre de défilement, bornée comme sur Mac.
-    private static int PageWidth(Panel scroll, FlowLayoutPanel content) =>
-        Math.Max(300, Math.Min(960, scroll.ClientSize.Width - content.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth));
+    // Comme sur Mac (maxWidth 800, marges 48, centré) : colonne de 800 pt au plus, centrée dans la page.
+    private static int PageWidth(Panel scroll, FlowLayoutPanel content)
+    {
+        var scale = scroll.DeviceDpi / 96f;
+        var available = scroll.ClientSize.Width - SystemInformation.VerticalScrollBarWidth;
+        var column = (int)Math.Min(800 * scale, Math.Max(300, available - 96 * scale));
+        var side = Math.Max((int)(48 * scale), (available - column) / 2);
+        if (content.Padding.Left != side || content.Padding.Right != side)
+            content.Padding = new Padding(side, content.Padding.Top, side, content.Padding.Bottom);
+        return column;
+    }
 
     private static FlowLayoutPanel Column(int left, int top, int right, int bottom) => new()
     {
