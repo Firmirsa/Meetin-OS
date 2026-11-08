@@ -29,12 +29,12 @@ struct Sidebar: View {
                 .padding(.horizontal, 10)
                 .padding(.bottom, 4)
                 .accessibilityAddTraits(.isHeader)
-            row("Intégrations", icon: "puzzlepiece.extension", selected: false) {
+            row("Intégrations", icon: "puzzlepiece.extension", selected: session.route == .integrations) {
                 session.integrationsRequest = IntegrationsRequest(page: .catalog)
             }
             row("Paramètres", icon: "gearshape", selected: session.route == .settings) { session.route = .settings }
             row(session.accountConnected ? "Compte" : "Se connecter", icon: "person", selected: session.route == .account) { session.route = .account }
-            row("Facturation et abonnement", icon: "creditcard", selected: false) { session.route = .account }
+            row("Facturation et abonnement", icon: "creditcard", selected: session.route == .billing) { session.route = .billing }
         }
         .padding(.horizontal, 12)
         .padding(.top, 10)

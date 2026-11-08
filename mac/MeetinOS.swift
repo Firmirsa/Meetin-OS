@@ -50,6 +50,8 @@ final class MeetingSession {
     var recordedTracks: AudioCapture.Tracks?
     var busy = false
     let account = HostedAccount()
+    var billingLaunchPending = false
+    var billingRequestBusy = false
     var live: LiveTranscription?
     var statusBelongsToMeeting = false
     var transcriptIncomplete = false { didSet { syncMeeting() } }
@@ -60,7 +62,9 @@ final class MeetingSession {
     var openWindowAction: OpenWindowAction?
     var proposalIssues: [String: String] = [:]
     var agentAccess: AgentAccess?
-    var integrationsRequest: IntegrationsRequest?
+    var integrationsRequest: IntegrationsRequest? {
+        didSet { if integrationsRequest != nil { route = .integrations } }
+    }
     let agent = AgentWorkspaceState()
     var status = "Prêt à enregistrer"
     var permissionHelp: AudioPermissionHelp? { didSet { noteSystemAudioPermission() } }
@@ -85,7 +89,21 @@ final class MeetingSession {
     }
     var notes = "" { didSet { syncMeeting() } }
     let store = MeetingStore()
-    var route: MainRoute = .home
+    var pageReturnRoute: MainRoute = .home
+    var route: MainRoute = .home {
+        didSet {
+            if oldValue == .integrations && route != .integrations { integrationsRequest = nil }
+            if [.settings, .account, .integrations, .billing].contains(route),
+               ![.settings, .account, .integrations, .billing].contains(oldValue) {
+                pageReturnRoute = oldValue
+            }
+        }
+    }
+
+    func returnFromPage() {
+        route = pageReturnRoute
+        integrationsRequest = nil
+    }
     var meetingID: UUID?
     var startedAt: Date?
     var recordingSource: MeetingSource?
@@ -126,12 +144,46 @@ struct CaptureView: View {
     @Bindable var session: MeetingSession
     var isMeetingWindow = false
     @State private var integrationsRequest: IntegrationsRequest?
+    @State private var internalRoute: MainRoute?
     @AppStorage("webWorkspaceURL") private var webWorkspaceURL = MeetinSite.defaultAddress
     @SceneStorage("meetingWorkspaceTab") private var selectedTab = MeetingWorkspaceTab.transcription.rawValue
 
     private var tab: MeetingWorkspaceTab { MeetingWorkspaceTab(rawValue: selectedTab) ?? .transcription }
 
     var body: some View {
+        ZStack {
+            meetingContent
+                .modifier(MeetingPaneVisibility(visible: internalRoute == nil))
+            if let internalRoute {
+                VStack(spacing: 0) {
+                    HStack {
+                        Button("Retour à la réunion", systemImage: "chevron.left", action: returnToMeeting)
+                            .buttonStyle(.mtGhost)
+                        Spacer()
+                    }.padding(16)
+                    switch internalRoute {
+                    case .integrations:
+                        if let request = integrationsRequest {
+                            IntegrationsNativePage(session: session, workspaceURL: $webWorkspaceURL,
+                                                   request: request, back: returnToMeeting, transcribe: transcribe,
+                                                   showsBack: false)
+                        }
+                    case .billing: BillingPage(session: session, showsBack: false)
+                    case .account:
+                        AccountPage(session: session, showsBack: false) {
+                            showIntegrations(session.agentAccess == nil ? .agent : .catalog)
+                        }
+                    case .settings:
+                        SettingsPage(session: session, showsBack: false, navigate: { self.internalRoute = $0 })
+                    default: EmptyView()
+                    }
+                }
+                .background(Color.mtCanvas)
+            }
+        }
+    }
+
+    private var meetingContent: some View {
         VStack(spacing: 0) {
             if isMeetingWindow {
                 HStack(spacing: 10) {
@@ -142,8 +194,14 @@ struct CaptureView: View {
                     Button("Intégrations", systemImage: "puzzlepiece.extension") { showIntegrations(.catalog) }
                         .buttonStyle(.borderless)
                         .disabled(session.agent.busy)
+                    Button { internalRoute = .billing } label: {
+                        Image(systemName: "creditcard")
+                    }
+                        .buttonStyle(.borderless)
+                        .help("Facturation et abonnement")
+                        .accessibilityLabel("Facturation et abonnement")
                     Button {
-                        session.showMain(.settings, openWindow: openWindow)
+                        internalRoute = .settings
                     } label: {
                         Image(systemName: "gearshape").frame(width: 24, height: 24)
                     }
@@ -206,7 +264,7 @@ struct CaptureView: View {
                             Text("Transcription").font(.headline).accessibilityAddTraits(.isHeader)
                             LiveTranscriptPanel(live: live, paused: session.captureState == .paused,
                                                 participants: session.participants) {
-                                session.showMain(.account, openWindow: openWindow)
+                                internalRoute = .billing
                             }
                         } else if isMeetingWindow {
                             Text("PENDANT ET APRÈS L’APPEL")
@@ -285,9 +343,6 @@ struct CaptureView: View {
         }
         .foregroundStyle(Color.mtInk)
         .frame(minWidth: isMeetingWindow ? 360 : 560, minHeight: 420)
-        .sheet(item: $integrationsRequest) { request in
-            IntegrationsView(session: session, workspaceURL: $webWorkspaceURL, request: request, transcribe: transcribe)
-        }
         .toolbar {
             if isMeetingWindow, session.recording != nil, session.capture == nil {
                 Button("Nouvel enregistrement", systemImage: "plus", action: toggleRecording)
@@ -309,6 +364,12 @@ struct CaptureView: View {
 
     private func showIntegrations(_ page: IntegrationsPage) {
         integrationsRequest = IntegrationsRequest(page: page)
+        internalRoute = .integrations
+    }
+
+    private func returnToMeeting() {
+        internalRoute = nil
+        integrationsRequest = nil
     }
 
     private func toggleRecording() {

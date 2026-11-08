@@ -22,9 +22,9 @@ struct HostedAccountView: View {
             if busy { ProgressView().controlSize(.small) }
             if !issue.isEmpty { Text(issue).foregroundStyle(Color.mtWarn).textSelection(.enabled) }
         }
-        .task(id: client?.baseURL) { if connected { refresh() } }
+        .task(id: client?.baseURL) { if connected && !session.billingLaunchPending { refresh() } }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            if connected { refresh() }
+            if connected && !session.billingRequestBusy { refresh() }
         }
     }
 
@@ -37,23 +37,35 @@ struct HostedAccountView: View {
                 LabeledContent("Plan", value: plan.planName)
                 LabeledContent("Audio restant", value: "\(duration(plan.remainingMs)) sur \(duration(plan.limitMs)) ce mois-ci")
                 if plan.plan != "premium" && plan.checkoutAvailable {
-                    Button("Passer à Premium") { openBilling(manage: false) }.buttonStyle(.mtPrimary).disabled(busy)
+                    Button("Passer à Premium") { openBilling(manage: false) }.buttonStyle(.mtPrimary).disabled(billingDisabled)
                 }
                 if plan.canManageBilling {
-                    Button("Gérer l’abonnement") { openBilling(manage: true) }.buttonStyle(.mtGhost).disabled(busy)
+                    Button("Gérer l’abonnement") { openBilling(manage: true) }.buttonStyle(.mtGhost).disabled(billingDisabled)
+                }
+                if plan.plan != "premium" && !plan.checkoutAvailable {
+                    Text("Le passage à Premium n’est pas configuré sur ce serveur.")
+                        .font(.mtSans(13)).foregroundStyle(Color.mtInk2)
+                }
+                if !plan.canManageBilling {
+                    Text("Aucun portail de gestion disponible pour ce compte sur ce serveur.")
+                        .font(.mtSans(13)).foregroundStyle(Color.mtInk2)
                 }
             } else {
                 Text("L’identité et le quota n’ont pas encore été actualisés.")
                     .font(.mtSans(13)).foregroundStyle(Color.mtInk2)
             }
+            if session.billingLaunchPending {
+                Text("Stripe est ouvert dans le navigateur. Reviens ici après paiement ou annulation, puis actualise le quota si nécessaire.")
+                    .font(.mtSans(13)).foregroundStyle(Color.mtInk2)
+            }
             HStack {
-                Button("Actualiser le quota", action: refresh).buttonStyle(.mtGhost).disabled(busy)
+                Button("Actualiser le quota", action: refresh).buttonStyle(.mtGhost).disabled(busy || session.billingRequestBusy)
                 Button("Se déconnecter") {
                     run { client in
                         await session.account.signOut(client)
                     }
                 }.buttonStyle(.mtGhost)
-                    .disabled(busy || session.busy || session.capture != nil)
+                    .disabled(busy || session.billingRequestBusy || session.billingLaunchPending || session.busy || session.capture != nil)
             }
             Text("La déconnexion conserve les réunions et les brouillons sur ce Mac.")
                 .font(.mtSans(12)).foregroundStyle(Color.mtInk2)
@@ -67,13 +79,28 @@ struct HostedAccountView: View {
     }
 
     private func refresh() {
-        run { client in _ = try await session.account.refreshUsage(client) }
+        run { client in
+            defer { session.billingLaunchPending = false }
+            _ = try await session.account.refreshUsage(client)
+        }
     }
 
+    private var billingDisabled: Bool { busy || session.billingRequestBusy || session.billingLaunchPending }
+
     private func openBilling(manage: Bool) {
+        guard !billingDisabled else { return }
+        guard client != nil else {
+            issue = "Saisis une adresse HTTPS, ou HTTP sur ce Mac."
+            return
+        }
+        session.billingRequestBusy = true
         run { client in
+            defer { session.billingRequestBusy = false }
             let url = try await client.billing(session.account.token(client), manage: manage)
-            NSWorkspace.shared.open(url)
+            guard NSWorkspace.shared.open(url) else {
+                throw AccountClient.Failure(message: "Impossible d’ouvrir Stripe dans le navigateur. Réessaie après avoir vérifié ton navigateur par défaut.")
+            }
+            session.billingLaunchPending = true
         }
     }
 

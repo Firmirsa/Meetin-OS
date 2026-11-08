@@ -4,14 +4,15 @@ import SwiftUI
 private struct SettingsScaffold<Content: View>: View {
     let title: String
     let session: MeetingSession
+    var showsBack = true
     @ViewBuilder let content: Content
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                if session.recording != nil, session.capture == nil {
-                    Button { session.route = .meetingDetail } label: {
-                        Label("Revenir à la réunion", systemImage: "chevron.left").font(.mtSans(13))
+                if showsBack {
+                    Button { session.returnFromPage() } label: {
+                        Label(session.pageReturnRoute == .meetingDetail ? "Retour à la réunion" : "Retour", systemImage: "chevron.left").font(.mtSans(13))
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.mtInk2)
@@ -44,14 +45,18 @@ private struct SettingsSection<Content: View>: View {
 
 struct SettingsPage: View {
     @Bindable var session: MeetingSession
+    var showsBack = true
+    var navigate: ((MainRoute) -> Void)? = nil
     @AppStorage("detectZoomMeetings") private var detectCalls = true
     @AppStorage(MeetingSession.liveTranscriptionKey) private var liveTranscription = true
     var body: some View {
-        SettingsScaffold(title: "Paramètres", session: session) {
+        SettingsScaffold(title: "Paramètres", session: session, showsBack: showsBack) {
             SettingsSection(title: "Transcription") {
                 Text("La transcription utilise ton quota Meetin-OS. Ouvre Compte pour te connecter ou consulter ton plan.")
                     .foregroundStyle(Color.mtInk2)
-                Button("Ouvrir le compte") { session.route = .account }.buttonStyle(.mtGhost)
+                Button("Ouvrir le compte") {
+                    if let navigate { navigate(.account) } else { session.route = .account }
+                }.buttonStyle(.mtGhost)
                 Toggle("Transcription en direct pendant l’enregistrement", isOn: $liveTranscription)
                     .tint(Color.mtControlTint)
                 Text("L’audio est envoyé en continu à Gladia pendant l’enregistrement. Si l’agent est connecté, le texte part aussi chez Holo (H Company) toutes les 15 s pour proposer des tâches. Rien n’est lancé sans ta validation.")
@@ -87,6 +92,8 @@ struct SettingsPage: View {
 
 struct AccountPage: View {
     @Bindable var session: MeetingSession
+    var showsBack = true
+    var openIntegrations: (() -> Void)? = nil
     @AppStorage("webWorkspaceURL") private var webWorkspaceURL = MeetinSite.defaultAddress
 
     private var accountAddress: Binding<String> {
@@ -99,7 +106,7 @@ struct AccountPage: View {
     }
 
     var body: some View {
-        SettingsScaffold(title: "Compte", session: session) {
+        SettingsScaffold(title: "Compte", session: session, showsBack: showsBack) {
             SettingsSection(title: "Compte Meetin-OS") {
                 HostedAccountView(session: session, address: accountAddress)
             }
@@ -113,10 +120,27 @@ struct AccountPage: View {
                         .foregroundStyle(Color.mtWarn)
                 }
                 Button(session.agentAccess == nil ? "Connecter l’agent" : "Gérer l’accès") {
-                    session.integrationsRequest = IntegrationsRequest(page: session.agentAccess == nil ? .agent : .catalog)
+                    if let openIntegrations { openIntegrations() }
+                    else { session.integrationsRequest = IntegrationsRequest(page: session.agentAccess == nil ? .agent : .catalog) }
                 }
                 .buttonStyle(.mtPrimary)
                 .disabled(session.agent.busy)
+            }
+        }
+    }
+}
+
+struct BillingPage: View {
+    @Bindable var session: MeetingSession
+    var showsBack = true
+    @AppStorage("webWorkspaceURL") private var webWorkspaceURL = MeetinSite.defaultAddress
+
+    var body: some View {
+        SettingsScaffold(title: "Facturation et abonnement", session: session, showsBack: showsBack) {
+            SettingsSection(title: "Abonnement Meetin-OS") {
+                HostedAccountView(session: session, address: $webWorkspaceURL)
+                Text("Le paiement et la gestion s’ouvrent sur le site officiel Stripe dans ton navigateur. Au retour, seul le plan confirmé par le serveur fait foi.")
+                    .font(.mtSans(13)).foregroundStyle(Color.mtInk2)
             }
         }
     }

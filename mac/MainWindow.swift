@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum MainRoute: Hashable {
-    case home, meetings, meetingDetail, settings, account
+    case home, meetings, meetingDetail, settings, account, integrations, billing
 }
 
 struct MainWindow: View {
@@ -47,9 +47,6 @@ struct MainWindow: View {
             guard signedIn, session.integrationsRequest == nil, let request = IntegrationsRequest.fromLink(url) else { return }
             session.integrationsRequest = request
         }
-        .sheet(item: $session.integrationsRequest) { request in
-            IntegrationsView(session: session, workspaceURL: $webWorkspaceURL, request: request, transcribe: {})
-        }
         .onChange(of: signedIn && detectCalls, initial: true) { _, enabled in
             session.setCallDetection(enabled, openWindow: openWindow)
         }
@@ -73,7 +70,14 @@ struct MainWindow: View {
                 .navigationSplitViewColumnWidth(min: 240, ideal: 250, max: 290)
                 .toolbar(removing: .sidebarToggle)
         } detail: {
-            page
+            ZStack {
+                // Keep the meeting workspace mounted while account pages cover it.
+                if session.route == .meetingDetail || session.pageReturnRoute == .meetingDetail {
+                    MeetingDetailView(session: session)
+                        .modifier(MeetingPaneVisibility(visible: session.route == .meetingDetail))
+                }
+                if session.route != .meetingDetail { page }
+            }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(MTMist().ignoresSafeArea())
         }
@@ -84,9 +88,15 @@ struct MainWindow: View {
         switch session.route {
         case .home: HomeView(session: session)
         case .meetings: MeetingsView(session: session)
-        case .meetingDetail: MeetingDetailView(session: session)
+        case .meetingDetail: EmptyView()
         case .settings: SettingsPage(session: session)
         case .account: AccountPage(session: session)
+        case .billing: BillingPage(session: session)
+        case .integrations:
+            if let request = session.integrationsRequest {
+                IntegrationsNativePage(session: session, workspaceURL: $webWorkspaceURL, request: request,
+                                       back: session.returnFromPage, transcribe: {})
+            }
         }
     }
 }

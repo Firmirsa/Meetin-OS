@@ -21,7 +21,7 @@ struct IntegrationsRequest: Identifiable {
 }
 
 struct IntegrationsView: View {
-    @Environment(\.dismiss) private var dismiss
+    let dismiss: () -> Void
     @Bindable var session: MeetingSession
     @Binding var workspaceURL: String
     let transcribe: () -> Void
@@ -30,7 +30,9 @@ struct IntegrationsView: View {
     @State private var checking = false
     @State private var issue = ""
 
-    init(session: MeetingSession, workspaceURL: Binding<String>, request: IntegrationsRequest, transcribe: @escaping () -> Void) {
+    init(session: MeetingSession, workspaceURL: Binding<String>, request: IntegrationsRequest, transcribe: @escaping () -> Void,
+         dismiss: @escaping () -> Void) {
+        self.dismiss = dismiss
         self.session = session
         self._workspaceURL = workspaceURL
         self.transcribe = transcribe
@@ -52,10 +54,9 @@ struct IntegrationsView: View {
             if checking { ProgressView("Vérification de l’accès…").controlSize(.small) }
         }
         .padding(24)
-        .frame(width: 475)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.mtCanvas)
         .foregroundStyle(Color.mtInk)
-        .interactiveDismissDisabled(checking)
     }
 
     private var catalog: some View {
@@ -198,5 +199,32 @@ struct IntegrationsView: View {
         session.agentAccess = nil
         session.agent.invalidateReview()
         session.agent.execution = nil
+    }
+}
+
+struct IntegrationsNativePage: View {
+    let session: MeetingSession
+    @Binding var workspaceURL: String
+    let request: IntegrationsRequest
+    let back: () -> Void
+    let transcribe: () -> Void
+    var showsBack = true
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                if showsBack {
+                    Button(session.route == .integrations && session.pageReturnRoute != .meetingDetail ? "Retour" : "Retour à la réunion",
+                           systemImage: "chevron.left", action: back)
+                        .buttonStyle(.mtGhost)
+                }
+                IntegrationsView(session: session, workspaceURL: $workspaceURL, request: request,
+                                 transcribe: transcribe, dismiss: back)
+                    .id(request.id)
+            }
+            .frame(maxWidth: 620, alignment: .leading)
+            .padding(20)
+            .frame(maxWidth: .infinity)
+        }
     }
 }
