@@ -51,3 +51,12 @@ Diagnostic du 8 novembre après le rendu :
   Mesure avec le vrai Holo, 4 essais par phrase : première personne 4/4 ; fausses tâches (notes, idée) 0/4 ; « Léni » 3/4 ; « L’ENIA » 1/4, Holo ignorant la tâche lui-même. Le gain attendu vient surtout du vocabulaire Gladia, pas encore vérifié sur une vraie voix.
 
 Essai réel vers 15h17, voix de Lenny sur la recette (`2b9c70b`) : le direct marche avec le vocabulaire Gladia. « Lenny » prononcé seul est bien transcrit. Dans la phrase, Gladia écrit encore « Leni », mais Holo a quand même proposé la tâche Devin « Ajouter un test pour la page de téléchargement ». Ajout de la variante « Leni » et d’un poids plus fort pour Lenny (`451a162`), déployé ; pas encore réessayé.
+
+Petits défauts de la recette visuelle, corrigés sur `lenny/petits-defauts` (`e241535`), qui part de `lenny/voix-vocabulaire`. Recette redéployée, et app Mac installée sur le Mac de Lenny :
+- Fenêtre au lancement : le carnet s’ouvre à chaque lancement, et la fenêtre de réunion seulement pendant une réunion. Vérifié 5 fois, après fermeture normale et après arrêt forcé.
+- Pause : l’annulation volontaire de la détection n’affiche plus « Détection interrompue : cancelled ».
+- Linkup : les titres de sources s’affichent sans entité HTML, par exemple « l’Australie » au lieu de `l&#039;Australie`.
+
+Vérifications : 25 tests web, build Next.js, 4 tests smoke Mac (Gladia, MeetingStore, détection, direct). Le message de pause n’a pas encore été revu à l’écran.
+
+Script de téléversement du profil H prêt, hors dépôt, pour l’archive Chromium que l’agent de Wael doit fournir.
