@@ -19,11 +19,14 @@ export async function POST(request, { params }) {
     if (operation === 'account-auth') result = await accountAuth(body, token);
     else if (operation === 'account-status') result = await accountStatus(token);
     else if (operation === 'account-billing') result = await accountBilling(body, token);
-    else if (operation === 'agent-access') result = agentAccess(token, await agentEnvironment(operation, token));
-    else if (operation === 'agent-prepare') result = await prepareTask(body, token, await agentEnvironment(operation, token));
-    else if (operation === 'agent-detect') result = await detectTasks(body, token, await agentEnvironment(operation, token));
-    else if (operation === 'agent-execute') result = await executeTask(body, token, await agentEnvironment(operation, token));
-    else if (operation === 'agent-trello-status') result = await trelloExecutionStatus(body, token, await agentEnvironment(operation, token));
+    else if (['agent-access', 'agent-prepare', 'agent-detect', 'agent-execute', 'agent-trello-status'].includes(operation)) {
+      const { userId, providerEnv } = await agentEnvironment(operation, token);
+      if (operation === 'agent-access') result = agentAccess(providerEnv);
+      else if (operation === 'agent-prepare') result = await prepareTask(body, userId, providerEnv);
+      else if (operation === 'agent-detect') result = await detectTasks(body, userId, providerEnv);
+      else if (operation === 'agent-execute') result = await executeTask(body, userId, providerEnv);
+      else result = await trelloExecutionStatus(body, userId, providerEnv);
+    }
     else result = await execute(operation, body, token);
     return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {

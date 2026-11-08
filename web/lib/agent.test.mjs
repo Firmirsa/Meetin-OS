@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { agentAccess, prepareTask, detectTasks, executeTask, trelloExecutionStatus } from './agent.mjs';
 
-const token = 'test-only-team-access-token';
+const token = 'verified-account-id';
 const env = {
-  MEETIN_DEMO_TOKEN: token, HAI_API_KEY: 'holo-fixture', DEVIN_API_KEY: 'devin-fixture',
+  HAI_API_KEY: 'holo-fixture', DEVIN_API_KEY: 'devin-fixture',
   DEVIN_ORG_ID: 'org-1', DEVIN_REPO: 'Firmirsa/Meetin-OS', HAI_COMPUTER_USE_URL: 'https://board.example/test',
 };
 const denied = () => assert.fail('Execution provider called without a valid confirmation');
@@ -18,7 +18,6 @@ function holo(result, inspect = () => {}) {
 }
 
 test('an unclear request asks for context and cannot start an execution', async () => {
-  await assert.rejects(prepareTask({task: 'Corriger ça'}, 'incorrect', env, denied), {status: 401});
   const result = await prepareTask({task: 'Corriger ça'}, token, env, holo({
     status: 'needs_clarification', question: 'Quel export faut-il corriger ?',
   }));
@@ -40,6 +39,7 @@ test('the review rejects invented meeting quotes and expired or changed plans', 
   const [payload, signature] = plan.approval.split('.');
   const modified = {...JSON.parse(Buffer.from(payload, 'base64url')), executor: 'computer_use'};
   const forged = `${Buffer.from(JSON.stringify(modified)).toString('base64url')}.${signature}`;
+  await assert.rejects(executeTask({confirmed: true, approval: plan.approval}, 'another-account', env, denied, 11), {status: 409});
   await assert.rejects(executeTask({confirmed: true, approval: forged}, token, env, denied, 11), {status: 409});
   await assert.rejects(executeTask({confirmed: true, approval: plan.approval}, token, env, denied, plan.expiresAt), {status: 409});
   await assert.rejects(executeTask({confirmed: true, approval: plan.approval}, token, {...env, DEVIN_REPO: 'Other/repo'}, denied, 11), {status: 409});
@@ -85,15 +85,14 @@ test('a confirmed UI task is sent to H with its approved target and idempotency 
 
 test('a private Trello task waits for the team browser profile and keeps its approval', async () => {
   const setup = {...env, HAI_COMPUTER_USE_URL: 'https://trello.com/b/fixture/demo'};
-  assert.throws(() => agentAccess('incorrect', setup), {status: 401});
-  assert.deepEqual(agentAccess(token, setup), {planning: true, trello: false, devin: true});
+  assert.deepEqual(agentAccess(setup), {planning: true, trello: false, devin: true});
   const task = 'Créer « Relire le guide » dans À faire.';
   const plan = await prepareTask({task}, token, setup, holo({status: 'ready', executor: 'computer_use', title: 'Relire le guide', task}));
   const approval = {confirmed: true, approval: plan.approval};
   await assert.rejects(executeTask(approval, token, setup, denied), {status: 503, code: 'trello_setup'});
 
   const configured = {...setup, HAI_BROWSER_PROFILE_ID: '12b9ade5-309f-4508-b82a-52e124a51600'};
-  assert.deepEqual(agentAccess(token, configured), {planning: true, trello: true, devin: true});
+  assert.deepEqual(agentAccess(configured), {planning: true, trello: true, devin: true});
   const result = await executeTask(approval, token, configured, async (url, request) => {
     assert.equal(url, 'https://agp.eu.hcompany.ai/api/v2/sessions');
     assert.equal(JSON.parse(request.body).overrides['agent.environments[kind=web].browser_profile_id'], configured.HAI_BROWSER_PROFILE_ID);
@@ -149,7 +148,7 @@ test('a detected Trello task returns a card only after H verifies it on the appr
   }
   assert.deepEqual(await trelloExecutionStatus(request, token, configured, read('completed', answer, 'partial'), 103), {status: 'unverified'});
   assert.deepEqual(await trelloExecutionStatus(request, token, configured, read('failed', answer), 103), {status: 'unverified'});
-  await assert.rejects(trelloExecutionStatus(request, 'incorrect', configured, denied, 103), {status: 401});
+  await assert.rejects(trelloExecutionStatus(request, 'another-account', configured, denied, 103), {status: 409});
   await assert.rejects(trelloExecutionStatus({trackingToken: plan.approval}, token, configured, denied, 103), {code: 'trello_tracking'});
   await assert.rejects(trelloExecutionStatus(request, token, configured, denied, 101 + 48 * 3600 * 1000), {code: 'trello_tracking'});
   const [payload, signature] = run.trackingToken.split('.');
@@ -160,7 +159,6 @@ test('a detected Trello task returns a card only after H verifies it on the appr
 
 test('task detection proposes reviewable plans without executing anything', async () => {
   const transcript = '[00:10] Micro · Karim corrige l’export des notes avant mardi.\n[00:20] Audio de l’appel · D’accord.';
-  await assert.rejects(detectTasks({transcript}, 'incorrect', env, denied), {status: 401});
   await assert.rejects(detectTasks({}, token, env, denied), {status: 400});
   const result = await detectTasks({transcript}, token, env, holo({tasks: [{
     ref: null, executor: 'devin', title: 'Corriger l’export', task: 'Corriger l’export des notes.',
@@ -212,6 +210,6 @@ test('a corrected commitment updates the known task instead of adding one', asyn
 });
 
 test('task detection skips Holo when no destination is configured', async () => {
-  const bare = {MEETIN_DEMO_TOKEN: token, HAI_API_KEY: 'holo-fixture'};
+  const bare = {HAI_API_KEY: 'holo-fixture'};
   assert.deepEqual(await detectTasks({transcript: 'Karim corrige l’export.'}, token, bare, denied), {tasks: []});
 });

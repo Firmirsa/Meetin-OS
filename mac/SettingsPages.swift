@@ -92,7 +92,6 @@ struct AccountPage: View {
     private var accountAddress: Binding<String> {
         Binding(get: { webWorkspaceURL }, set: { address in
             if MeetinSite.baseURL(address) != MeetinSite.baseURL(webWorkspaceURL) {
-                session.agentAccessCode = ""
                 session.agentAccess = nil
             }
             webWorkspaceURL = address
@@ -104,12 +103,10 @@ struct AccountPage: View {
             SettingsSection(title: "Compte Meetin-OS") {
                 HostedAccountView(session: session, address: accountAddress)
             }
-            SettingsSection(title: "Accès de l’équipe") {
-                Text("Le code de l’équipe donne accès aux outils de l’onglet Agent.")
+            SettingsSection(title: "Agent") {
+                Text("Votre connexion Google donne accès aux outils de l’onglet Agent.")
                     .foregroundStyle(Color.mtInk2)
                 LabeledContent("Adresse du site", value: webWorkspaceURL).font(.mtSans(14))
-                LabeledContent("Code d’accès", value: session.agentAccess == nil ? "Non connecté" : "Validé pour cette session")
-                    .font(.mtSans(14))
                 if MeetinSite.baseURL(webWorkspaceURL) == nil {
                     Text("Utilise une adresse https, ou http sur localhost, sans chemin.")
                         .font(.mtSans(13))

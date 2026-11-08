@@ -1,6 +1,6 @@
 # Site Meetin-OS
 
-Le site Next.js sert les téléchargements à `/telecharger` et les premiers pas à `/onboarding`. L’app Mac utilise `/api/agent-access` pour vérifier le code d’équipe et lire l’état de la configuration, puis `/api/agent-prepare` et `/api/agent-execute` pour préparer et lancer une tâche. Depuis ce dossier, lance `npm ci`, copie `.env.example` vers `.env.local`, puis lance `npm run dev`. Génère `MEETIN_DEMO_TOKEN` avec `openssl rand -hex 32` pour protéger les routes d’intégration.
+Le site Next.js sert les téléchargements à `/telecharger` et les premiers pas à `/onboarding`. L’app Mac utilise `/api/agent-access` pour vérifier sa session Google et lire l’état de la configuration, puis `/api/agent-prepare` et `/api/agent-execute` pour préparer et lancer une tâche. Depuis ce dossier, lance `npm ci`, copie `.env.example` vers `.env.local`, puis lance `npm run dev`. Génère `MEETIN_DEMO_TOKEN` avec `openssl rand -hex 32` pour protéger la route Linkup historique.
 
 ## Comptes, transcription et abonnement Mac
 
@@ -49,7 +49,7 @@ Le site sert à installer l’app et à ouvrir **Compte** ou **Intégrations**. 
 - **Devin** traite les tâches de code sans interface tierce. Configure `DEVIN_ORG_ID`, la clé d’un utilisateur de service v3 et `DEVIN_REPO`. Restreins les accès Git du compte de service à ce dépôt. Le lien de session permet de suivre le travail et de retrouver la PR éventuelle.
 - **H Computer Use** crée ou modifie une fiche dans le tableau de test HTTPS défini par `HAI_COMPUTER_USE_URL`. Pour Trello, `HAI_BROWSER_PROFILE_ID` doit désigner un profil H dédié, connecté au compte de test. Sans ce profil, la proposition reste disponible dans l’app et le serveur attend la configuration avant de lancer H. Après configuration, utilise **Vérifier les accès** dans **Intégrations**. L’app affiche **En cours** et appelle `/api/agent-trello-status` avec le reçu signé du lancement. Elle affiche le lien direct quand H a terminé et confirmé la relecture de la fiche sur le tableau approuvé. [Profils navigateur H](https://hub.hcompany.ai/agents-api/browser/profiles) · [Résultat d’une session H](https://hub.hcompany.ai/agents-api/sessions/retrieve)
 
-Saisis le code d’équipe dans **Intégrations** sur Mac. L’agent garde son code distinct du compte de transcription. Pour la recette locale, `npm test` exécute les intégrations avec des réponses simulées et `npm run build` compile le site.
+Sur Mac, la connexion Google donne accès à la transcription et à l’agent. Pour la recette locale, `npm test` exécute les intégrations avec des réponses simulées et `npm run build` compile le site.
 
 Le bouton **Confirmer et lancer** dans l’app approuve la proposition affichée, sa destination et le contexte associé pour quinze minutes. Modifier la demande exige une nouvelle préparation. H déduplique la création de session avec l’identifiant de validation. Pour Devin, la protection contre les doubles clics fonctionne dans l’app et sur une même instance serveur. Si le lancement est incertain, vérifie la session dans le service avant de préparer une nouvelle validation.
 

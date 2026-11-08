@@ -90,9 +90,7 @@ extension MeetingSession {
 
     // Détection seulement si le direct tourne et si l'équipe a validé l'accès à l'agent.
     func startDetection(reading live: LiveTranscription) {
-        let address = UserDefaults.standard.string(forKey: "webWorkspaceURL") ?? MeetinSite.defaultAddress
-        guard agentAccess?.planning == true, let base = AgentClient.serverURL(address) else { return }
-        let client = AgentClient(baseURL: base, accessCode: agentAccessCode)
+        guard let client = agentClient else { return }
         let transcript = live.transcript
         LiveAlerts.requestPermission()
         let detector = TaskDetector(text: { transcript.confirmedText }) { text, known in
@@ -143,9 +141,10 @@ extension MeetingSession {
     }
 
     var agentClient: AgentClient? {
-        let address = UserDefaults.standard.string(forKey: "webWorkspaceURL") ?? MeetinSite.defaultAddress
-        guard agentAccess != nil, let base = AgentClient.serverURL(address) else { return nil }
-        return AgentClient(baseURL: base, accessCode: agentAccessCode)
+        guard let client = accountClient, accountConnected else { return nil }
+        return AgentClient(baseURL: client.baseURL) { [account] in
+            try await account.token(client)
+        }
     }
 
     // Seul un clic lance une tâche : sur la carte ou dans sa notification.

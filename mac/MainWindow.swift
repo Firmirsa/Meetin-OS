@@ -44,10 +44,15 @@ struct MainWindow: View {
             session.setCallDetection(enabled, openWindow: openWindow)
         }
         .task(id: signedIn) {
+            session.agentAccess = nil
             guard signedIn, let client else { return }
             do { _ = try await session.account.refreshUsage(client) }
             catch let failure as AccountClient.Failure where failure.status == 401 { session.account.forget(client) }
             catch { /* A network outage keeps the local notebook available. */ }
+            if let agent = session.agentClient {
+                let access = try? await agent.access()
+                if !Task.isCancelled { session.agentAccess = access }
+            }
         }
     }
 

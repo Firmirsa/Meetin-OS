@@ -11,7 +11,7 @@ struct AgentExecutionView: View {
 
     private struct FollowKey: Equatable {
         let token: String?
-        let accessCode: String?
+        let server: URL?
         let refresh: Int
     }
 
@@ -32,7 +32,7 @@ struct AgentExecutionView: View {
                 if trackingClient == nil {
                     Text("Reconnectez l’agent au serveur utilisé pour suivre cette tâche.")
                         .foregroundStyle(Color.mtInk2)
-                    Button("Connecter l’agent", action: connect).buttonStyle(.mtGhost)
+                    Button("Vérifier les accès", action: connect).buttonStyle(.mtGhost)
                 } else if let issue {
                     Text(issue).foregroundStyle(Color.mtWarn)
                     Button("Actualiser le suivi") { refresh += 1 }.buttonStyle(.mtGhost)
@@ -42,7 +42,7 @@ struct AgentExecutionView: View {
             }
             Link("Suivre dans \(execution.executor.name)", destination: execution.url)
         }
-        .task(id: FollowKey(token: execution.trackingToken, accessCode: trackingClient?.accessCode, refresh: refresh)) {
+        .task(id: FollowKey(token: execution.trackingToken, server: trackingClient?.baseURL, refresh: refresh)) {
             await follow()
         }
     }

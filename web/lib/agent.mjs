@@ -1,5 +1,5 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
-import { ApiError, input, provider, requireAccess, safeURL, setting } from './integrations.mjs';
+import { ApiError, input, provider, safeURL, setting } from './integrations.mjs';
 
 const reviewTTL = 15 * 60 * 1000;
 const trackingTTL = 48 * 60 * 60 * 1000;
@@ -71,8 +71,7 @@ function trelloLinkID(value, kind) {
   return isTrello(safe) && !url.port && type === kind && /^[a-z0-9]{1,64}$/i.test(id ?? '') ? id : null;
 }
 
-export function agentAccess(token, env = process.env) {
-  requireAccess(token, env);
+export function agentAccess(env = process.env) {
   const planning = Boolean(env.HAI_API_KEY?.trim());
   return {
     planning,
@@ -125,7 +124,6 @@ function readApproval(value, token, env, now) {
 }
 
 export async function prepareTask(body, token, env = process.env, fetcher = fetch, now = Date.now()) {
-  requireAccess(token, env);
   const request = optionalText(body?.task, 2000);
   const transcript = optionalText(body?.transcript, 5000);
   if (!request && !transcript) throw new ApiError(400, 'Saisis une demande ou colle un extrait de réunion.');
@@ -170,7 +168,6 @@ export async function prepareTask(body, token, env = process.env, fetcher = fetc
 
 // Propose des tâches à relire : rien n'est exécuté ici. Une entrée invalide est ignorée, sans faire échouer les autres.
 export async function detectTasks(body, token, env = process.env, fetcher = fetch, now = Date.now()) {
-  requireAccess(token, env);
   const transcript = input(body?.transcript, 5000);
   const given = body?.known ?? [];
   if (!Array.isArray(given) || given.length > 10) throw new ApiError(400, 'Vérifie le contenu et sa longueur.');
@@ -214,7 +211,6 @@ export async function detectTasks(body, token, env = process.env, fetcher = fetc
 }
 
 export async function executeTask(body, token, env = process.env, fetcher = fetch, now = Date.now()) {
-  requireAccess(token, env);
   if (body?.confirmed !== true) throw new ApiError(400, 'Confirme la proposition avant de lancer la tâche.');
   const plan = readApproval(body.approval, token, env, now);
   const context = JSON.stringify({ title: plan.title, task: plan.task, excerpt: plan.quote, clarifications: plan.clarifications });
@@ -279,7 +275,6 @@ export async function executeTask(body, token, env = process.env, fetcher = fetc
 }
 
 export async function trelloExecutionStatus(body, token, env = process.env, fetcher = fetch, now = Date.now()) {
-  requireAccess(token, env);
   const invalid = () => new ApiError(409, 'Ce suivi a expiré ou n’est plus disponible. Consulte la session H.', 'trello_tracking');
   const receipt = readSealed(body?.trackingToken, token, env, 'trello-status', invalid);
   if (!sessionID.test(receipt.sessionId) || receipt.expiresAt <= now) throw invalid();

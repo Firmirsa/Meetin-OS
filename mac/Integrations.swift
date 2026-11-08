@@ -26,12 +26,9 @@ struct IntegrationsView: View {
     @Binding var workspaceURL: String
     let transcribe: () -> Void
     @State private var page: IntegrationsPage
-    @State private var server: String
     @State private var accountAddress: String
-    @State private var code = ""
     @State private var checking = false
     @State private var issue = ""
-    @FocusState private var credentialFocused: Bool
 
     init(session: MeetingSession, workspaceURL: Binding<String>, request: IntegrationsRequest, transcribe: @escaping () -> Void) {
         self.session = session
@@ -39,7 +36,6 @@ struct IntegrationsView: View {
         self.transcribe = transcribe
         self._page = State(initialValue: request.page)
         let address = request.suggestedServer?.absoluteString ?? workspaceURL.wrappedValue
-        self._server = State(initialValue: address)
         self._accountAddress = State(initialValue: address)
     }
 
@@ -67,8 +63,8 @@ struct IntegrationsView: View {
         return VStack(alignment: .leading, spacing: 12) {
             Text("Intégrations").font(.title2.bold()).accessibilityAddTraits(.isHeader)
             Text(session.agentAccess == nil
-                 ? "Connectez l’agent quand vous avez besoin des outils de votre équipe."
-                 : "Le code de l’équipe est validé pour cette session.")
+                 ? "Vérifiez les outils disponibles pour votre compte Google."
+                 : "Votre compte Google donne accès à l’agent.")
                 .foregroundStyle(Color.mtInk2)
             if session.agentAccess?.planning == false {
                 Text("Votre équipe doit activer l’agent sur son serveur. Vous pouvez continuer à utiliser le carnet.")
@@ -90,7 +86,6 @@ struct IntegrationsView: View {
                 if session.agentAccess == nil {
                     Button("Connecter l’agent") { show(.agent) }.buttonStyle(.mtPrimary)
                 } else {
-                    Button("Déconnecter", action: disconnect).disabled(checking || session.agent.busy)
                     Button("Vérifier les accès", action: refresh).buttonStyle(.mtPrimary).disabled(checking || session.agent.busy)
                 }
             }
@@ -99,24 +94,19 @@ struct IntegrationsView: View {
 
     private var agentForm: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Connecter l’agent").font(.title2.bold()).accessibilityAddTraits(.isHeader)
-            Text("Utilisez le code fourni par votre équipe. Il donne accès aux outils qu’elle a configurés.")
+            Text("Accès à l’agent").font(.title2.bold()).accessibilityAddTraits(.isHeader)
+            Text("L’agent utilise votre connexion Google Meetin-OS.")
                 .foregroundStyle(Color.mtInk2)
-            TextField("Adresse du site de l’équipe", text: $server).textFieldStyle(.roundedBorder).disabled(checking)
-            SecureField("Code d’accès de l’équipe", text: $code)
-                .textFieldStyle(.roundedBorder).focused($credentialFocused).disabled(checking)
-                .onSubmit(connect)
             HStack {
                 Button(session.agentAccess == nil ? "Plus tard" : "Retour") {
                     if session.agentAccess == nil { dismiss() } else { show(.catalog) }
                 }
                 .keyboardShortcut(.cancelAction).disabled(checking)
                 Spacer()
-                Button(page == .prepare ? "Connecter et préparer" : "Connecter", action: connect)
-                    .buttonStyle(.mtPrimary).disabled(checking || session.agent.busy || code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button(page == .prepare ? "Vérifier et préparer" : "Vérifier les accès", action: connect)
+                    .buttonStyle(.mtPrimary).disabled(checking || session.agent.busy)
             }
         }
-        .onAppear { credentialFocused = true }
     }
 
     private var gladiaForm: some View {
@@ -159,18 +149,13 @@ struct IntegrationsView: View {
     }
 
     private func connect() {
-        let accessCode = code.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !accessCode.isEmpty else { return }
-        guard let url = AgentClient.serverURL(server) else {
-            issue = "Saisissez l’adresse du site de votre équipe, qui commence par https://."
-            return
-        }
-        verify(AgentClient(baseURL: url, accessCode: accessCode), resume: page == .prepare)
+        guard let client = session.agentClient else { show(.gladia); return }
+        verify(client, resume: page == .prepare)
     }
 
     private func refresh() {
-        guard let url = AgentClient.serverURL(workspaceURL), !session.agentAccessCode.isEmpty else { return }
-        verify(AgentClient(baseURL: url, accessCode: session.agentAccessCode), resume: false)
+        guard let client = session.agentClient else { show(.gladia); return }
+        verify(client, resume: false)
     }
 
     private func verify(_ client: AgentClient, resume: Bool) {
@@ -185,20 +170,14 @@ struct IntegrationsView: View {
                     issue = "Une tâche est en cours. Réessayez quand elle est terminée."
                     return
                 }
-                if session.agentAccessCode != client.accessCode || AgentClient.serverURL(workspaceURL) != client.baseURL {
-                    session.agent.invalidateReview()
-                    session.agent.execution = nil
-                }
+                guard session.accountConnected, session.accountClient?.baseURL == client.baseURL else { return }
                 if session.agent.needsAccess { session.agent.error = "" }
                 session.agent.needsAccess = false
                 if access.trello && session.agent.trelloSetupRequired {
                     session.agent.trelloSetupRequired = false
                     session.agent.error = ""
                 }
-                workspaceURL = client.baseURL.absoluteString
-                session.agentAccessCode = client.accessCode
                 session.agentAccess = access
-                code = ""
                 if resume && access.planning {
                     dismiss()
                     session.agent.prepare(using: client)
@@ -217,7 +196,6 @@ struct IntegrationsView: View {
     }
 
     private func disconnect() {
-        session.agentAccessCode = ""
         session.agentAccess = nil
         session.agent.invalidateReview()
         session.agent.execution = nil

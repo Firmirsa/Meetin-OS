@@ -47,7 +47,6 @@ final class MeetingSession {
     var showAgentTab = false
     var openWindowAction: OpenWindowAction?
     var proposalIssues: [String: String] = [:]
-    var agentAccessCode = ""
     var agentAccess: AgentAccess?
     var integrationsRequest: IntegrationsRequest?
     let agent = AgentWorkspaceState()
@@ -283,8 +282,7 @@ struct CaptureView: View {
     }
 
     private var agentClient: AgentClient? {
-        guard session.agentAccess != nil, let base = AgentClient.serverURL(webWorkspaceURL) else { return nil }
-        return AgentClient(baseURL: base, accessCode: session.agentAccessCode)
+        session.agentClient
     }
 
     private var agentPanel: some View {

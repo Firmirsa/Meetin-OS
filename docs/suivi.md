@@ -1,6 +1,6 @@
 # Suivi Meetin-OS
 
-Dernier point : 7 novembre 2026. La [bêta 0.1.0](https://github.com/Firmirsa/Meetin-OS/releases/tag/v0.1.0-beta) contient les installateurs Mac et Windows. Le [plan d’exécution](plan-hackathon.md) reste la référence pour la répartition et la démo.
+Dernier point : 8 novembre 2026. La [bêta 0.1.0](https://github.com/Firmirsa/Meetin-OS/releases/tag/v0.1.0-beta) contient les installateurs Mac et Windows. Le [plan d’exécution](plan-hackathon.md) reste la référence pour la répartition et la démo.
 
 | Sujet | État | Prochaine action |
 |---|---|---|
@@ -15,3 +15,5 @@ Dernier point : 7 novembre 2026. La [bêta 0.1.0](https://github.com/Firmirsa/Me
 | Recette H Computer Use · Trello | Le 7 novembre, HoloTab a créé et rouvert une seule fiche « Relire le guide » dans À faire sur Meetin-OS Démo après confirmation de Wael. Le nouveau parcours Mac et Next.js a été testé avec Holo et H simulés. Une confirmation a lancé une session, affiché « En cours », puis affiché et enregistré le lien direct après la vérification de la fiche. | Renseigner la clé H, le profil H connecté à Trello et le lien du tableau dans `web/.env.local`, puis rejouer la création depuis l’app Mac. |
 | Premiers pas · Mac 0.1.5 | Sur `codex/google-onboarding`, le carnet s’ouvre après connexion Google. Le 7 novembre, accueil avec logo et seul bouton Google observé sur macOS 26.5.2. L’API locale a échangé un code simulé à usage unique, refusé une preuve PKCE erronée et renvoyé le quota. L’API publique répond encore avec l’ancien contrôle du code d’équipe. | Activer Google dans Supabase, déployer la branche sur l’environnement de recette et vérifier le retour dans le carnet avec un vrai compte Google. |
 | Site et démo · Lenny et équipe | Le site Next.js contient les téléchargements et les premiers pas. Sur `codex/hosted-gladia`, l’abonnement se lance depuis Compte sur Mac et le site affiche le retour de Stripe Checkout. Le 7 novembre, Mac 0.1.4 a été compilé et ouvert sur le Mac de Wael avec `https://meetin-os.vercel.app`. Le site répond, mais `/api/account-status` renvoie encore le refus du code d’équipe et `/api/gladia-live` répond 405. La version hébergée ne permet pas encore la recette du compte et du direct. | Déployer la branche sur Vercel avec les variables de recette, vérifier les routes, puis tester les deux voix sur un appel court. |
+
+Le 8 novembre, le build Mac 0.1.5 de `codex/google-agent` a été installé dans Applications. Les tests locaux valident la session Google pour l’agent et le rejet de l’ancien code partagé. Sur le site public Vercel, `account-auth` répond encore HTTP 401 à la demande de connexion Google. Déployer le serveur sur l’environnement de recette configuré pour Google avant l’essai des notifications.

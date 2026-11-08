@@ -134,7 +134,7 @@ struct AgentClient {
 
     private static let session = URLSession(configuration: .ephemeral, delegate: NoRedirects(), delegateQueue: nil)
     let baseURL: URL
-    let accessCode: String
+    let token: @MainActor () async throws -> String
     var session: URLSession = Self.session
 
     static func serverURL(_ address: String) -> URL? {
@@ -198,7 +198,7 @@ struct AgentClient {
         var request = URLRequest(url: baseURL.appendingPathComponent("api").appendingPathComponent(operation), timeoutInterval: 35)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(accessCode)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(try await token())", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(body)
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw Failure("Réponse de l’agent indisponible.") }

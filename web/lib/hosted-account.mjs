@@ -1,4 +1,4 @@
-import { ApiError, requireAccess, setting } from './integrations.mjs';
+import { ApiError, setting } from './integrations.mjs';
 
 export const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const serverMessage = 'Le service de comptes Meetin-OS est indisponible.';
@@ -142,13 +142,13 @@ export async function providerKey(provider, env = process.env, fetcher = fetch) 
 }
 
 export async function agentEnvironment(operation, token, env = process.env, fetcher = fetch) {
-  requireAccess(token, env);
+  const user = await requireUser(token, env, fetcher);
   const needsDevin = env.DEVIN_ORG_ID && ['agent-access', 'agent-execute'].includes(operation);
   const [hai, devin] = await Promise.all([
     providerKey('hcompany', env, fetcher),
     needsDevin ? providerKey('devin', env, fetcher) : null,
   ]);
-  return {...env, HAI_API_KEY: hai ?? undefined, DEVIN_API_KEY: devin ?? env.DEVIN_API_KEY};
+  return { userId: user.id, providerEnv: {...env, HAI_API_KEY: hai ?? undefined, DEVIN_API_KEY: devin ?? env.DEVIN_API_KEY} };
 }
 
 export function accountQuota(user, env = process.env, fetcher = fetch) {

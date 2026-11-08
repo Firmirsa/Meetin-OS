@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter, once } from 'node:events';
 import Stripe from 'stripe';
-import { accountAuth, requireUser } from './hosted-account.mjs';
+import { accountAuth, agentEnvironment, requireUser } from './hosted-account.mjs';
 import { batchResult, startBatch } from './gladia-hosted.mjs';
 import { relayGladia } from './gladia-relay.mjs';
 import { accountBilling, stripeWebhook } from './hosted-stripe.mjs';
@@ -42,6 +42,22 @@ test('Google PKCE exchanges the code, and legacy OTP cannot open a session', asy
   await assert.rejects(requireUser(googleToken, env, async () => Response.json({
     ...user, app_metadata: {providers: ['google', 'github']},
   })), {status: 401});
+});
+
+test('the agent accepts verified Google sessions and rejects the old shared code', async () => {
+  const configured = {...env, MEETIN_DEMO_TOKEN: 'old-code', HAI_API_KEY: 'holo-fixture'};
+  const fetcher = async (url, options) => {
+    assert.equal(url, configured.SUPABASE_URL + '/auth/v1/user');
+    if (new Headers(options.headers).get('authorization') !== 'Bearer ' + googleToken) {
+      return new Response(null, {status: 401});
+    }
+    return Response.json(user);
+  };
+  await assert.rejects(agentEnvironment('agent-access', 'old-code', configured, fetcher), {status: 401});
+  await assert.rejects(agentEnvironment('agent-access', null, configured, fetcher), {status: 401});
+  const access = await agentEnvironment('agent-access', googleToken, configured, fetcher);
+  assert.equal(access.userId, user.id);
+  assert.equal(access.providerEnv.HAI_API_KEY, 'holo-fixture');
 });
 
 test('paid audio requires a confirmed user and budget, and a foreign job is unavailable', async () => {
