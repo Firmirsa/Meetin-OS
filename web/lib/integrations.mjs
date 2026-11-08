@@ -61,17 +61,19 @@ export async function execute(operation, body, token, env = process.env, fetcher
   requireAccess(token, env);
   if (!body || typeof body !== 'object') throw new ApiError(400, 'Requête invalide.');
 
-  if (operation === 'linkup') {
-    const q = input(body.query, 500);
-    const result = await provider(fetcher, 'https://api.linkup.so/v1/search', setting(env, 'LINKUP_API_KEY'),
-      { q, depth: 'standard', outputType: 'sourcedAnswer' }, 'Linkup');
-    const sources = Array.isArray(result?.sources) ? result.sources.slice(0, 10).flatMap((source) => {
-      const url = safeURL(source?.url);
-      return url ? [{ name: typeof source.name === 'string' ? source.name : url, url }] : [];
-    }) : [];
-    if (typeof result?.answer !== 'string') throw new ApiError(502, 'Linkup a renvoyé une réponse inattendue.');
-    return { answer: result.answer, sources };
-  }
+  if (operation === 'linkup') return searchLinkup(body, env, fetcher);
 
   throw new ApiError(404, 'Action inconnue.');
+}
+
+export async function searchLinkup(body, env = process.env, fetcher = fetch) {
+  const q = input(body?.query, 500);
+  const result = await provider(fetcher, 'https://api.linkup.so/v1/search', setting(env, 'LINKUP_API_KEY'),
+    { q, depth: 'standard', outputType: 'sourcedAnswer' }, 'Linkup');
+  const sources = Array.isArray(result?.sources) ? result.sources.slice(0, 10).flatMap((source) => {
+    const url = safeURL(source?.url);
+    return url ? [{ name: typeof source.name === 'string' ? source.name : url, url }] : [];
+  }) : [];
+  if (typeof result?.answer !== 'string') throw new ApiError(502, 'Linkup a renvoyé une réponse inattendue.');
+  return { answer: result.answer, sources };
 }

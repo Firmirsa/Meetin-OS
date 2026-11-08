@@ -68,7 +68,7 @@ test('a confirmed code task reaches Devin once for concurrent clicks on the same
 
 test('a confirmed UI task is sent to H with its approved target and idempotency key', async () => {
   const task = 'Sur le tableau de test, crée la fiche « Relire le guide ».';
-  const plan = await prepareTask({task}, token, env, holo({status: 'ready', executor: 'computer_use', title: 'Relire le guide', task}));
+  const plan = await prepareTask({task}, token, env, holo({status: 'ready', executor: 'computer_use', title: 'Relire le guide', task, target: 'Relire le guide'}));
   assert.equal(plan.destination, env.HAI_COMPUTER_USE_URL);
   const sessionId = '45463597-20b7-4af7-b3b3-f5fb778203ab';
   const result = await executeTask({confirmed: true, approval: plan.approval}, token, env, async (url, request) => {
@@ -78,6 +78,7 @@ test('a confirmed UI task is sent to H with its approved target and idempotency 
     assert.equal(body.agent, 'h/web-surfer-pro');
     assert.equal(body.overrides['agent.environments[kind=web].start_url'], env.HAI_COMPUTER_USE_URL);
     assert.match(body.messages, /Relire le guide/);
+    assert.match(body.messages, /"target":"Relire le guide"/);
     return Response.json({id: sessionId, agent_view_url: 'https://invalid.example/not-the-provider'});
   });
   assert.deepEqual(result, {status: 'pending', executor: 'computer_use', sessionId, url: `https://platform.hcompany.ai/agent-view/${sessionId}`});
@@ -85,20 +86,36 @@ test('a confirmed UI task is sent to H with its approved target and idempotency 
 
 test('a private Trello task waits for the team browser profile and keeps its approval', async () => {
   const setup = {...env, HAI_COMPUTER_USE_URL: 'https://trello.com/b/fixture/demo'};
-  assert.deepEqual(agentAccess(setup), {planning: true, trello: false, devin: true});
+  assert.deepEqual(agentAccess(setup), {planning: true, linkup: false, trello: false, devin: true});
   const task = 'Créer « Relire le guide » dans À faire.';
-  const plan = await prepareTask({task}, token, setup, holo({status: 'ready', executor: 'computer_use', title: 'Relire le guide', task}));
+  const plan = await prepareTask({task}, token, setup, holo({status: 'ready', executor: 'computer_use', title: 'Relire le guide', task, target: 'Relire le guide'}));
   const approval = {confirmed: true, approval: plan.approval};
   await assert.rejects(executeTask(approval, token, setup, denied), {status: 503, code: 'trello_setup'});
 
   const configured = {...setup, HAI_BROWSER_PROFILE_ID: '12b9ade5-309f-4508-b82a-52e124a51600'};
-  assert.deepEqual(agentAccess(configured), {planning: true, trello: true, devin: true});
+  assert.deepEqual(agentAccess(configured), {planning: true, linkup: false, trello: true, devin: true});
   const result = await executeTask(approval, token, configured, async (url, request) => {
     assert.equal(url, 'https://agp.eu.hcompany.ai/api/v2/sessions');
     assert.equal(JSON.parse(request.body).overrides['agent.environments[kind=web].browser_profile_id'], configured.HAI_BROWSER_PROFILE_ID);
     return Response.json({id: '45463597-20b7-4af7-b3b3-f5fb778203ab'});
   });
   assert.equal(result.status, 'pending');
+});
+
+test('a UI plan with no concrete source-backed target asks before signing', async () => {
+  const request = 'Déplace la carte.';
+  const draft = {status: 'ready', executor: 'computer_use', title: 'Déplacer la carte', task: request};
+  for (const target of [undefined, 'la carte', 'Guide']) {
+    const result = await prepareTask({task: request}, token, env, holo({...draft, target, task: target === 'Guide' ? 'Déplacer Guide.' : draft.task}));
+    assert.deepEqual(result, {status: 'needs_clarification', question: 'Quel est le titre exact ou le lien de la fiche concernée ?'});
+    await assert.rejects(executeTask({confirmed: true, approval: result.approval}, token, env, denied), {status: 409});
+  }
+  const clarifications = [{question: 'Quelle fiche ?', answer: 'État de la démo'}];
+  const completed = await prepareTask({task: request, clarifications}, token, env, holo({
+    ...draft, task: 'Déplacer État de la démo.', target: 'État de la démo',
+  }));
+  assert.equal(completed.status, 'ready');
+  assert.equal(completed.target, 'État de la démo');
 });
 
 test('a detected Trello task returns a card only after H verifies it on the approved board', async () => {
@@ -205,11 +222,37 @@ test('a corrected commitment updates the known task instead of adding one', asyn
   }));
   assert.equal(result.tasks[0].replaces, 'k1');
   const unknown = await detectTasks({transcript, known}, token, env, holo({tasks: [{...update, ref: 'autre'}]}));
-  assert.equal(unknown.tasks[0].replaces, null);
+  assert.deepEqual(unknown.tasks, [], 'an unknown reference cannot silently create a duplicate');
   await assert.rejects(detectTasks({transcript, known: Array(11).fill(known[0])}, token, env, denied), {status: 400});
+});
+
+test('detection collapses exact replays and keeps distinct same-title commitments', async () => {
+  const first = {executor: 'devin', title: 'Ajouter un test', task: 'Tester l’export.', quote: 'Karim ajoute un test pour l’export.'};
+  const second = {...first, task: 'Tester l’import.', quote: 'Léa ajoute un test pour l’import.'};
+  const transcript = first.quote + '\n' + second.quote;
+  const draft = {tasks: [first, {...first, title: 'Tester les exports'}, second]};
+  const fresh = await detectTasks({transcript}, token, env, holo(draft));
+  assert.deepEqual(fresh.tasks.map(task => task.task), [first.task, second.task]);
+  // This value is also asserted by the Mac test: an exact replay must match even with a changed title.
+  const known = [{ref: 'k1', title: first.title, task: first.task, fingerprint: '377ffd88854e6252c5cad6ce5b908040bda194a65964c48f323fdf1030c58762'}];
+  const replay = await detectTasks({transcript, known}, token, env, holo(draft));
+  assert.deepEqual(replay.tasks.map(task => task.task), [second.task]);
+
+  const correction = await detectTasks({transcript, known}, token, env, holo({tasks: [
+    second, {...second, ref: 'k1'}, {...second, ref: 'k1'},
+  ]}));
+  assert.equal(correction.tasks.length, 1);
+  assert.equal(correction.tasks[0].replaces, 'k1');
 });
 
 test('task detection skips Holo when no destination is configured', async () => {
   const bare = {HAI_API_KEY: 'holo-fixture'};
   assert.deepEqual(await detectTasks({transcript: 'Karim corrige l’export.'}, token, bare, denied), {tasks: []});
+});
+
+test('Linkup availability does not depend on planning', () => {
+  assert.deepEqual(agentAccess({LINKUP_API_KEY: 'fixture'}), {
+    planning: false, linkup: true, trello: false, devin: false,
+  });
+  assert.equal(agentAccess({LINKUP_API_KEY: '  '}).linkup, false);
 });

@@ -67,6 +67,7 @@ struct AgentWorkspace<Proposals: View>: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 proposals
+                LinkupResearch(client: client, available: access?.linkup)
                 Text("Tâche à exécuter").font(.mtSerif(36)).accessibilityAddTraits(.isHeader)
                 if client == nil {
                     Text("Vous pouvez préparer votre demande ici. L’accès de l’équipe sera demandé au moment d’utiliser l’agent.")

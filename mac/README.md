@@ -15,7 +15,7 @@ Depuis la racine du dépôt :
 open mac/.build/Meetin-OS.app
 ```
 
-Le script construit et signe localement l’application. Au premier enregistrement, macOS peut demander l’accès au **Microphone** et à **Audio du système uniquement**. Si une piste manque, le carnet propose un lien vers les réglages concernés et conserve la piste disponible. Les deux raccourcis sont aussi dans **Paramètres → Autorisations audio**. Une nouvelle version signée localement peut demander à nouveau les autorisations.
+Le script construit et signe localement l’application. Au premier enregistrement, macOS peut demander l’accès au **Microphone** et à **Audio du système uniquement**. Si une piste manque, le carnet propose un lien vers les réglages concernés et conserve la piste disponible. Les deux raccourcis sont aussi dans **Paramètres → Autorisations audio**. Une nouvelle version signée localement peut demander à nouveau les autorisations. Si la détection d’appels reste inactive alors que Meetin-OS apparaît activé dans **Confidentialité et sécurité → Accessibilité**, retire l’entrée de l’ancien build et ajoute à nouveau la copie de Meetin-OS que tu ouvres.
 
 Au lancement de Mac 0.1.5, clique sur **Se connecter avec Google** pour ouvrir ton carnet. Compile la version de recette avec `MEETIN_WEB_URL` défini sur l’adresse du serveur de test. Le serveur Meetin-OS utilise la clé Gladia de l’équipe. **Compte** affiche le quota restant et permet de passer à Premium via Stripe si le paiement est configuré. [Configuration du serveur](../web/README.md#comptes-transcription-et-abonnement-mac)
 
@@ -25,6 +25,10 @@ Au lancement de Mac 0.1.5, clique sur **Se connecter avec Google** pour ouvrir t
 4. Dans l’onglet **Agent**, insère et ajuste l’extrait de transcription ou saisis une demande. Clique sur **Préparer la tâche**, réponds à la question éventuelle, puis relis l’action et sa destination avant de confirmer. Le lien de session s’affiche quand Devin ou H Computer Use accepte le lancement.
 
 La connexion Google à Meetin-OS donne accès à l’agent. Le catalogue **Intégrations** indique si Trello et Devin sont configurés. Les clés de Devin et H Company restent sur le serveur. [Guide Next.js](../web/README.md)
+
+Dans l’onglet Agent, **Recherche publique avec Linkup** permet d’envoyer volontairement une question publique et d’ouvrir les sources de la réponse. La session Google et `LINKUP_API_KEY` sur le serveur sont nécessaires ; le panneau indique si l’accès reste non confirmé. Il ne transmet pas automatiquement la transcription et ne lance aucune tâche.
+
+Le raccordement Trello global décrit dans le prototype est en cours de remplacement par une connexion personnelle : voir le [diagnostic](../docs/connexion-trello.md). Ne pas le configurer comme accès partagé entre utilisateurs.
 
 L’historique est conservé sur ce Mac dans `~/Library/Application Support/Meetin-OS` : `meetings.json` (titre, date, durée, chemin audio, transcription, notes) et un dossier audio par réunion dans `recordings/`. Il se remplit à l’arrêt de l’enregistrement et après la transcription. Pour reprendre un essai, rouvre la réunion depuis **Réunions**. Pour un fichier externe, utilise **Ouvrir un enregistrement** sur cette page et choisis un M4A.
 

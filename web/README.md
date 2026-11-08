@@ -13,7 +13,7 @@ Le site Next.js sert les téléchargements à `/telecharger` et les premiers pas
 
 ### Vercel
 
-Pour la recette de Mac 0.1.5, déploie la branche `codex/google-onboarding`, avec `web` comme dossier racine. Choisis une URL HTTPS stable et affecte les variables à ce déploiement, puis redéploie. Le Mac et Stripe doivent pouvoir joindre l’API à cette adresse sans passer par l’écran de connexion Vercel. Si la Preview est protégée, utilise une [exception limitée à son domaine de test](https://vercel.com/changelog/protect-production-deployments-for-free-on-every-plan) ou un projet de test dédié.
+Pour la recette de Mac 0.1.5, déploie la branche `codex/google-agent`, avec `web` comme dossier racine. Choisis une URL HTTPS stable et affecte les variables à ce déploiement, puis redéploie. Le Mac et Stripe doivent pouvoir joindre l’API à cette adresse sans passer par l’écran de connexion Vercel. Si la Preview est protégée, utilise une [exception limitée à son domaine de test](https://vercel.com/changelog/protect-production-deployments-for-free-on-every-plan) ou un projet de test dédié.
 
 | Variable serveur | Valeur pour la recette |
 |---|---|
@@ -44,8 +44,10 @@ Le site sert à installer l’app et à ouvrir **Compte** ou **Intégrations**. 
 
 ## Intégrations de l’agent
 
+**Décision du 8 novembre : Trello doit être connecté par chaque utilisateur.** Le profil et le tableau globaux décrits ci-dessous sont le prototype historique de test, pas une configuration multi-utilisateur à activer. Le [parcours personnel proposé](../docs/connexion-trello.md) reste à implémenter.
+
 - **Holo** utilise la clé H et, facultativement, `HAI_MODEL` pour préparer une tâche depuis une demande ou un extrait. Il pose une question si le résultat ou la cible est ambigu. La préparation n’ouvre aucune session d’exécution.
-- **Linkup** utilise `LINKUP_API_KEY` pour répondre à une question publique avec des liens vers les sources. Cette route serveur reste disponible pour un futur branchement dans l’app.
+- **Linkup** utilise `LINKUP_API_KEY` pour répondre à une question publique avec des liens vers les sources. Le panneau facultatif « Recherche publique avec Linkup » de l’onglet Agent utilise `/api/agent-research` avec la session Google. Seule la question explicitement envoyée part chez Linkup ; la réponse et ses sources ne modifient pas automatiquement une tâche. Les nouveaux fichiers serveur doivent être déployés pour activer ce parcours.
 - **Devin** traite les tâches de code sans interface tierce. Configure `DEVIN_ORG_ID`, la clé d’un utilisateur de service v3 et `DEVIN_REPO`. Restreins les accès Git du compte de service à ce dépôt. Le lien de session permet de suivre le travail et de retrouver la PR éventuelle.
 - **H Computer Use** crée ou modifie une fiche dans le tableau de test HTTPS défini par `HAI_COMPUTER_USE_URL`. Pour Trello, `HAI_BROWSER_PROFILE_ID` doit désigner un profil H dédié, connecté au compte de test. Sans ce profil, la proposition reste disponible dans l’app et le serveur attend la configuration avant de lancer H. Après configuration, utilise **Vérifier les accès** dans **Intégrations**. L’app affiche **En cours** et appelle `/api/agent-trello-status` avec le reçu signé du lancement. Elle affiche le lien direct quand H a terminé et confirmé la relecture de la fiche sur le tableau approuvé. [Profils navigateur H](https://hub.hcompany.ai/agents-api/browser/profiles) · [Résultat d’une session H](https://hub.hcompany.ai/agents-api/sessions/retrieve)
 

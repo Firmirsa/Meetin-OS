@@ -143,12 +143,24 @@ export async function providerKey(provider, env = process.env, fetcher = fetch) 
 
 export async function agentEnvironment(operation, token, env = process.env, fetcher = fetch) {
   const user = await requireUser(token, env, fetcher);
+  if (operation === 'agent-trello-status') {
+    throw new ApiError(409, 'Ce suivi utilisait l’ancien accès Trello. La connexion personnelle sera disponible dans une prochaine version.', 'trello_setup');
+  }
   const needsDevin = env.DEVIN_ORG_ID && ['agent-access', 'agent-execute'].includes(operation);
   const [hai, devin] = await Promise.all([
     providerKey('hcompany', env, fetcher),
     needsDevin ? providerKey('devin', env, fetcher) : null,
   ]);
-  return { userId: user.id, providerEnv: {...env, HAI_API_KEY: hai ?? undefined, DEVIN_API_KEY: devin ?? env.DEVIN_API_KEY} };
+  const providerEnv = {...env, HAI_API_KEY: hai ?? undefined, DEVIN_API_KEY: devin ?? env.DEVIN_API_KEY};
+  // An OAuth account must never inherit saved browser credentials from another user.
+  delete providerEnv.HAI_BROWSER_PROFILE_ID;
+  if (providerEnv.HAI_COMPUTER_USE_URL) {
+    try {
+      const host = new URL(providerEnv.HAI_COMPUTER_USE_URL.trim()).hostname.replace(/\.$/, '');
+      if (host === 'trello.com' || host.endsWith('.trello.com')) delete providerEnv.HAI_COMPUTER_USE_URL;
+    } catch { delete providerEnv.HAI_COMPUTER_USE_URL; }
+  }
+  return { userId: user.id, providerEnv };
 }
 
 export function accountQuota(user, env = process.env, fetcher = fetch) {

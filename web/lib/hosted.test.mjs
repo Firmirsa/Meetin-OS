@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { EventEmitter, once } from 'node:events';
 import Stripe from 'stripe';
 import { accountAuth, agentEnvironment, requireUser } from './hosted-account.mjs';
+import { agentAccess, executeTask, prepareTask } from './agent.mjs';
 import { batchResult, startBatch } from './gladia-hosted.mjs';
 import { relayGladia } from './gladia-relay.mjs';
 import { accountBilling, stripeWebhook } from './hosted-stripe.mjs';
@@ -58,6 +59,38 @@ test('the agent accepts verified Google sessions and rejects the old shared code
   const access = await agentEnvironment('agent-access', googleToken, configured, fetcher);
   assert.equal(access.userId, user.id);
   assert.equal(access.providerEnv.HAI_API_KEY, 'holo-fixture');
+});
+
+test('Google users cannot inherit or execute through a shared Trello browser profile', async () => {
+  const oldConfig = {...env, HAI_API_KEY: 'holo-fixture', HAI_COMPUTER_USE_URL: 'https://trello.com/b/fixture', HAI_BROWSER_PROFILE_ID: 'shared-fixture'};
+  const other = {...user, id: 'c4c859c9-a0a8-445e-830c-e1cc4bc177ef', email: 'other@example.test'};
+  const otherToken = `fixture.${Buffer.from(JSON.stringify({sub: other.id, amr: [{method: 'oauth'}]})).toString('base64url')}.fixture`;
+  const auth = async (url, options) => {
+    assert.equal(url, oldConfig.SUPABASE_URL + '/auth/v1/user');
+    const bearer = new Headers(options.headers).get('authorization');
+    return Response.json(bearer === `Bearer ${googleToken}` ? user : other);
+  };
+  const task = 'Déplacer la fiche Relire le guide.';
+  const holo = async () => Response.json({choices: [{message: {content: JSON.stringify({
+    status: 'ready', executor: 'computer_use', title: 'Relire le guide', task, target: 'Relire le guide',
+  })}}]});
+  const denied = () => assert.fail('H was called using a shared browser profile');
+
+  for (const [id, token] of [[user.id, googleToken], [other.id, otherToken]]) {
+    const legacy = await prepareTask({task}, id, oldConfig, holo);
+    const current = await agentEnvironment('agent-execute', token, oldConfig, auth);
+    assert.equal(current.userId, id);
+    assert.equal(agentAccess(current.providerEnv).trello, false);
+    assert.equal(current.providerEnv.HAI_BROWSER_PROFILE_ID, undefined);
+    assert.equal(current.providerEnv.HAI_COMPUTER_USE_URL, undefined);
+    await assert.rejects(executeTask({confirmed: true, approval: legacy.approval}, id, current.providerEnv, denied), {status: 503});
+    await assert.rejects(agentEnvironment('agent-trello-status', token, oldConfig, auth), {status: 409});
+  }
+
+  const nonTrello = {...oldConfig, HAI_COMPUTER_USE_URL: 'https://example.test/board'};
+  const otherSite = await agentEnvironment('agent-execute', googleToken, nonTrello, auth);
+  assert.equal(otherSite.providerEnv.HAI_COMPUTER_USE_URL, nonTrello.HAI_COMPUTER_USE_URL);
+  assert.equal(otherSite.providerEnv.HAI_BROWSER_PROFILE_ID, undefined);
 });
 
 test('paid audio requires a confirmed user and budget, and a foreign job is unavailable', async () => {

@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 struct AgentClarification: Codable {
     let question: String
@@ -24,6 +25,12 @@ struct AgentReview: Codable {
 
     var usesTrello: Bool {
         executor == .computerUse && ["trello.com", "www.trello.com"].contains(URL(string: destination)?.host ?? "")
+    }
+
+    var detectionFingerprint: String {
+        let fields = [executor.rawValue, destination, task, quote]
+        let payload = fields.map { "\($0.utf8.count):\($0)" }.joined()
+        return SHA256.hash(data: Data(payload.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 }
 
@@ -62,6 +69,7 @@ struct KnownTask: Encodable, Equatable {
     let ref: String
     let title: String
     let task: String
+    let fingerprint: String
 }
 
 struct AgentExecution: Codable {
@@ -92,6 +100,23 @@ struct AgentAccess: Decodable {
     let planning: Bool
     let trello: Bool
     let devin: Bool
+    let linkup: Bool?
+}
+
+struct AgentResearch: Decodable {
+    struct Source: Decodable {
+        let name: String
+        let url: String
+
+        var safeURL: URL? {
+            guard let url = URL(string: url), url.scheme == "https",
+                  let host = url.host, !host.isEmpty, url.user == nil, url.password == nil else { return nil }
+            return url
+        }
+    }
+
+    let answer: String
+    let sources: [Source]
 }
 
 struct AgentClient {
@@ -148,6 +173,10 @@ struct AgentClient {
 
     func access() async throws -> AgentAccess {
         try await post("agent-access", [String: String]())
+    }
+
+    func research(query: String) async throws -> AgentResearch {
+        try await post("agent-research", ["query": query])
     }
 
     func prepare(task: String, transcript: String, clarifications: [AgentClarification]) async throws -> AgentPreparation {

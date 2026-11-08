@@ -1,4 +1,4 @@
-import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { ApiError, input, provider, safeURL, setting } from './integrations.mjs';
 
 const reviewTTL = 15 * 60 * 1000;
@@ -24,10 +24,11 @@ const planner = [
   'or "computer_use" for one create or update action on a task in the configured test board UI.',
   'If the action, target, or expected result is unclear, or if more than one task is requested, ask one precise question in French.',
   'Never invent a target, assignee, deadline or decision. An optional field alone does not require a question.',
+  'For "computer_use", include target: the exact card title or card link copied from the source, and include it verbatim in task. For a new card, use its requested title. A generic reference such as "la carte" is not a target.',
   'For work outside the available destinations or capabilities, ask the user to choose a supported action.',
   'If the task comes from a transcript, copy a short exact contiguous supporting quote. Otherwise quote can be empty.',
   'Return only JSON in French, either {"status":"needs_clarification","question":"..."}',
-  'or {"status":"ready","executor":"devin" or "computer_use","title":"...","task":"...","quote":"..."}.',
+  'or {"status":"ready","executor":"devin" or "computer_use","title":"...","task":"...","quote":"...","target":"..."}. Omit target for Devin.',
 ].join(' ');
 
 const detector = [
@@ -49,6 +50,21 @@ const detector = [
 
 function optionalText(value, limit) {
   return value == null || (typeof value === 'string' && !value.trim()) ? '' : input(value, limit);
+}
+
+function cardTarget(value, task, sources) {
+  const target = typeof value === 'string' ? value.trim() : '';
+  const vague = /^(?:(?:la|le|une?|cette?|ce|l['’])\s*)?(?:carte|fiche|ticket|tâche|card)(?:\s+(?:à\b.*|concern[ée]e?|en question|existante?|ci-dessus|ci-dessous))?$/iu;
+  return target.length <= 250 && /[\p{L}\p{N}]/u.test(target) &&
+    !vague.test(target) && !/^(?:ça|cela|ceci|celle(?:-ci|-là)?|celui(?:-ci|-là)?|it|this|that)$/iu.test(target) &&
+    task.includes(target) && sources.some(source => source.includes(target)) ? target : null;
+}
+
+// Match the Mac encoding: concatenate the UTF-8 byte length and value of each field.
+function detectionFingerprint(executor, destination, task, quote) {
+  const hash = createHash('sha256');
+  for (const field of [executor, destination, task, quote]) hash.update(`${Buffer.byteLength(field)}:${field}`);
+  return hash.digest('hex');
 }
 
 function codeRepository(env) {
@@ -79,6 +95,7 @@ export function agentAccess(env = process.env) {
   const planning = Boolean(env.HAI_API_KEY?.trim());
   return {
     planning,
+    linkup: Boolean(env.LINKUP_API_KEY?.trim()),
     trello: Boolean(planning && trelloLinkID(testBoard(env), 'b') && env.HAI_BROWSER_PROFILE_ID?.trim()),
     devin: Boolean(planning && codeRepository(env) && env.DEVIN_ORG_ID?.trim() && env.DEVIN_API_KEY?.trim()),
   };
@@ -163,9 +180,13 @@ export async function prepareTask(body, token, env = process.env, fetcher = fetc
     throw new ApiError(422, 'La proposition est incomplète ou son extrait ne correspond pas à la réunion. Précise la demande.');
   }
 
+  const target = draft.executor === 'computer_use' ? cardTarget(draft.target, task, [request, transcript, ...clarifications.map(turn => turn.answer)]) : null;
+  if (draft.executor === 'computer_use' && !target) {
+    return { status: 'needs_clarification', question: 'Quel est le titre exact ou le lien de la fiche concernée ?' };
+  }
   const plan = {
     id: randomUUID(), expiresAt: now + reviewTTL, executor: draft.executor,
-    destination: destination(draft.executor, env), title, task, quote, clarifications,
+    destination: destination(draft.executor, env), title, task, quote, clarifications, ...(target && { target }),
   };
   return { status: 'ready', ...plan, approval: approve(plan, token, env) };
 }
@@ -196,28 +217,42 @@ export async function detectTasks(body, token, env = process.env, fetcher = fetc
   }
   if (!Array.isArray(result?.tasks)) throw new ApiError(502, 'Holo n’a pas renvoyé de proposition exploitable.');
 
+  const fingerprints = new Map(known.map((item, index) => [item.ref, given[index].fingerprint])
+    .filter(([, fingerprint]) => typeof fingerprint === 'string' && /^[a-f0-9]{64}$/.test(fingerprint)));
+  const knownFingerprints = new Set(fingerprints.values());
   const refs = new Set(known.map(item => item.ref));
-  const tasks = [];
+  const candidates = [];
   for (const draft of result.tasks.slice(0, 3)) {
     const title = typeof draft?.title === 'string' ? draft.title.trim() : '';
     const task = typeof draft?.task === 'string' ? draft.task.trim() : '';
     const quote = typeof draft?.quote === 'string' ? draft.quote.trim() : '';
     if (!title || title.length > 120 || !task || task.length > 2000 || !quote || quote.length > 1500 ||
-        !transcript.includes(quote) || !destinations[draft.executor] ||
+        !transcript.includes(quote) || typeof draft.executor !== 'string' || !destinations[draft.executor] ||
         !Object.hasOwn(destinations, draft.executor)) continue;
-    const plan = {
-      id: randomUUID(), expiresAt: now + reviewTTL, executor: draft.executor,
-      destination: destinations[draft.executor], title, task, quote, clarifications: [],
-    };
-    tasks.push({ ...plan, replaces: refs.has(draft.ref) ? draft.ref : null, approval: approve(plan, token, env) });
+    const ref = draft.ref ?? null;
+    if (ref !== null && (!refs.has(ref) || candidates.some(candidate => candidate.ref === ref))) continue;
+    const fingerprint = detectionFingerprint(draft.executor, destinations[draft.executor], task, quote);
+    if (ref === null ? knownFingerprints.has(fingerprint) : fingerprints.get(ref) === fingerprint) continue;
+    const duplicate = candidates.findIndex(candidate => candidate.fingerprint === fingerprint &&
+      (candidate.ref === null || ref === null || candidate.ref === ref));
+    const candidate = { executor: draft.executor, title, task, quote, ref, fingerprint };
+    if (duplicate === -1) candidates.push(candidate);
+    else if (ref !== null && candidates[duplicate].ref === null) candidates[duplicate] = candidate;
   }
+  const tasks = candidates.map(({ executor, title, task, quote, ref }) => {
+    const plan = {
+      id: randomUUID(), expiresAt: now + reviewTTL, executor,
+      destination: destinations[executor], title, task, quote, clarifications: [],
+    };
+    return { ...plan, replaces: ref, approval: approve(plan, token, env) };
+  });
   return { tasks };
 }
 
 export async function executeTask(body, token, env = process.env, fetcher = fetch, now = Date.now()) {
   if (body?.confirmed !== true) throw new ApiError(400, 'Confirme la proposition avant de lancer la tâche.');
   const plan = readApproval(body.approval, token, env, now);
-  const context = JSON.stringify({ title: plan.title, task: plan.task, excerpt: plan.quote, clarifications: plan.clarifications });
+  const context = JSON.stringify({ title: plan.title, task: plan.task, target: plan.target, excerpt: plan.quote, clarifications: plan.clarifications });
 
   if (plan.executor === 'devin') {
     const org = encodeURIComponent(setting(env, 'DEVIN_ORG_ID'));

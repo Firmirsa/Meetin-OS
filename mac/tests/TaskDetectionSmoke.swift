@@ -1,9 +1,9 @@
 import Foundation
 
-func detected(_ id: String, title: String, task: String = "Faire la tâche.", replaces: String? = nil) throws -> DetectedTask {
+func detected(_ id: String, title: String, task: String = "Faire la tâche.", replaces: String? = nil, quote: String = "extrait") throws -> DetectedTask {
     var values: [String: Any] = [
         "id": id, "executor": "devin", "destination": "Firmirsa/Meetin-OS", "title": title, "task": task,
-        "quote": "extrait", "clarifications": [Any](), "approval": "signature-\(id)"
+        "quote": quote, "clarifications": [Any](), "approval": "signature-\(id)"
     ]
     if let replaces { values["replaces"] = replaces }
     return try JSONDecoder().decode(DetectedTask.self, from: JSONSerialization.data(withJSONObject: values))
@@ -29,7 +29,8 @@ struct TaskDetectionSmoke {
         await detector.tick()
         precondition(calls.isEmpty, "aucun texte, aucun appel")
         text = "[00:01] Micro · Léa envoie le devis."
-        responses = [.success([try detected("a", title: "Envoyer le devis", task: "Léa envoie le devis.")])]
+        let initial = try detected("a", title: "Envoyer le devis", task: "Léa envoie le devis.")
+        responses = [.success([initial])]
         await detector.tick()
         await detector.tick()
         precondition(calls.count == 1, "texte inchangé, aucun nouvel appel")
@@ -39,17 +40,19 @@ struct TaskDetectionSmoke {
         text += "\n[00:09] Micro · Finalement, Karim le fait mardi."
         responses = [.success([try detected("b", title: "Devis pour Atlas", task: "Karim envoie le devis mardi.", replaces: "a")])]
         await detector.tick()
-        precondition(calls[1].1 == [KnownTask(ref: "a", title: "Envoyer le devis", task: "Léa envoie le devis.")], "tâches connues envoyées")
+        precondition(calls[1].1 == [KnownTask(ref: "a", title: "Envoyer le devis", task: "Léa envoie le devis.",
+                                             fingerprint: initial.review.detectionFingerprint)], "tâches connues envoyées")
         precondition(detector.proposals.count == 1 && detector.proposals[0].id == "a", "identifiant stable")
         precondition(detector.proposals[0].review.approval == "signature-b", "dernier plan signé")
         precondition(announced.count == 1, "une seule annonce par tâche")
         precondition(updated == ["a"], "mise à jour signalée")
 
-        // Doublon de titre : mise à jour, pas de nouvelle tâche
+        // Même acte et même citation avec un autre titre : le plan approuvé ne change pas.
         text += "\n[00:15] Micro · Oui, le devis."
-        responses = [.success([try detected("c", title: "DEVIS POUR ATLAS")])]
+        responses = [.success([try detected("c", title: "DEVIS POUR ATLAS", task: "Karim envoie le devis mardi.")])]
         await detector.tick()
         precondition(detector.proposals.count == 1 && announced.count == 1, "doublon fusionné")
+        precondition(detector.proposals[0].review.approval == "signature-b" && updated == ["a"], "le plan signé reste stable")
 
         // Erreur passagère : le texte sera renvoyé
         text += "\n[00:20] Micro · Autre chose."
@@ -74,6 +77,15 @@ struct TaskDetectionSmoke {
         text += "\n[00:40] Micro · Toujours."
         await detector.tick()
         precondition(detector.isStopped && calls.count == count, "arrêt sur accès refusé")
+
+        // Le titre partagé ne suffit pas à fusionner deux tâches, et le serveur calcule la même empreinte.
+        let export = try detected("export", title: "Ajouter un test", task: "Tester l’export.", quote: "Karim ajoute un test pour l’export.")
+        let distinct = try detected("import", title: export.review.title, task: "Tester l’import.", quote: "Léa ajoute un test pour l’import.")
+        let unknown = try detected("unknown", title: "Correction inconnue", replaces: "absente")
+        let sameTitle = TaskDetector(text: { "Deux engagements" }) { _, _ in [export, distinct, unknown] }
+        await sameTitle.tick()
+        precondition(sameTitle.proposals.map(\.id) == ["export", "import"])
+        precondition(export.review.detectionFingerprint == "377ffd88854e6252c5cad6ce5b908040bda194a65964c48f323fdf1030c58762")
 
         // Fenêtre : lignes entières et limite du serveur
         let long = (0..<400).map { "[00:\($0)] Micro · Une phrase avec des accents éàç." }.joined(separator: "\n")

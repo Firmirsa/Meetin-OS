@@ -83,25 +83,26 @@ final class TaskDetector {
 
     private func known() -> [KnownTask] {
         proposals.suffix(Self.maxKnown).map {
-            KnownTask(ref: $0.id, title: $0.review.title, task: String(decoding: Array($0.review.task.utf16.prefix(Self.maxKnownTask)), as: UTF16.self))
+            KnownTask(ref: $0.id, title: $0.review.title,
+                      task: String(decoding: Array($0.review.task.utf16.prefix(Self.maxKnownTask)), as: UTF16.self),
+                      fingerprint: $0.review.detectionFingerprint)
         }
     }
 
     private func apply(_ found: [DetectedTask]) {
         for task in found {
-            if let index = proposals.firstIndex(where: { $0.id == task.replaces || Self.sameTitle($0.review.title, task.review.title) }) {
+            if let ref = task.replaces {
+                guard let index = proposals.firstIndex(where: { $0.id == ref }),
+                      proposals[index].review.detectionFingerprint != task.review.detectionFingerprint else { continue }
                 proposals[index].review = task.review
                 onUpdatedProposal?(proposals[index])
             } else {
+                guard !proposals.contains(where: { $0.review.detectionFingerprint == task.review.detectionFingerprint }) else { continue }
                 let proposal = Proposal(id: task.id, review: task.review)
                 proposals.append(proposal)
                 onNewProposal?(proposal)
             }
         }
-    }
-
-    private static func sameTitle(_ first: String, _ second: String) -> Bool {
-        first.compare(second, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
     }
 
     // Les dernières lignes entières qui tiennent dans la limite du serveur : les citations restent exactes.

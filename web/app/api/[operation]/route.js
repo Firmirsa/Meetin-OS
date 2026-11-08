@@ -1,4 +1,5 @@
 import { ApiError, execute } from '../../../lib/integrations.mjs';
+import { research } from '../../../lib/agent-research.mjs';
 import { agentAccess, prepareTask, detectTasks, executeTask, trelloExecutionStatus } from '../../../lib/agent.mjs';
 import { accountAuth, accountStatus, agentEnvironment, bearer } from '../../../lib/hosted-account.mjs';
 import { boundedBody } from '../../../lib/hosted-response.mjs';
@@ -19,6 +20,7 @@ export async function POST(request, { params }) {
     if (operation === 'account-auth') result = await accountAuth(body, token);
     else if (operation === 'account-status') result = await accountStatus(token);
     else if (operation === 'account-billing') result = await accountBilling(body, token);
+    else if (operation === 'agent-research') result = await research(body, token);
     else if (['agent-access', 'agent-prepare', 'agent-detect', 'agent-execute', 'agent-trello-status'].includes(operation)) {
       const { userId, providerEnv } = await agentEnvironment(operation, token);
       if (operation === 'agent-access') result = agentAccess(providerEnv);
