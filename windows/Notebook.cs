@@ -1247,7 +1247,7 @@ internal sealed partial class Notebook : Form
             detector = StartDetection();
             using var meeting = new Form
             {
-                Text = "Réunion en cours · Meetin-OS", Icon = Icon, ClientSize = new Size(720, 460),
+                Text = "Réunion Meetin-OS", Icon = Icon, ClientSize = new Size(720, 520),
                 MinimumSize = new Size(560, 360), StartPosition = FormStartPosition.CenterParent,
                 BackColor = Night.Canvas, ForeColor = Night.Ink, Font = Font, ShowInTaskbar = false
             };
@@ -1270,33 +1270,87 @@ internal sealed partial class Notebook : Form
                 args.Cancel = true;
                 recording.Stop();
             };
-            var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 3, Padding = new Padding(32, 28, 32, 24), BackColor = Night.Canvas };
-            panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            // Fenêtre « Réunion Meetin-OS » comme CaptureView sur Mac : en-tête, segments, « Le fil de la réunion. », notes, barre du bas.
+            var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6, BackColor = Night.Canvas, Margin = new Padding(0), Padding = new Padding(0) };
             panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 1));
             panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            var heading = new Label { Text = "Réunion en cours", Font = Night.Serif(26f), ForeColor = Night.Ink, AutoSize = true, Margin = new Padding(0, 0, 0, 14) };
-            panel.Controls.Add(heading, 0, 0);
-            panel.SetColumnSpan(heading, 2);
-            var row = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = false, Margin = new Padding(0, 0, 0, 18) };
-            row.Controls.Add(indicator);
-            row.Controls.Add(stop);
-            var livePill = new Pill(LiveLabel(), LivePillKind()) { Margin = new Padding(0, 14, 0, 0) };
-            row.Controls.Add(livePill);
-            var taskPill = new Pill("0 tâche proposée", PillKind.Wait) { Margin = new Padding(10, 14, 0, 0), Visible = false };
-            row.Controls.Add(taskPill);
-            panel.Controls.Add(row, 0, 1);
-            panel.SetColumnSpan(row, 2);
-            var notesCardLive = Card("Notes de réunion", meetingNotes);
-            notesCardLive.Margin = new Padding(0, 0, 10, 0);
-            panel.Controls.Add(notesCardLive, 0, 2);
+            panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 1));
+            panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var header = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, Padding = new Padding(22, 10, 22, 10), Margin = new Padding(0), BackColor = Night.Canvas };
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            var brandRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
+            brandRow.Controls.Add(new PictureBox { Size = new Size(24, 24), SizeMode = PictureBoxSizeMode.Zoom, Image = Icon.ToBitmap(), Margin = new Padding(0, 2, 10, 0) });
+            brandRow.Controls.Add(new Label { Text = "Meetin-OS", Font = Night.Sans(12f, true), ForeColor = Night.Ink, AutoSize = true, Margin = new Padding(0, 3, 8, 0) });
+            brandRow.Controls.Add(new Label { Text = "Réunion", Font = Night.Sans(9f), ForeColor = Night.Ink2, AutoSize = true, Margin = new Padding(0, 7, 0, 0) });
+            header.Controls.Add(brandRow, 0, 0);
+            var tools = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
+            var integrationsLink = new LinkLabel { Text = "Intégrations", AutoSize = true, LinkColor = Night.Ink, ActiveLinkColor = Night.Accent, LinkBehavior = LinkBehavior.HoverUnderline, Font = Night.Sans(10.5f), Margin = new Padding(0, 4, 14, 0) };
+            integrationsLink.LinkClicked += (_, _) => { Activate(); ShowPage("Intégrations"); };
+            var settingsLink = new LinkLabel { Text = "\uE713", AutoSize = true, LinkColor = Night.Ink, ActiveLinkColor = Night.Accent, LinkBehavior = LinkBehavior.NeverUnderline, Font = Night.Icons(11f), Margin = new Padding(0, 6, 0, 0) };
+            settingsLink.LinkClicked += (_, _) => { Activate(); ShowPage("Paramètres"); };
+            tools.Controls.Add(integrationsLink);
+            tools.Controls.Add(settingsLink);
+            header.Controls.Add(tools, 1, 0);
+            panel.Controls.Add(header, 0, 0);
+            panel.Controls.Add(new Panel { Dock = DockStyle.Fill, BackColor = Night.Line, Margin = new Padding(0) }, 0, 1);
+            var segs = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.Top, Margin = new Padding(0, 12, 0, 6), BackColor = Night.Surface, Padding = new Padding(2) };
+            var segTranscript = SegmentLabel("Transcription");
+            segTranscript.BackColor = Olive;
+            var segAgent = SegmentLabel("Agent");
+            segAgent.Click += (_, _) => { Activate(); ShowPage("Agent"); };
+            segs.Controls.Add(segTranscript);
+            segs.Controls.Add(segAgent);
+            panel.Controls.Add(segs, 0, 2);
+            var body = new Panel { Dock = DockStyle.Fill, BackColor = Night.Canvas, Margin = new Padding(0) };
+            var col = new TableLayoutPanel { ColumnCount = 1, RowCount = 6, BackColor = Night.Canvas, Margin = new Padding(0) };
+            for (var i = 0; i < 4; i++) col.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            col.RowStyles.Add(new RowStyle(SizeType.Absolute, 150));
+            col.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            col.Controls.Add(new Label { Text = "PENDANT ET APRÈS L’APPEL", Font = Night.Sans(8.5f, true), ForeColor = Night.Accent, AutoSize = true, Margin = new Padding(0, 10, 0, 10) }, 0, 0);
+            col.Controls.Add(new Label { Text = "Le fil de la réunion.", Font = Night.Serif(31f), ForeColor = Night.Ink, AutoSize = true, Margin = new Padding(0, 0, 0, 10) }, 0, 1);
+            col.Controls.Add(new Label { Text = "Prenez des notes pendant l’appel, puis retrouvez la transcription ici.", Font = Night.Sans(10f), ForeColor = Night.Ink2, AutoSize = true, Margin = new Padding(0, 0, 0, 12) }, 0, 2);
+            col.Controls.Add(new Label { Text = "Notes", Font = Night.Sans(10f, true), ForeColor = Night.Ink, AutoSize = true, Margin = new Padding(0, 0, 0, 6) }, 0, 3);
+            var notesCardLive = Card("", meetingNotes);
+            notesCardLive.Margin = new Padding(0, 0, 0, 14);
+            col.Controls.Add(notesCardLive, 0, 4);
             var liveText = Editor("Transcription en direct", true);
             liveText.Text = live == null ? LiveWaitingMessage() : "En attente du premier passage…";
-            var liveCard = Card("Transcription en direct", liveText);
-            liveCard.Margin = new Padding(10, 0, 0, 0);
-            panel.Controls.Add(liveCard, 1, 2);
+            var liveCard = Card("Transcription", liveText);
+            liveCard.Margin = new Padding(0, 0, 0, 12);
+            col.Controls.Add(liveCard, 0, 5);
+            body.Controls.Add(col);
+            void PlaceMeeting()
+            {
+                var s = body.DeviceDpi / 96f;
+                var w = (int)Math.Min(620 * s, Math.Max(280, body.ClientSize.Width - 56 * s));
+                col.Bounds = new Rectangle((body.ClientSize.Width - w) / 2, 0, w, body.ClientSize.Height);
+            }
+            body.Resize += (_, _) => PlaceMeeting();
+            panel.Controls.Add(body, 0, 3);
+            panel.Controls.Add(new Panel { Dock = DockStyle.Fill, BackColor = Night.Line, Margin = new Padding(0) }, 0, 4);
+            var bottom = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, RowCount = 2, Padding = new Padding(22, 10, 22, 12), Margin = new Padding(0), BackColor = Night.Canvas };
+            bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            bottom.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            var statusLine = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 6) };
+            statusLine.Controls.Add(new Label { Text = "●", AutoSize = true, ForeColor = Night.Rec, Font = Night.Sans(7f), Margin = new Padding(0, 3, 0, 0) });
+            statusLine.Controls.Add(new Label { Text = "Enregistrement en cours", AutoSize = true, ForeColor = Night.Ink2, Font = Night.Sans(9.5f), Margin = new Padding(4, 0, 0, 0) });
+            bottom.Controls.Add(statusLine, 0, 0);
+            bottom.SetColumnSpan(statusLine, 2);
+            var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
+            var livePill = new Pill(LiveLabel(), LivePillKind()) { Margin = new Padding(0, 14, 10, 0) };
+            row.Controls.Add(livePill);
+            var taskPill = new Pill("0 tâche proposée", PillKind.Wait) { Margin = new Padding(0, 14, 10, 0), Visible = false };
+            row.Controls.Add(taskPill);
+            row.Controls.Add(indicator);
+            bottom.Controls.Add(row, 0, 1);
+            stop.Margin = new Padding(0);
+            bottom.Controls.Add(stop, 1, 1);
+            panel.Controls.Add(bottom, 0, 5);
             meeting.Controls.Add(panel);
+            meeting.Shown += (_, _) => PlaceMeeting();
             meeting.Show(this);
             using var liveTimer = new System.Windows.Forms.Timer { Interval = 700 };
             liveTimer.Tick += (_, _) =>
