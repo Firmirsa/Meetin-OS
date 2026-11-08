@@ -116,3 +116,9 @@ test('agent-research requires Google and sends only the explicit public question
   const missing = await agentEnvironment('agent-access', google, {...process.env, HAI_API_KEY: 'planner-fixture'});
   assert.equal(agentAccess(missing.providerEnv).linkup, false);
 });
+
+test('Linkup source titles are shown without HTML entities', async () => {
+  const { plainText } = await import('./integrations.mjs');
+  assert.equal(plainText('Quelle est la capitale de l&#039;Australie ?'), "Quelle est la capitale de l'Australie ?");
+  assert.equal(plainText('R&amp;D &lt;b&gt; &#x41; &unknown;'), 'R&D <b> A &unknown;');
+});

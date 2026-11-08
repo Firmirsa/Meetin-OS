@@ -14,6 +14,8 @@ struct MeetinOS: App {
         .defaultSize(width: 1100, height: 760)
         .defaultWindowPlacement { _, context in MainWindow.placement(in: context) }
         .restorationBehavior(.disabled)
+        // Always open the notebook at launch; the meeting window only opens for a meeting.
+        .defaultLaunchBehavior(.presented)
         .commands { CommandGroup(replacing: .newItem) {} }
         Window("Réunion Meetin-OS", id: "meeting") {
             MeetingWindow(session: meeting)
@@ -26,6 +28,7 @@ struct MeetinOS: App {
             return WindowPlacement(.trailing, size: CGSize(width: visible.width / 3, height: visible.height))
         }
         .restorationBehavior(.disabled)
+        .defaultLaunchBehavior(.suppressed)
         .commandsRemoved()
     }
 }

@@ -66,13 +66,25 @@ export async function execute(operation, body, token, env = process.env, fetcher
   throw new ApiError(404, 'Action inconnue.');
 }
 
+// Source titles come back with HTML entities ("l&#039;Australie"): show them as plain text.
+const namedEntities = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+export function plainText(value) {
+  return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, code) => {
+    if (code[0] === '#') {
+      const point = code[1].toLowerCase() === 'x' ? parseInt(code.slice(2), 16) : Number(code.slice(1));
+      return point > 0 && point <= 0x10ffff ? String.fromCodePoint(point) : entity;
+    }
+    return namedEntities[code.toLowerCase()] ?? entity;
+  });
+}
+
 export async function searchLinkup(body, env = process.env, fetcher = fetch) {
   const q = input(body?.query, 500);
   const result = await provider(fetcher, 'https://api.linkup.so/v1/search', setting(env, 'LINKUP_API_KEY'),
     { q, depth: 'standard', outputType: 'sourcedAnswer' }, 'Linkup');
   const sources = Array.isArray(result?.sources) ? result.sources.slice(0, 10).flatMap((source) => {
     const url = safeURL(source?.url);
-    return url ? [{ name: typeof source.name === 'string' ? source.name : url, url }] : [];
+    return url ? [{ name: typeof source.name === 'string' ? plainText(source.name) : url, url }] : [];
   }) : [];
   if (typeof result?.answer !== 'string') throw new ApiError(502, 'Linkup a renvoyé une réponse inattendue.');
   return { answer: result.answer, sources };

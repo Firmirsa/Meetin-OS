@@ -104,6 +104,10 @@ final class TaskDetector {
         } catch let failure as AgentClient.Failure where failure.status == 401 || failure.status == 503 {
             lastError = failure.message
             isStopped = true
+        } catch is CancellationError {
+            // Pause or stop cancelled the request on purpose: nothing to report.
+        } catch let error as URLError where error.code == .cancelled {
+            // Same deliberate cancellation, surfaced by URLSession.
         } catch {
             lastError = error.localizedDescription
         }
