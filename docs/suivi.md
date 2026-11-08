@@ -1,5 +1,11 @@
 # Suivi Meetin-OS
 
+## Linkup central via Supabase Vault, 8 novembre 2026
+
+Demande Wael : clé centrale côté serveur, aucun compte ni clé Linkup à demander aux utilisateurs. Chemin réel : route Next.js sur Vercel, puis RPC Supabase `meetin_provider_secret` réservée au rôle serveur, puis API Linkup. Migration additive `20261108111500_linkup_provider_secret.sql` préparée pour autoriser le fournisseur Linkup et le nom Vault `linkup_api_key`. Compatibilité conservée avec LINKUP_API_KEY serveur prioritaire ; retirer cette variable sur recette après configuration Vault pour vérifier ce chemin. Aucun secret embarqué dans le Mac ou renvoyé au client. La recherche reste une question explicite après clic, sans envoi automatique des conversations.
+
+Tests Node ciblés avec services simulés : accès Google obligatoire, validation avant lecture Vault, clé lue seulement via serveur, question seule transmise, clé absente des réponses, flag Linkup issu de la configuration centrale, absence de clé refusée. Migration SQL relue, non exécutée à distance. Blocage réel : Chrome Codex Agents est connecté à Supabase en Fraawdrinn ; les deux organisations visibles ne contiennent aucun projet Meetin-OS. Aucune clé réelle disponible dans ce lot ; aucune configuration distante ni recherche réelle effectuée. Le code doit être déployé sur recette, la migration appliquée et le secret déposé par une personne ayant accès au bon projet avant le test réel. Prompt propriétaire : `/private/tmp/prompt-lenny-linkup-vault.md`.
+
 ## Installation Samy et retouche UI préparée, 8 novembre 2026
 
 À 10 h 52 (Paris), installation autorisée du lot Samy `7b974e0` dans Applications : **0.1.6 build 10**, recette. Aucune capture active avant fermeture normale ; processus absent avant remplacement. Sauvegarde dans `~/Library/Application Support/Meetin-OS/Build Backups/before-samy-build10.91tz5ivn`. Signature vérifiée et carnet inchangé. À la réouverture : compte connecté, quatre réunions présentes, menus Renommer/Supprimer visibles, accueil avec Enregistrer seul. Micro à autoriser affiché. Aucun enregistrement démarré par l’agent. Reçu : `/private/tmp/meetin-samy-integrated-20261108/installation-receipt.json`. Le numéro de packaging passe de 9 à 10, exécutable validé inchangé.

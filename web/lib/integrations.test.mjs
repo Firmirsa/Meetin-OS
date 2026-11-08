@@ -44,12 +44,20 @@ test('agent-research requires Google and sends only the explicit public question
   }
   let linkupCalls = 0;
   let outcome = 'success';
+  let vaultKey = null;
+  let vaultCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     if (url === 'https://auth.example.test/auth/v1/user') {
       if (![google, otp].some(value => options.headers.authorization === `Bearer ${value}`)) {
         return new Response(null, {status: 401});
       }
       return Response.json({id: userId, email: 'recette@example.test', email_confirmed_at: '2026-11-07', app_metadata: {providers: ['google']}});
+    }
+    if (url === 'https://auth.example.test/rest/v1/rpc/meetin_provider_secret') {
+      vaultCalls++;
+      assert.equal(options.headers.apikey, 'server-fixture');
+      assert.deepEqual(JSON.parse(options.body), {p_provider: 'linkup'});
+      return Response.json(vaultKey);
     }
     assert.equal(url, 'https://api.linkup.so/v1/search');
     linkupCalls++;
@@ -73,6 +81,7 @@ test('agent-research requires Google and sends only the explicit public question
   for (const bearer of [null, token, otp]) assert.equal((await post(bearer)).status, 401);
   for (const query of ['', '   ', 'a'.repeat(501)]) assert.equal((await post(google, query)).status, 400);
   assert.equal(linkupCalls, 0);
+  assert.equal(vaultCalls, 0, "no secret read for rejected access or invalid input");
 
   const response = await post(google);
   assert.equal(response.status, 200);
@@ -91,4 +100,19 @@ test('agent-research requires Google and sends only the explicit public question
   delete process.env.LINKUP_API_KEY;
   assert.equal((await post(google)).status, 503);
   assert.equal(linkupCalls, 3);
+  vaultKey = 'linkup-fixture';
+  outcome = 'success';
+  const central = await post(google);
+  assert.equal(central.status, 200);
+  assert.equal(JSON.stringify(await central.json()).includes(vaultKey), false);
+  assert.equal(linkupCalls, 4);
+  assert.equal(vaultCalls, 2);
+  const {agentEnvironment} = await import('./hosted-account.mjs');
+  const {agentAccess} = await import('./agent.mjs');
+  const access = await agentEnvironment('agent-access', google, {...process.env, HAI_API_KEY: 'planner-fixture'});
+  assert.equal(agentAccess(access.providerEnv).linkup, true);
+  assert.equal(JSON.stringify(agentAccess(access.providerEnv)).includes(vaultKey), false);
+  vaultKey = null;
+  const missing = await agentEnvironment('agent-access', google, {...process.env, HAI_API_KEY: 'planner-fixture'});
+  assert.equal(agentAccess(missing.providerEnv).linkup, false);
 });

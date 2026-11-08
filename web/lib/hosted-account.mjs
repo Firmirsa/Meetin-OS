@@ -132,7 +132,7 @@ export async function accountAuth(body, token, env = process.env, fetcher = fetc
 }
 
 export async function providerKey(provider, env = process.env, fetcher = fetch) {
-  const variable = {gladia: 'GLADIA_API_KEY', hcompany: 'HAI_API_KEY', devin: 'DEVIN_API_KEY'}[provider];
+  const variable = {gladia: 'GLADIA_API_KEY', hcompany: 'HAI_API_KEY', devin: 'DEVIN_API_KEY', linkup: 'LINKUP_API_KEY'}[provider];
   if (!variable) throw new ApiError(503, 'Intégration indisponible.');
   const configured = env[variable]?.trim();
   if (configured) return configured;
@@ -147,11 +147,12 @@ export async function agentEnvironment(operation, token, env = process.env, fetc
     throw new ApiError(409, 'Ce suivi utilisait l’ancien accès Trello. La connexion personnelle sera disponible dans une prochaine version.', 'trello_setup');
   }
   const needsDevin = env.DEVIN_ORG_ID && ['agent-access', 'agent-execute'].includes(operation);
-  const [hai, devin] = await Promise.all([
+  const [hai, devin, linkup] = await Promise.all([
     providerKey('hcompany', env, fetcher),
     needsDevin ? providerKey('devin', env, fetcher) : null,
+    operation === 'agent-access' ? providerKey('linkup', env, fetcher).catch(() => null) : null,
   ]);
-  const providerEnv = {...env, HAI_API_KEY: hai ?? undefined, DEVIN_API_KEY: devin ?? env.DEVIN_API_KEY};
+  const providerEnv = {...env, LINKUP_API_KEY: linkup ?? undefined, HAI_API_KEY: hai ?? undefined, DEVIN_API_KEY: devin ?? env.DEVIN_API_KEY};
   // An OAuth account must never inherit saved browser credentials from another user.
   delete providerEnv.HAI_BROWSER_PROFILE_ID;
   if (providerEnv.HAI_COMPUTER_USE_URL) {
