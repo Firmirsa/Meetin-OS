@@ -36,10 +36,20 @@ enum AudioPermissionHelp: LocalizedError {
     }
 }
 
+// L'identifiant de piste (rawValue) reste interne : écho, tri et fichiers s'appuient dessus.
+// Le libellé n'est que le nom affiché devant chaque phrase de la transcription.
 enum AudioTrack: String, CaseIterable, Hashable, Sendable {
     case microphone, system
 
-    var label: String { self == .microphone ? "Micro" : "Audio de l’appel" }
+    var label: String { self == .microphone ? Self.userLabel : "Audio de l’appel" }
+
+    static let userLabel = speakerName(NSFullUserName())
+
+    // Nom complet du compte macOS, ou « Vous » s'il est vide.
+    static func speakerName(_ fullName: String) -> String {
+        let name = fullName.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return name.isEmpty ? "Vous" : name
+    }
 }
 
 final class AudioCapture {

@@ -59,12 +59,20 @@ struct GladiaSmoke {
         let mixedTranscript = try await client.transcribe(mix)
         precondition(mixedTranscript == "[00:01] Voix 1 · Bonjour.")
         let trackTranscript = try await client.transcribe(tracks: tracks)
-        precondition(trackTranscript == "[00:01] Micro · Bonjour.\n[00:03] Audio de l’appel · Bonjour.")
+        let me = AudioTrack.microphone.label
+        precondition(me == AudioTrack.speakerName(NSFullUserName()))
+        precondition(trackTranscript == "[00:01] \(me) · Bonjour.\n[00:03] Audio de l’appel · Bonjour.")
+        precondition(AudioTrack.speakerName("  Léa   Martin\n") == "Léa Martin")
+        precondition(AudioTrack.speakerName(" ") == "Vous")
         let silentTrack = Gladia.format(
             microphone: [.init(start: 1, speaker: 0, text: "Bonjour.")], system: [], tracks: tracks
         )
         precondition(silentTrack.contains("Audio de l’appel · aucune parole reconnue."))
-        print("Mix, horodatage, pistes séparées, silence et refus de clé vérifiés avec Gladia simulé.")
+        let silentMicrophone = Gladia.format(
+            microphone: [], system: [.init(start: 1, speaker: 0, text: "Bonjour.")], tracks: tracks
+        )
+        precondition(silentMicrophone.contains("\(me) · aucune parole reconnue."))
+        print("Mix, horodatage, pistes séparées, nom de l’utilisateur, silence et refus de clé vérifiés avec Gladia simulé.")
     }
 
     static func writeTone(at url: URL) throws {
