@@ -49,3 +49,5 @@ Diagnostic du 8 novembre après le rendu :
   - règle YouTube appliquée sur un texte normalisé et sur des lignes coupées.
   
   Mesure avec le vrai Holo, 4 essais par phrase : première personne 4/4 ; fausses tâches (notes, idée) 0/4 ; « Léni » 3/4 ; « L’ENIA » 1/4, Holo ignorant la tâche lui-même. Le gain attendu vient surtout du vocabulaire Gladia, pas encore vérifié sur une vraie voix.
+
+Essai réel vers 15h17, voix de Lenny sur la recette (`2b9c70b`) : le direct marche avec le vocabulaire Gladia. « Lenny » prononcé seul est bien transcrit. Dans la phrase, Gladia écrit encore « Leni », mais Holo a quand même proposé la tâche Devin « Ajouter un test pour la page de téléchargement ». Ajout de la variante « Leni » et d’un poids plus fort pour Lenny (`451a162`), déployé ; pas encore réessayé.
