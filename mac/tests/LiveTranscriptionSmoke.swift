@@ -103,7 +103,8 @@ struct LiveTranscriptionSmoke {
         text.apply(.init(id: "1", text: "Salut", start: 0, isFinal: true), track: .system)
         text.apply(.init(id: "2", text: "Ça va ?", start: 4, isFinal: true), track: .microphone)
         precondition(text.lines.count == 3, "même id sur deux pistes : deux énoncés")
-        let expected = "[00:01] Micro · Bonjour\n[00:02] Audio de l’appel · Salut\n[00:04] Micro · Ça va ?"
+        let me = AudioTrack.microphone.label
+        let expected = "[00:01] \(me) · Bonjour\n[00:02] Audio de l’appel · Salut\n[00:04] \(me) · Ça va ?"
         precondition(text.finalText == expected, text.finalText)
 
         // Écho du micro : la piste de l'appel garde la phrase, et les vraies répliques restent
