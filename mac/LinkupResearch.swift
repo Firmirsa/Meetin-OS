@@ -14,7 +14,7 @@ struct LinkupResearch: View {
             if client == nil {
                 Text("Connectez-vous avec Google pour utiliser la recherche.").font(.callout).foregroundStyle(Color.mtInk2)
             } else if available != true {
-                Text(available == false ? "Linkup reste à configurer." : "L’accès à Linkup n’a pas été confirmé.")
+                Text(available == false ? "La recherche est indisponible : le service doit être activé par l’équipe Meetin-OS. Aucune clé ni compte Linkup ne vous est demandé." : "La disponibilité de la recherche n’a pas encore été confirmée par le serveur. Aucune configuration Linkup n’est nécessaire de votre côté.")
                     .font(.callout).foregroundStyle(Color.mtInk2)
             } else {
                 Text("Le bouton Envoyer transmet votre question à Linkup. Posez une question sur des informations publiques.")

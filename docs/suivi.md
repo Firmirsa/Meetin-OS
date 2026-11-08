@@ -1,5 +1,9 @@
 # Suivi Meetin-OS
 
+## Linkup retiré du catalogue personnel, 8 novembre 2026
+
+À la demande de Wael, la carte Linkup est retirée d’Intégrations. La recherche explicite dans Agent reste présente ; son message d’indisponibilité précise que l’activation incombe à l’équipe et qu’aucune clé ni compte Linkup ne sont demandés aux utilisateurs. Le backend central est livré dans `ce9b145`. Aucun secret retrouvé/affiché par ce changement UI, aucun changement distant. Build Mac 0.1.6 (12) préparé, non installé ; Applications reste en 0.1.6 (10).
+
 ## Linkup central via Supabase Vault, 8 novembre 2026
 
 Demande Wael : clé centrale côté serveur, aucun compte ni clé Linkup à demander aux utilisateurs. Chemin réel : route Next.js sur Vercel, puis RPC Supabase `meetin_provider_secret` réservée au rôle serveur, puis API Linkup. Migration additive `20261108111500_linkup_provider_secret.sql` préparée pour autoriser le fournisseur Linkup et le nom Vault `linkup_api_key`. Compatibilité conservée avec LINKUP_API_KEY serveur prioritaire ; retirer cette variable sur recette après configuration Vault pour vérifier ce chemin. Aucun secret embarqué dans le Mac ou renvoyé au client. La recherche reste une question explicite après clic, sans envoi automatique des conversations.

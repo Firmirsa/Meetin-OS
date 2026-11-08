@@ -83,7 +83,6 @@ struct IntegrationsView: View {
             toolRow("Google Calendar", purpose: "Google Meetin-OS ne connecte pas ton agenda", status: "À venir") { EmptyView() }
             toolRow("Devin", purpose: "Service de code via le serveur, pas un compte personnel relié ici", status: toolStatus(session.agentAccess?.devin)) { EmptyView() }
             toolRow("H Company", purpose: "Préparation des propositions via Holo, service fourni par le serveur", status: toolStatus(session.agentAccess?.planning)) { EmptyView() }
-            toolRow("Linkup", purpose: "Recherche publique facultative, envoyée uniquement après clic", status: toolStatus(session.agentAccess?.linkup)) { EmptyView() }
             Text("Aucune clé d’équipe à saisir. Trello et Calendar attendent leur propre parcours de consentement.")
                 .font(.callout).foregroundStyle(Color.mtInk2)
             HStack {
@@ -150,7 +149,7 @@ struct IntegrationsView: View {
 
     @ViewBuilder private func providerLogo(_ name: String) -> some View {
         let resource = ["Google Meetin-OS": "GoogleG", "Google Calendar": "Calendar", "Trello": "Trello",
-                        "Devin": "Devin", "H Company": "HCompany", "Linkup": "Linkup"][name]
+                        "Devin": "Devin", "H Company": "HCompany"][name]
         if let resource,
            let url = Bundle.main.url(forResource: resource, withExtension: "png",
                                      subdirectory: resource == "GoogleG" ? nil : "Integrations"),
