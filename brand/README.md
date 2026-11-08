@@ -36,6 +36,8 @@ Contrastes (WCAG) : encre/canvas 15,8 · encre/citron 12,3 · secondaire/canvas 
 - `web/theme-nuit.css` · thème du site : fond encre, brume citron et olive, cartes en verre fumé. Chargé en dernier dans `web/app/layout.jsx`, il ne change que les couleurs. Pour revenir au clair : retirer l'import.
 - `components/components.css` · carte de revue, suivi de l'agent (avant → après), barre REC, notification. Dépend de `tokens.css`.
 - `components/preview.html` · page de démo à ouvrir dans un navigateur. `?theme=dark`, `?state=done`.
+- `components/rec-bar-demo.html` · la barre REC animée seule (glyphe « deux voix, un point » + barres de niveau), markup prêt à copier.
+- `animations/son-qui-bouge.gif` · la même animation en GIF (boucle de 1,8 s), pour un post ou une slide.
 - `MeetinTheme.swift` · couleurs dynamiques, polices, boutons, carte. Pour Wael.
 - `MeetinComponents.swift` · `MTReviewCard`, `MTAgentTimeline`, `MTRecordingBar`, `MTMeetingToast`, `MTHighlight`, `MTPill`. Syntaxe vérifiée, **non compilé** (pas de Swift côté marque) : tester dans Xcode (`#Preview` inclus).
 - `logo/app-icon.svg` / `app-icon-1024.png` · logo : tuile encre, guillemets crème qui convergent, point citron vert. Le nom s'écrit en texte, jamais en logo.

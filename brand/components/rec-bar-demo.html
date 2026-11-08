@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meetin-OS · barre REC animée</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Figtree:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="components.css">
+<style>
+  /* Fond nuit du site (web/theme-nuit.css) pour voir la barre dans son contexte. */
+  html, body { margin: 0; background: #0F1613; }
+  body {
+    min-height: 100vh; display: grid; place-items: center;
+    background:
+      radial-gradient(60% 90% at 15% 110%, rgba(207, 232, 107, .22), transparent 70%),
+      radial-gradient(60% 90% at 95% 120%, rgba(92, 107, 15, .45), transparent 72%),
+      #0F1613;
+  }
+</style>
+</head>
+<body>
+<!-- Le markup à copier. L'animation vient de components.css :
+     glyphe = mtGuilL / mtGuilR / mtDot (1,8 s), barres de niveau = mtLevel (1,1 s).
+     Sans mouvement si prefers-reduced-motion. Côté app Mac : MTRecordingBar(level:) dans MeetinComponents.swift. -->
+<div class="mt-recbar" role="status" aria-label="Enregistrement en cours">
+  <svg class="mt-recbar__glyph" viewBox="0 0 96 96" aria-hidden="true">
+    <g class="l o"><path class="c" d="M10 34L20 48L10 62"/></g>
+    <g class="l"><path class="c" d="M23 34L33 48L23 62"/></g>
+    <g class="r o"><path class="c" d="M86 34L76 48L86 62"/></g>
+    <g class="r"><path class="c" d="M73 34L63 48L73 62"/></g>
+    <circle class="dot" cx="48" cy="48" r="8.5"/>
+  </svg>
+  <span class="mt-recbar__time">00:12:41</span>
+  <span class="mt-recbar__meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+  <button class="mt-btn mt-btn--ghost" type="button">Pause</button>
+  <button class="mt-btn mt-btn--primary" type="button">Arrêter</button>
+</div>
+</body>
+</html>
