@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { youtubeProposal, launchYoutube, youtubeStatus, youtubeDestination } from './agent-youtube.mjs';
 import { ApiError, input, provider, safeURL, setting } from './integrations.mjs';
 
 const reviewTTL = 15 * 60 * 1000;
@@ -140,7 +141,7 @@ function approve(plan, token, env) {
 function readApproval(value, token, env, now) {
   const invalid = () => new ApiError(409, 'La validation a expiré ou la proposition a changé. Prépare la tâche à nouveau.');
   const plan = readSealed(value, token, env, 'review', invalid);
-  if (plan.expiresAt <= now || destination(plan.executor, env) !== plan.destination) throw invalid();
+  if (plan.expiresAt <= now || (plan.action === 'youtube_comment' ? youtubeDestination : destination(plan.executor, env)) !== plan.destination) throw invalid();
   return plan;
 }
 
@@ -148,6 +149,11 @@ export async function prepareTask(body, token, env = process.env, fetcher = fetc
   const request = optionalText(body?.task, 2000);
   const transcript = optionalText(body?.transcript, 5000);
   if (!request && !transcript) throw new ApiError(400, 'Saisis une demande ou colle un extrait de réunion.');
+  const youtube = youtubeProposal(request || transcript, token, env);
+  if (youtube) {
+    const plan = { ...youtube, id: randomUUID(), expiresAt: now + reviewTTL, quote: request ? '' : youtube.quote, clarifications: [] };
+    return { status: 'ready', ...plan, approval: approve(plan, token, env) };
+  }
   const turns = body?.clarifications ?? [];
   if (!Array.isArray(turns) || turns.length > 4) throw new ApiError(400, 'Intègre ces précisions à la demande pour continuer.');
   const clarifications = turns.map(turn => ({ question: input(turn?.question, 350), answer: input(turn?.answer, 600) }));
@@ -197,6 +203,13 @@ export async function detectTasks(body, token, env = process.env, fetcher = fetc
   const given = body?.known ?? [];
   if (!Array.isArray(given) || given.length > 10) throw new ApiError(400, 'Vérifie le contenu et sa longueur.');
   const known = given.map(item => ({ ref: input(item?.ref, 64), title: input(item?.title, 120), task: input(item?.task, 400) }));
+  const youtube = youtubeProposal(transcript, token, env);
+  if (youtube) {
+    const fingerprint = detectionFingerprint(youtube.executor, youtube.destination, youtube.task, youtube.quote);
+    if (given.some(item => item.fingerprint === fingerprint)) return { tasks: [] };
+    const plan = { ...youtube, id: randomUUID(), expiresAt: now + reviewTTL, clarifications: [] };
+    return { tasks: [{ ...plan, replaces: null, approval: approve(plan, token, env) }] };
+  }
   const destinations = { devin: codeRepository(env), computer_use: testBoard(env) };
   if (!destinations.devin && !destinations.computer_use) return { tasks: [] };
   const completion = await provider(fetcher, 'https://api.hcompany.ai/v1/chat/completions', setting(env, 'HAI_API_KEY'), {
@@ -252,6 +265,10 @@ export async function detectTasks(body, token, env = process.env, fetcher = fetc
 export async function executeTask(body, token, env = process.env, fetcher = fetch, now = Date.now()) {
   if (body?.confirmed !== true) throw new ApiError(400, 'Confirme la proposition avant de lancer la tâche.');
   const plan = readApproval(body.approval, token, env, now);
+  if (plan.action === 'youtube_comment') {
+    const result = await launchYoutube(plan, token, env, fetcher);
+    return { ...result, trackingToken: seal({ sessionId: result.sessionId, expiresAt: now + trackingTTL }, token, env, 'youtube-status') };
+  }
   const context = JSON.stringify({ title: plan.title, task: plan.task, target: plan.target, excerpt: plan.quote, clarifications: plan.clarifications });
 
   if (plan.executor === 'devin') {
@@ -332,4 +349,11 @@ export async function trelloExecutionStatus(body, token, env = process.env, fetc
   }
   if (['completed', 'failed', 'timed_out', 'interrupted'].includes(state)) return {status: 'unverified'};
   throw new ApiError(502, 'L’état de la session H est indisponible.');
+}
+
+export async function youtubeExecutionStatus(body, token, env = process.env, fetcher = fetch, now = Date.now()) {
+  const invalid = () => new ApiError(409, 'Le suivi YouTube a expiré. Consultez la session H.');
+  const receipt = readSealed(body?.trackingToken, token, env, 'youtube-status', invalid);
+  if (!sessionID.test(receipt.sessionId) || receipt.expiresAt <= now) throw invalid();
+  return youtubeStatus(receipt, token, env, fetcher);
 }

@@ -16,6 +16,13 @@ func detected(_ id: String, title: String, task: String = "Faire la tâche.", re
 struct TaskDetectionSmoke {
     @MainActor
     static func main() async throws {
+        let decoder = JSONDecoder()
+        let youtube = try decoder.decode(TrelloExecutionResult.self, from: Data(#"{"status":"verified","commentUrl":"https://www.youtube.com/watch?v=abcdefghijk&lc=Ugx123"}"#.utf8))
+        precondition(youtube.verifiedURL != nil)
+        let fake = try decoder.decode(TrelloExecutionResult.self, from: Data(#"{"status":"verified","commentUrl":"https://evil.example/watch?v=abcdefghijk&lc=Ugx123"}"#.utf8))
+        precondition(fake.verifiedURL == nil)
+        let blocked = try decoder.decode(TrelloExecutionResult.self, from: Data(#"{"status":"unverified","message":"Commentaires désactivés"}"#.utf8))
+        precondition(blocked.message == "Commentaires désactivés" && blocked.verifiedURL == nil)
         var text = ""
         var calls: [(String, [KnownTask])] = []
         var responses: [Result<[DetectedTask], Error>] = []

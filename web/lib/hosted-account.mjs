@@ -155,6 +155,10 @@ export async function agentEnvironment(operation, token, env = process.env, fetc
   const providerEnv = {...env, LINKUP_API_KEY: linkup ?? undefined, HAI_API_KEY: hai ?? undefined, DEVIN_API_KEY: devin ?? env.DEVIN_API_KEY};
   // An OAuth account must never inherit saved browser credentials from another user.
   delete providerEnv.HAI_BROWSER_PROFILE_ID;
+  if (user.id !== env.MEETIN_YOUTUBE_DEMO_USER_ID) {
+    delete providerEnv.MEETIN_YOUTUBE_PROFILE_ID;
+    delete providerEnv.MEETIN_YOUTUBE_DEMO_USER_ID;
+  }
   if (providerEnv.HAI_COMPUTER_USE_URL) {
     try {
       const host = new URL(providerEnv.HAI_COMPUTER_USE_URL.trim()).hostname.replace(/\.$/, '');

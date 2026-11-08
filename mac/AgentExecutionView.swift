@@ -23,10 +23,10 @@ struct AgentExecutionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             if let url = execution.trelloResult?.verifiedURL {
-                Label("Fiche vérifiée", systemImage: "checkmark.circle")
-                Link("Ouvrir la fiche dans Trello", destination: url)
+                Label(execution.trelloResult?.commentURL != nil ? "Commentaire vérifié" : "Fiche vérifiée", systemImage: "checkmark.circle")
+                Link(execution.trelloResult?.commentURL != nil ? "Voir le commentaire YouTube" : "Ouvrir la fiche dans Trello", destination: url)
             } else if execution.trelloResult != nil {
-                Text("H n’a pas confirmé la fiche. Consultez la session pour voir ce qui manque.")
+                Text(execution.trelloResult?.message ?? "H n’a pas confirmé le résultat. Consultez la session pour voir ce qui manque.")
                     .foregroundStyle(Color.mtWarn)
             } else if execution.statusEndpoint != nil {
                 if trackingClient == nil {
@@ -51,7 +51,7 @@ struct AgentExecutionView: View {
         guard execution.trelloResult == nil, let client = trackingClient else { return }
         issue = nil
         let clock = ContinuousClock()
-        let deadline = clock.now.advanced(by: .seconds(150))
+        let deadline = clock.now.advanced(by: .seconds(270))
         do {
             repeat {
                 let result = try await client.trelloStatus(execution)

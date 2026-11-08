@@ -23,6 +23,10 @@ struct AgentReview: Codable {
     let clarifications: [AgentClarification]
     let approval: String
 
+    var usesYouTube: Bool {
+        executor == .computerUse && destination == "https://www.youtube.com/@HCompanyOfficial/videos"
+    }
+
     var usesTrello: Bool {
         executor == .computerUse && ["trello.com", "www.trello.com"].contains(URL(string: destination)?.host ?? "")
     }
@@ -85,10 +89,18 @@ struct TrelloExecutionResult: Codable {
 
     let status: State
     let cardURL: URL?
+    var commentURL: URL? = nil
+    var message: String? = nil
 
-    private enum CodingKeys: String, CodingKey { case status, cardURL = "cardUrl" }
+    private enum CodingKeys: String, CodingKey { case status, cardURL = "cardUrl", commentURL = "commentUrl", message }
 
     var verifiedURL: URL? {
+        if status == .verified, let url = commentURL, let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           url.scheme == "https", url.host == "www.youtube.com", url.port == nil, url.user == nil,
+           url.password == nil, url.path == "/watch", url.fragment == nil,
+           let items = parts.queryItems, items.count == 2,
+           items.first(where: { $0.name == "v" })?.value?.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil,
+           items.first(where: { $0.name == "lc" })?.value?.range(of: "^[A-Za-z0-9_-]{1,200}$", options: .regularExpression) != nil { return url }
         guard status == .verified, let url = cardURL, url.scheme == "https", url.host == "trello.com",
               url.port == nil, url.user == nil, url.password == nil, url.query == nil, url.fragment == nil,
               url.path.range(of: "^/c/[A-Za-z0-9]{1,64}$", options: .regularExpression) != nil else { return nil }
@@ -199,9 +211,13 @@ struct AgentClient {
               result.url.user == nil, result.url.password == nil, result.url.port == nil || result.url.port == 443 else {
             throw Failure("Le service n’a pas renvoyé de lien de session valide.")
         }
-        result.statusEndpoint = review.usesTrello && result.trackingToken != nil ? trelloStatusEndpoint : nil
+        result.statusEndpoint = result.trackingToken == nil ? nil : (review.usesYouTube ? youtubeStatusEndpoint : (review.usesTrello ? trelloStatusEndpoint : nil))
         result.trelloResult = nil
         return result
+    }
+
+    private var youtubeStatusEndpoint: URL {
+        baseURL.appendingPathComponent("api/agent-youtube-status")
     }
 
     private var trelloStatusEndpoint: URL {
@@ -209,16 +225,16 @@ struct AgentClient {
     }
 
     func canTrack(_ execution: AgentExecution) -> Bool {
-        execution.statusEndpoint == trelloStatusEndpoint && execution.trackingToken != nil
+        (execution.statusEndpoint == trelloStatusEndpoint || execution.statusEndpoint == youtubeStatusEndpoint) && execution.trackingToken != nil
     }
 
     func trelloStatus(_ execution: AgentExecution) async throws -> TrelloExecutionResult {
         guard canTrack(execution), let token = execution.trackingToken else {
             throw Failure("Connectez l’agent au serveur utilisé pour cette tâche.")
         }
-        let result: TrelloExecutionResult = try await post("agent-trello-status", ["trackingToken": token])
+        let result: TrelloExecutionResult = try await post(execution.statusEndpoint == youtubeStatusEndpoint ? "agent-youtube-status" : "agent-trello-status", ["trackingToken": token])
         guard result.status != .verified || result.verifiedURL != nil else {
-            throw Failure("Le serveur n’a pas renvoyé de lien Trello valide.")
+            throw Failure("Le serveur n’a pas renvoyé de lien de résultat valide.")
         }
         return result
     }

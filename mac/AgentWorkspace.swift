@@ -185,7 +185,7 @@ struct AgentWorkspace<Proposals: View>: View {
                 let failure = error as? AgentClient.Failure
                 state.needsAccess = failure?.status == 401
                 state.trelloSetupRequired = failure?.code == "trello_setup"
-                if !state.needsAccess && !state.trelloSetupRequired { state.preparation = nil }
+                if !state.needsAccess && !state.trelloSetupRequired && failure?.code != "youtube_setup" { state.preparation = nil }
                 state.error = error.localizedDescription
             }
         }

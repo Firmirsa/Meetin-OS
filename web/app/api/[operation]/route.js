@@ -1,6 +1,6 @@
 import { ApiError, execute } from '../../../lib/integrations.mjs';
 import { research } from '../../../lib/agent-research.mjs';
-import { agentAccess, prepareTask, detectTasks, executeTask, trelloExecutionStatus } from '../../../lib/agent.mjs';
+import { agentAccess, prepareTask, detectTasks, executeTask, trelloExecutionStatus, youtubeExecutionStatus } from '../../../lib/agent.mjs';
 import { accountAuth, accountStatus, agentEnvironment, bearer } from '../../../lib/hosted-account.mjs';
 import { boundedBody } from '../../../lib/hosted-response.mjs';
 import { accountBilling } from '../../../lib/hosted-stripe.mjs';
@@ -21,12 +21,13 @@ export async function POST(request, { params }) {
     else if (operation === 'account-status') result = await accountStatus(token);
     else if (operation === 'account-billing') result = await accountBilling(body, token);
     else if (operation === 'agent-research') result = await research(body, token);
-    else if (['agent-access', 'agent-prepare', 'agent-detect', 'agent-execute', 'agent-trello-status'].includes(operation)) {
+    else if (['agent-access', 'agent-prepare', 'agent-detect', 'agent-execute', 'agent-trello-status', 'agent-youtube-status'].includes(operation)) {
       const { userId, providerEnv } = await agentEnvironment(operation, token);
       if (operation === 'agent-access') result = agentAccess(providerEnv);
       else if (operation === 'agent-prepare') result = await prepareTask(body, userId, providerEnv);
       else if (operation === 'agent-detect') result = await detectTasks(body, userId, providerEnv);
       else if (operation === 'agent-execute') result = await executeTask(body, userId, providerEnv);
+      else if (operation === 'agent-youtube-status') result = await youtubeExecutionStatus(body, userId, providerEnv);
       else result = await trelloExecutionStatus(body, userId, providerEnv);
     }
     else result = await execute(operation, body, token);

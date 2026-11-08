@@ -87,6 +87,13 @@ test('Google users cannot inherit or execute through a shared Trello browser pro
     await assert.rejects(agentEnvironment('agent-trello-status', token, oldConfig, auth), {status: 409});
   }
 
+  const youtubeConfig = {...oldConfig, MEETIN_YOUTUBE_DEMO_USER_ID:user.id, MEETIN_YOUTUBE_PROFILE_ID:'22222222-2222-4222-8222-222222222222'};
+  const personal = await agentEnvironment('agent-execute', googleToken, youtubeConfig, auth);
+  assert.equal(personal.providerEnv.MEETIN_YOUTUBE_PROFILE_ID, youtubeConfig.MEETIN_YOUTUBE_PROFILE_ID);
+  const foreign = await agentEnvironment('agent-execute', otherToken, youtubeConfig, auth);
+  assert.equal(foreign.providerEnv.MEETIN_YOUTUBE_PROFILE_ID, undefined);
+  assert.equal(foreign.providerEnv.MEETIN_YOUTUBE_DEMO_USER_ID, undefined);
+
   const nonTrello = {...oldConfig, HAI_COMPUTER_USE_URL: 'https://example.test/board'};
   const otherSite = await agentEnvironment('agent-execute', googleToken, nonTrello, auth);
   assert.equal(otherSite.providerEnv.HAI_COMPUTER_USE_URL, nonTrello.HAI_COMPUTER_USE_URL);
