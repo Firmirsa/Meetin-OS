@@ -47,7 +47,7 @@ export async function youtubeProposal(source, user, env, fetcher = fetch, known 
         { role: 'system', content: extractor },
         { role: 'user', content: JSON.stringify({ text: source, known: known.map(item => item.title).slice(0, 10) }) },
       ],
-      max_tokens: 400,
+      max_tokens: 1500,
     }, 'Holo');
     draft = JSON.parse(completion?.choices?.[0]?.message?.content.trim().replace(/^\x60\x60\x60(?:json)?\s*|\s*\x60\x60\x60$/gi, ''));
   } catch { return null; }
