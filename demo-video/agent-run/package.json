@@ -1,0 +1,14 @@
+{
+  "name": "meetinos-agent-run",
+  "private": true,
+  "type": "module",
+  "description": "Renders the 'agent makes us win the hackathon' clip frame by frame.",
+  "scripts": {
+    "draft": "node record.mjs --draft",
+    "record": "node record.mjs"
+  },
+  "devDependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "playwright-core": "^1.48.0"
+  }
+}
