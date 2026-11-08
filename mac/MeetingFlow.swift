@@ -311,6 +311,46 @@ extension MeetingSession {
         route = .meetingDetail
     }
 
+    // Renvoie false si le titre est vide : l'ancien titre reste affiché.
+    @discardableResult
+    func renameMeeting(_ id: UUID, to title: String) -> Bool {
+        let renamed = store.rename(id, to: title)
+        reportStoreError()
+        return renamed
+    }
+
+    // Pendant un enregistrement, une transcription ou une action de l'agent, aucune réunion n'est supprimée.
+    var canDeleteMeetings: Bool { canSwitchMeeting }
+
+    func deleteMeeting(_ id: UUID) {
+        guard canDeleteMeetings, let record = store.meeting(id: id) else { return }
+        guard store.delete(id) else {
+            reportStoreError()
+            return
+        }
+        record.proposals?.forEach { TaskNotifications.shared.remove($0.id) }
+        if meetingID == id { closeMeeting() }
+        reportStoreError()
+    }
+
+    // Vide le carnet après la suppression de la réunion ouverte et revient à la liste.
+    private func closeMeeting() {
+        meetingID = nil
+        recording = nil
+        recordedTracks = nil
+        transcript = ""
+        notes = ""
+        transcriptIncomplete = false
+        detector = nil
+        proposals = []
+        proposalIssues = [:]
+        agent.newRecording()
+        permissionHelp = nil
+        status = "Prêt à enregistrer"
+        statusBelongsToMeeting = false
+        if route == .meetingDetail { route = .meetings }
+    }
+
     func importRecording() {
         guard canSwitchMeeting else { return }
         busy = true

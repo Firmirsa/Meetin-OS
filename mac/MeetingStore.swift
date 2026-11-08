@@ -45,6 +45,7 @@ final class MeetingStore {
     @ObservationIgnored private var pendingSave: Task<Void, Never>?
     @ObservationIgnored private var canSave = true
     @ObservationIgnored private var terminationObserver: NSObjectProtocol?
+    @ObservationIgnored private let discard: (URL) throws -> Void
 
     nonisolated static var defaultFolder: URL {
         URL.applicationSupportDirectory.appendingPathComponent("Meetin-OS", isDirectory: true)
@@ -53,8 +54,11 @@ final class MeetingStore {
     private var fileURL: URL { folder.appendingPathComponent("meetings.json") }
     private var recordingsFolder: URL { folder.appendingPathComponent("recordings", isDirectory: true) }
 
-    init(folder: URL = MeetingStore.defaultFolder) {
+    // `discard` met de côté le dossier audio d'une réunion supprimée.
+    // Par défaut : la Corbeille de macOS, pour qu'une erreur reste récupérable.
+    init(folder: URL = MeetingStore.defaultFolder, discard: @escaping (URL) throws -> Void = MeetingStore.moveToTrash) {
         self.folder = folder
+        self.discard = discard
         load()
         terminationObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification, object: nil, queue: .main
@@ -79,10 +83,51 @@ final class MeetingStore {
         scheduleSave()
     }
 
+    // Un titre vide est refusé : l'ancien titre reste. Le nouveau titre est écrit tout de suite dans meetings.json.
+    @discardableResult
+    func rename(_ id: UUID, to title: String) -> Bool {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let index = meetings.firstIndex(where: { $0.id == id }) else { return false }
+        guard meetings[index].title != trimmed else { return true }
+        meetings[index].title = trimmed
+        saveNow()
+        return true
+    }
+
+    // Dossier audio créé par Meetin-OS pour une réunion. Un fichier importé n'en a pas.
+    func recordingFolder(for id: UUID) -> URL {
+        recordingsFolder.appendingPathComponent(id.uuidString, isDirectory: true)
+    }
+
+    func ownsAudio(_ id: UUID) -> Bool {
+        FileManager.default.fileExists(atPath: recordingFolder(for: id).path)
+    }
+
+    // Met le dossier audio à la Corbeille, puis retire la réunion de meetings.json.
+    // Si l'audio ne peut pas partir, la réunion reste dans l'historique. Un fichier importé n'est jamais touché.
+    @discardableResult
+    func delete(_ id: UUID) -> Bool {
+        guard let index = meetings.firstIndex(where: { $0.id == id }) else { return false }
+        if ownsAudio(id) {
+            do { try discard(recordingFolder(for: id)) }
+            catch {
+                lastError = "Réunion non supprimée : l’audio n’a pas pu aller à la Corbeille (\(error.localizedDescription))."
+                return false
+            }
+        }
+        meetings.remove(at: index)
+        saveNow()
+        return true
+    }
+
+    nonisolated static func moveToTrash(_ url: URL) throws {
+        try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+    }
+
     // Déplace le dossier temporaire d'une capture vers le stockage durable.
     func adoptRecording(from source: URL, id: UUID) throws -> URL {
         try prepareFolder(recordingsFolder)
-        let destination = recordingsFolder.appendingPathComponent(id.uuidString, isDirectory: true)
+        let destination = recordingFolder(for: id)
         try FileManager.default.moveItem(at: source, to: destination)
         return destination
     }
