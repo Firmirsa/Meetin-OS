@@ -250,6 +250,7 @@ extension MeetingSession {
         captureRevision += 1
         detector?.stop()
         capturePaused = true
+        recordingLevel.stop()
         status = "Enregistrement en pause"
         do { try capture.pause() }
         catch { status = "Enregistrement en pause. \(error.localizedDescription)" }
@@ -262,12 +263,15 @@ extension MeetingSession {
         defer { busy = false }
         let nextSegment = captureSegment + 1
         let next = makeLive(transcript: live?.transcript, segment: nextSegment, startTime: capture.activeDuration)
-        let listener: ((AudioTrack, AVAudioPCMBuffer, UInt64) -> Void)? = next.map { live in
-            { track, buffer, time in live.feed(track, buffer, hostTime: time) }
+        let meter = audioLevelMeter
+        let listener: (AudioTrack, AVAudioPCMBuffer, UInt64) -> Void = { track, buffer, time in
+            meter.feed(buffer)
+            next?.feed(track, buffer, hostTime: time)
         }
         do {
             try capture.resume(onAudio: listener)
             capturePaused = false
+            recordingLevel.start(reading: audioLevelMeter, since: Date())
             captureSegment = nextSegment
             if let next {
                 live = next
@@ -448,6 +452,46 @@ extension MeetingSession {
         meetingID = record.id
         statusBelongsToMeeting = true
         route = .meetingDetail
+    }
+
+    // Renvoie false si le titre est vide : l'ancien titre reste affiché.
+    @discardableResult
+    func renameMeeting(_ id: UUID, to title: String) -> Bool {
+        let renamed = store.rename(id, to: title)
+        reportStoreError()
+        return renamed
+    }
+
+    // Pendant un enregistrement, une transcription ou une action de l'agent, aucune réunion n'est supprimée.
+    var canDeleteMeetings: Bool { canSwitchMeeting }
+
+    func deleteMeeting(_ id: UUID) {
+        guard canDeleteMeetings, let record = store.meeting(id: id) else { return }
+        guard store.delete(id) else {
+            reportStoreError()
+            return
+        }
+        record.proposals?.forEach { TaskNotifications.shared.remove($0.id) }
+        if meetingID == id { closeMeeting() }
+        reportStoreError()
+    }
+
+    // Vide le carnet après la suppression de la réunion ouverte et revient à la liste.
+    private func closeMeeting() {
+        meetingID = nil
+        recording = nil
+        recordedTracks = nil
+        transcript = ""
+        notes = ""
+        transcriptIncomplete = false
+        detector = nil
+        proposals = []
+        proposalIssues = [:]
+        agent.newRecording()
+        permissionHelp = nil
+        status = "Prêt à enregistrer"
+        statusBelongsToMeeting = false
+        if route == .meetingDetail { route = .meetings }
     }
 
     func importRecording() {

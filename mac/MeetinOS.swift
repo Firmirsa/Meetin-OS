@@ -66,6 +66,8 @@ final class MeetingSession {
         didSet { if integrationsRequest != nil { route = .integrations } }
     }
     let agent = AgentWorkspaceState()
+    let recordingLevel = RecordingLevel()
+    let audioLevelMeter = AudioLevelMeter()
     var status = "Prêt à enregistrer"
     var permissionHelp: AudioPermissionHelp? { didSet { noteSystemAudioPermission() } }
     var transcript = "" { didSet { syncMeeting() } }
@@ -383,6 +385,7 @@ struct CaptureView: View {
             defer { session.busy = false }
             do {
                 if let current = session.capture {
+                    session.recordingLevel.stop()
                     session.status = "Préparation du fichier audio…"
                     let result: (mix: URL, tracks: AudioCapture.Tracks?, help: AudioPermissionHelp?)
                     do {
@@ -409,8 +412,10 @@ struct CaptureView: View {
                 } else {
                     let next = AudioCapture()
                     let live = session.makeLive()
-                    if let live {
-                        next.onAudio = { track, buffer, hostTime in live.feed(track, buffer, hostTime: hostTime) }
+                    let meter = session.audioLevelMeter
+                    next.onAudio = { track, buffer, hostTime in
+                        meter.feed(buffer)
+                        live?.feed(track, buffer, hostTime: hostTime)
                     }
                     session.statusBelongsToMeeting = false
                     session.permissionHelp = nil
@@ -422,6 +427,7 @@ struct CaptureView: View {
                     session.transcript = ""
                     session.agent.newRecording()
                     session.capture = next
+                    session.recordingLevel.start(reading: session.audioLevelMeter, since: Date())
                     session.live = live
                     live?.start()
                     if let live { session.startDetection(reading: live) }

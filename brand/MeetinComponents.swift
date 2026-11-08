@@ -352,6 +352,8 @@ struct MTRecordGlyph: View {
 struct MTRecordingBar: View {
     var elapsed: TimeInterval
     var level: Double = 0.5                  // 0...1
+    var paused = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var onPause: () -> Void = {}
     var onStop: () -> Void = {}
 
@@ -378,15 +380,15 @@ struct MTRecordingBar: View {
                 }
             }
             .frame(height: 24)
-            .animation(.easeInOut(duration: 0.15), value: level)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: level)
 
-            Button("Pause", action: onPause)
+            Button(paused ? "Reprendre" : "Pause", action: onPause)
                 .buttonStyle(.plain)
                 .font(.mtSans(14, weight: .medium)).foregroundStyle(barFG)
                 .padding(.horizontal, 16).frame(height: 36)
                 .overlay(Capsule().stroke(barFG.opacity(0.32), lineWidth: 1))
             // Un seul citron vert par écran : « Arrêter » est crème plein dans la barre
-            Button("Arrêter", action: onStop)
+            Button("Terminer", action: onStop)
                 .buttonStyle(.plain)
                 .font(.mtSans(14, weight: .medium)).foregroundStyle(barBG)
                 .padding(.horizontal, 16).frame(height: 36)
@@ -397,7 +399,7 @@ struct MTRecordingBar: View {
         .background(barBG, in: Capsule())
         .overlay(Capsule().stroke(barFG.opacity(0.14), lineWidth: 1))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Enregistrement en cours")
+        .accessibilityLabel(paused ? "Enregistrement en pause" : "Enregistrement en cours")
     }
 }
 

@@ -1,5 +1,13 @@
 # Suivi Meetin-OS
 
+## Intégration Mac des nouveaux commits de Samy, 8 novembre 2026
+
+Références récupérées : `28feb68` (renommer/supprimer les réunions), `a9420ad` (barre audio animée), `8db7236` (site Linux, hors périmètre Mac). Les deux ajouts Mac sont portés sur `codex/google-agent` en conservant la détection réactive `23330e6`. Le conflit de bouton Nouvel enregistrement conserve le blocage pendant une capture. La suppression demande confirmation, est bloquée pendant capture/transcription/action et préserve les fichiers audio importés ; les dossiers audio propres vont à la Corbeille.
+
+La barre de Samy est une vue intégrée, pas une fenêtre flottante. Son bouton Pause initialement sans action est relié à pause/reprise ; Terminer conserve la finalisation existante et le chrono affiche la durée audio active. Les niveaux micro/appel restent branchés après reprise. Pause/Terminer sont retirés de l’Accueil uniquement, avec accès à la réunion active conservé. Aucune pastille flottante réimplémentée.
+
+Contrôles : build Mac complet et signature stricte réussis ; RecordingLevelSmoke réussi avec sons synthétiques (silence, mono/stéréo, lissage et arrêt), MeetingStoreSmoke réussi sur données temporaires (renommage, relecture, suppression, fichier importé préservé, refus de Corbeille). Aucun essai UI ni capture réelle dans ce lot. Binaire prêt dans `/private/tmp/meetin-samy-integrated-20261108/Meetin-OS.app`, non installé. La version Applications 0.1.6 (9) de Wael reste intacte ; retouches logos/Facturation toujours en attente.
+
 ## Détection réactive préparée, 8 novembre 2026
 
 Correctif local ciblé : observation du texte définitif avec regroupement de 350 ms, remplaçant la boucle de 15 s. Un seul appel actif ; le texte arrivé pendant une requête est traité ensuite. Les corrections, empreintes anti-doublons et confirmation avant exécution restent inchangées. Les protections de révision de réunion existantes sont conservées. Devin CLI restant bloqué par la revue de transmission, ce correctif a été réalisé localement, sans nouvel envoi à Devin.

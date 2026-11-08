@@ -92,31 +92,24 @@ struct MeetingCaptureControls: View {
                     .font(.mtSans(12)).foregroundStyle(Color.mtWarn)
                     .accessibilityAddTraits(.updatesFrequently)
             }
-            HStack(spacing: 8) {
-                Button(action: recordOrFinish) {
-                    Text("Enregistrer").frame(width: 68)
+            if idle {
+                Button("Enregistrer", action: recordOrFinish)
+                    .buttonStyle(WorkspaceButtonStyle(prominent: true))
+                    .keyboardShortcut("r", modifiers: .command)
+                    .disabled(session.busy || session.agent.busy || !session.launchingProposals.isEmpty)
+                    .help("Démarrer une nouvelle capture locale (⌘R)")
+            } else {
+                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                    LiveRecordingBar(level: session.recordingLevel,
+                                     elapsed: session.captureActiveDuration, paused: paused,
+                                     onPause: {
+                        Task {
+                            if paused { await session.resumeCapture() }
+                            else { await session.pauseCapture() }
+                        }
+                    }, onStop: recordOrFinish)
+                    .disabled(session.busy)
                 }
-                .buttonStyle(WorkspaceButtonStyle(prominent: idle))
-                .keyboardShortcut("r", modifiers: .command)
-                .disabled(!idle || session.busy || session.agent.busy || !session.launchingProposals.isEmpty)
-                .help("Démarrer une nouvelle capture locale (⌘R)")
-                Button {
-                    Task {
-                        if paused { await session.resumeCapture() }
-                        else { await session.pauseCapture() }
-                    }
-                } label: {
-                    Text(paused ? "Reprendre" : "Pause").frame(width: 68)
-                }
-                .buttonStyle(WorkspaceButtonStyle())
-                .disabled(idle || session.busy)
-                .help(paused ? "Continuer la même réunion" : "Suspendre l’audio et la transcription")
-                Button(action: recordOrFinish) {
-                    Text("Terminer").frame(width: 68)
-                }
-                .buttonStyle(WorkspaceButtonStyle())
-                .disabled(idle || session.busy)
-                .help("Finaliser le fichier audio et conserver la réunion")
             }
         }
     }

@@ -27,7 +27,7 @@ fi
 compile() {
   swiftc -parse-as-library -target "$1-apple-macos$minimum_macos" \
     MeetinOS.swift Capture.swift Gladia.swift AgentClient.swift AgentExecutionView.swift AgentWorkspace.swift LinkupResearch.swift Integrations.swift MeetingDetector.swift MeetingAccessibility.swift MainWindow.swift Sidebar.swift HomeView.swift MeetingsView.swift SettingsPages.swift MeetingStore.swift MeetingFlow.swift MeetinSite.swift NightTheme.swift HostedAccount.swift HostedAccountView.swift GoogleSignIn.swift WelcomeView.swift LiveTranscription.swift LiveTranscriptPanel.swift LiveAlerts.swift TaskDetection.swift ProposalCards.swift TaskActions.swift TaskNotifications.swift \
-    MeetingWorkspaceUI.swift MeetingParticipants.swift ParticipantsEditor.swift ../brand/MeetinTheme.swift ../brand/MeetinComponents.swift -o "$2"
+    RecordingBar.swift MeetingWorkspaceUI.swift MeetingParticipants.swift ParticipantsEditor.swift ../brand/MeetinTheme.swift ../brand/MeetinComponents.swift -o "$2"
 }
 
 executable="$app/Contents/MacOS/MeetinOS"

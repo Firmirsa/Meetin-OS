@@ -183,8 +183,13 @@ struct HomeView: View {
                     .buttonStyle(.mtGhost)
                 }
             }
-            MeetingCaptureControls(session: session, recordOrFinish: toggleRecording)
-                .frame(maxWidth: 440)
+            if session.capture == nil {
+                Button("Enregistrer", systemImage: "record.circle", action: toggleRecording)
+                    .buttonStyle(.mtPrimary)
+                    .keyboardShortcut("r", modifiers: .command)
+                    .disabled(session.busy || session.agent.busy || !session.launchingProposals.isEmpty)
+                    .help("Démarrer une nouvelle capture locale")
+            }
         }
         .frame(maxWidth: .infinity)
     }
