@@ -138,7 +138,7 @@ Le [guide macOS](mac/README.md) détaille les permissions, les fichiers audio et
 </details>
 
 <details>
-<summary><b>🪟 App Windows</b> · Windows 10 ou 11 (x64)</summary>
+<summary><b>💻 App Windows</b> · Windows 10 ou 11 (x64)</summary>
 
 <br>
 
