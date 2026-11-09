@@ -57,6 +57,92 @@ internal static class Night
     }
 }
 
+// Fond « brume » du Mac (MTMist) : encre et quatre halos, peint par la fenêtre ; les conteneurs transparents le laissent voir.
+internal static class Mist
+{
+    private static readonly Color Lime = Color.FromArgb(207, 232, 107);
+    private static readonly Color Olive = Color.FromArgb(92, 107, 15);
+    private static readonly Color Moss = Color.FromArgb(42, 51, 32);
+    private static readonly Dictionary<Size, Bitmap> cache = new();
+
+    private static Bitmap Render(Size size)
+    {
+        if (cache.TryGetValue(size, out var known)) return known;
+        if (cache.Count > 4) { foreach (var old in cache.Values) old.Dispose(); cache.Clear(); }
+        var w = Math.Max(1, size.Width); var h = Math.Max(1, size.Height);
+        var sw = Math.Max(2, w / 4); var sh = Math.Max(2, h / 4);
+        var glows = new (Color color, float alpha, float x, float y, float radius)[]
+        {
+            (Lime, 0.13f, 0.18f, 0.96f, 0.5f),
+            (Olive, 0.34f, 0.86f, 1.0f, 0.55f),
+            (Lime, 0.05f, 0.92f, 0.06f, 0.42f),
+            (Moss, 0.55f, 0f, 0f, 0.5f)
+        };
+        var pixels = new int[sw * sh];
+        for (var j = 0; j < sh; j++)
+        for (var i = 0; i < sw; i++)
+        {
+            float r = Night.Canvas.R, gr = Night.Canvas.G, bl = Night.Canvas.B;
+            var u = (i + 0.5f) / sw; var v = (j + 0.5f) / sh;
+            foreach (var glow in glows)
+            {
+                var dx = (u - glow.x) / glow.radius; var dy = (v - glow.y) / glow.radius;
+                var d = (float)Math.Sqrt(dx * dx + dy * dy);
+                if (d >= 1f) continue;
+                var a = glow.alpha * (1f - d);
+                r += (glow.color.R - r) * a; gr += (glow.color.G - gr) * a; bl += (glow.color.B - bl) * a;
+            }
+            pixels[j * sw + i] = unchecked((int)0xFF000000) | ((int)r << 16) | ((int)gr << 8) | (int)bl;
+        }
+        using var small = new Bitmap(sw, sh, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        var data = small.LockBits(new Rectangle(0, 0, sw, sh), System.Drawing.Imaging.ImageLockMode.WriteOnly, small.PixelFormat);
+        for (var j = 0; j < sh; j++)
+            System.Runtime.InteropServices.Marshal.Copy(pixels, j * sw, data.Scan0 + j * data.Stride, sw);
+        small.UnlockBits(data);
+        var bmp = new Bitmap(w, h);
+        using (var g = Graphics.FromImage(bmp))
+        using (var tiles = new System.Drawing.Imaging.ImageAttributes())
+        {
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            tiles.SetWrapMode(WrapMode.TileFlipXY);
+            g.DrawImage(small, new Rectangle(0, 0, w, h), 0, 0, sw, sh, GraphicsUnit.Pixel, tiles);
+        }
+        cache[size] = bmp;
+        return bmp;
+    }
+
+    public static void PaintForm(Form form, Graphics g) => g.DrawImageUnscaled(Render(form.ClientSize), 0, 0);
+
+    // Fond derrière un contrôle dessiné à la main : la brume si rien d’opaque ne le sépare de la fenêtre.
+    public static void PaintBehind(Control control, Graphics g)
+    {
+        var parent = control.Parent;
+        while (parent != null && parent is not Form && parent.BackColor.A < 255) parent = parent.Parent;
+        if (parent is Form form && (form is Notebook || form is MistForm))
+        {
+            var at = form.PointToClient(control.PointToScreen(Point.Empty));
+            g.DrawImageUnscaled(Render(form.ClientSize), -at.X, -at.Y);
+        }
+        else g.Clear(parent?.BackColor ?? Night.Canvas);
+    }
+
+    public static void Follow(Form form)
+    {
+        form.Resize += (_, _) => form.Invalidate(true);
+    }
+}
+
+internal sealed class MistForm : Form
+{
+    public MistForm()
+    {
+        DoubleBuffered = true;
+        Mist.Follow(this);
+    }
+
+    protected override void OnPaintBackground(PaintEventArgs e) => Mist.PaintForm(this, e.Graphics);
+}
+
 // Carte « verre fumé » : surface, bord fin, coins arrondis.
 internal sealed class Glass : Panel
 {
@@ -127,7 +213,7 @@ internal sealed class Capsule : Button
     {
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        g.Clear(Parent?.BackColor ?? Night.Canvas);
+        Mist.PaintBehind(this, g);
         var r = new Rectangle(0, 0, Width - 1, Height - 1);
         var radius = Kind == CapsuleKind.Nav ? Night.InputRadius : Height / 2;
         using var path = Night.Rounded(r, radius);
@@ -196,7 +282,7 @@ internal sealed class SidebarPanel : Panel
 
     protected override void OnPaint(PaintEventArgs e)
     {
-        e.Graphics.Clear(BackColor);
+        Mist.PaintBehind(this, e.Graphics);
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         var r = new Rectangle(Padding.Left - 1, Padding.Top - 1, Inner.Width + 1, Inner.Height + 1);
         using var path = Night.Rounded(r, 12);
@@ -240,7 +326,7 @@ internal sealed class Pill : Label
             PillKind.Rec => (ColorTranslator.FromHtml("#3A1F1A"), Night.Rec),
             _ => (Night.Well, Night.Ink2)
         };
-        using (var clear = new SolidBrush(Parent?.BackColor ?? Night.Canvas)) g.FillRectangle(clear, ClientRectangle);
+        Mist.PaintBehind(this, g);
         using var path = Night.Rounded(new Rectangle(0, 0, Width - 1, Height - 1), Height / 2);
         using (var b = new SolidBrush(back)) g.FillPath(b, path);
         TextRenderer.DrawText(g, Text, Font, new Rectangle(0, 0, Width, Height), fore, TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPadding);
@@ -263,7 +349,7 @@ internal sealed class Hero : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
-        g.Clear(Parent?.BackColor ?? Night.Canvas);
+        Mist.PaintBehind(this, g);
         foreach (var size in new[] { 44f, 36f, 28f })
         {
             using var font = Night.Serif(size);
@@ -544,6 +630,8 @@ internal sealed class MeetingRow : Control
 
 internal sealed partial class Notebook : Form
 {
+    protected override void OnPaintBackground(PaintEventArgs e) => Mist.PaintForm(this, e.Graphics);
+
     private readonly Capsule record = new("Commencer à enregistrer", CapsuleKind.Record);
     private readonly Capsule import = new("Ouvrir un enregistrement", CapsuleKind.Ghost, "\uE8B7");
     private readonly Capsule transcribe = new("Transcrire", CapsuleKind.Primary, "\uE8A4");
@@ -576,7 +664,7 @@ internal sealed partial class Notebook : Form
     private readonly Label micDot = Dot();
     private readonly Label audioDot = Dot();
     private readonly LinkLabel keyDot = new() { AutoSize = true, Font = Night.Sans(9.5f), LinkColor = Night.Ink, ActiveLinkColor = Night.Accent, LinkBehavior = LinkBehavior.AlwaysUnderline, Text = "●  Ajouter la clé Gladia", Margin = new Padding(0, 0, 18, 0) };
-    private readonly Panel pages = new() { Dock = DockStyle.Fill, BackColor = Night.Canvas };
+    private readonly Panel pages = new() { Dock = DockStyle.Fill, BackColor = Color.Transparent };
     private readonly Dictionary<string, Control> pageByName = new();
     private readonly Dictionary<string, Capsule> navByName = new();
     private readonly Panel recentHost = new() { Dock = DockStyle.Top, AutoSize = true, Margin = new Padding(0) };
@@ -640,11 +728,12 @@ internal sealed partial class Notebook : Form
         ForeColor = Night.Ink;
         AutoScaleMode = AutoScaleMode.Dpi;
         DoubleBuffered = true;
+        Mist.Follow(this);
 
         notesCard = Card("Notes", notes);
         transcriptCard = Card("Transcription", transcript);
 
-        var shell = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = Night.Canvas };
+        var shell = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = Color.Transparent };
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 250));
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         shell.Controls.Add(Sidebar(), 0, 0);
@@ -740,7 +829,7 @@ internal sealed partial class Notebook : Form
 
     private Control HomePage()
     {
-        var page = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, BackColor = Night.Canvas };
+        var page = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, BackColor = Color.Transparent };
         page.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         page.RowStyles.Add(new RowStyle(SizeType.Absolute, 1));
         page.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -780,7 +869,7 @@ internal sealed partial class Notebook : Form
         page.Controls.Add(scroll, 0, 0);
         page.Controls.Add(new Panel { Dock = DockStyle.Fill, BackColor = Night.Line, Margin = new Padding(0) }, 0, 1);
 
-        var bar = new Panel { Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(24, 14, 24, 18), BackColor = Night.Canvas, MinimumSize = new Size(0, 96) };
+        var bar = new Panel { Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(24, 14, 24, 18), BackColor = Color.Transparent, MinimumSize = new Size(0, 96) };
         bar.Controls.Add(status);
         bar.Controls.Add(record);
         bar.Controls.Add(homeBar);
@@ -825,13 +914,13 @@ internal sealed partial class Notebook : Form
     // Fiche réunion comme MeetingDetailView sur Mac : colonne de 620 centrée, titre modifiable, onglets Transcription | Agent, barre du bas.
     private Control DetailPage()
     {
-        var page = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, BackColor = Night.Canvas, Margin = new Padding(0), Padding = new Padding(0) };
+        var page = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, BackColor = Color.Transparent, Margin = new Padding(0), Padding = new Padding(0) };
         page.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         page.RowStyles.Add(new RowStyle(SizeType.Absolute, 1));
         page.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        var host = new Panel { Dock = DockStyle.Fill, BackColor = Night.Canvas, Margin = new Padding(0) };
-        var col = new TableLayoutPanel { ColumnCount = 1, RowCount = 5, BackColor = Night.Canvas, Margin = new Padding(0) };
+        var host = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Margin = new Padding(0) };
+        var col = new TableLayoutPanel { ColumnCount = 1, RowCount = 5, BackColor = Color.Transparent, Margin = new Padding(0) };
         for (var i = 0; i < 4; i++) col.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         col.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
@@ -863,8 +952,8 @@ internal sealed partial class Notebook : Form
         tabAgent.Click += (_, _) => SelectDetailTab(true);
         col.Controls.Add(segments, 0, 3);
 
-        detailBody = new Panel { Dock = DockStyle.Fill, BackColor = Night.Canvas, Margin = new Padding(0) };
-        var view = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, BackColor = Night.Canvas, Margin = new Padding(0) };
+        detailBody = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Margin = new Padding(0) };
+        var view = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, BackColor = Color.Transparent, Margin = new Padding(0) };
         view.RowStyles.Add(new RowStyle(SizeType.Absolute, 170));
         view.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         notesCard.Margin = new Padding(0, 0, 0, 14);
@@ -887,7 +976,7 @@ internal sealed partial class Notebook : Form
         page.Controls.Add(host, 0, 0);
         page.Controls.Add(new Panel { Dock = DockStyle.Fill, BackColor = Night.Line, Margin = new Padding(0) }, 0, 1);
 
-        var bar = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, RowCount = 2, Padding = new Padding(22, 12, 22, 14), BackColor = Night.Canvas, Margin = new Padding(0) };
+        var bar = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, RowCount = 2, Padding = new Padding(22, 12, 22, 14), BackColor = Color.Transparent, Margin = new Padding(0) };
         bar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         bar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         var statusRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 8) };
@@ -945,13 +1034,13 @@ internal sealed partial class Notebook : Form
         if (!pageByName.TryGetValue("Intégrations", out var sheetPage)) return;
         var owner = (Form?)Form.ActiveForm is { } active && active != this && active.Visible ? active : this;
         RefreshIntegrationsPage();
-        using var sheet = new Form
+        using var sheet = new MistForm
         {
             Text = "Intégrations", Icon = Icon, ClientSize = new Size(740, 660), MinimumSize = new Size(600, 420),
             StartPosition = FormStartPosition.CenterParent, BackColor = Night.Canvas, ForeColor = Night.Ink, Font = Font,
             ShowInTaskbar = false, MinimizeBox = false, MaximizeBox = false
         };
-        var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(16, 10, 16, 14), BackColor = Night.Canvas };
+        var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(16, 10, 16, 14), BackColor = Color.Transparent };
         var close = new Capsule("Fermer", CapsuleKind.Ghost);
         close.Click += (_, _) => sheet.Close();
         bar.Controls.Add(close);
@@ -1278,7 +1367,7 @@ internal sealed partial class Notebook : Form
             SetStatus("Enregistrement en cours");
             proposals = new List<TaskProposal>();
             detector = StartDetection();
-            using var meeting = new Form
+            using var meeting = new MistForm
             {
                 Text = "Réunion Meetin-OS", Icon = Icon, ClientSize = new Size(720, 520),
                 MinimumSize = new Size(560, 360), StartPosition = FormStartPosition.CenterParent,
@@ -1304,14 +1393,14 @@ internal sealed partial class Notebook : Form
                 recording.Stop();
             };
             // Fenêtre « Réunion Meetin-OS » comme CaptureView sur Mac : en-tête, segments, « Le fil de la réunion. », notes, barre du bas.
-            var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6, BackColor = Night.Canvas, Margin = new Padding(0), Padding = new Padding(0) };
+            var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6, BackColor = Color.Transparent, Margin = new Padding(0), Padding = new Padding(0) };
             panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 1));
             panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 1));
             panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            var header = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, Padding = new Padding(22, 10, 22, 10), Margin = new Padding(0), BackColor = Night.Canvas };
+            var header = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, Padding = new Padding(22, 10, 22, 10), Margin = new Padding(0), BackColor = Color.Transparent };
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             var brandRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
@@ -1337,8 +1426,8 @@ internal sealed partial class Notebook : Form
             segs.Controls.Add(segTranscript);
             segs.Controls.Add(segAgent);
             panel.Controls.Add(segs, 0, 2);
-            var body = new Panel { Dock = DockStyle.Fill, BackColor = Night.Canvas, Margin = new Padding(0) };
-            var col = new TableLayoutPanel { ColumnCount = 1, RowCount = 6, BackColor = Night.Canvas, Margin = new Padding(0) };
+            var body = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Margin = new Padding(0) };
+            var col = new TableLayoutPanel { ColumnCount = 1, RowCount = 6, BackColor = Color.Transparent, Margin = new Padding(0) };
             for (var i = 0; i < 4; i++) col.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             col.RowStyles.Add(new RowStyle(SizeType.Absolute, 150));
             col.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -1364,7 +1453,7 @@ internal sealed partial class Notebook : Form
             body.Resize += (_, _) => PlaceMeeting();
             panel.Controls.Add(body, 0, 3);
             panel.Controls.Add(new Panel { Dock = DockStyle.Fill, BackColor = Night.Line, Margin = new Padding(0) }, 0, 4);
-            var bottom = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, RowCount = 2, Padding = new Padding(22, 10, 22, 12), Margin = new Padding(0), BackColor = Night.Canvas };
+            var bottom = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, RowCount = 2, Padding = new Padding(22, 10, 22, 12), Margin = new Padding(0), BackColor = Color.Transparent };
             bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             bottom.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             var statusLine = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 6) };
@@ -1664,7 +1753,13 @@ internal sealed partial class Notebook : Form
         scroll.VisibleChanged += (_, _) => Place();
     }
 
-    private static Panel ScrollPane() => new() { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Night.Canvas };
+    private static Panel ScrollPane()
+    {
+        var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Color.Transparent };
+        scroll.Scroll += (_, _) => scroll.Invalidate(true);
+        scroll.MouseWheel += (_, _) => scroll.Invalidate(true);
+        return scroll;
+    }
 
     // Comme sur Mac (maxWidth 800, marges 48, centré) : colonne de 800 pt au plus, centrée dans la page.
     private static int PageWidth(Panel scroll, FlowLayoutPanel content)
@@ -1681,7 +1776,7 @@ internal sealed partial class Notebook : Form
     private static FlowLayoutPanel Column(int left, int top, int right, int bottom) => new()
     {
         Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
-        FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(left, top, right, bottom), BackColor = Night.Canvas
+        FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(left, top, right, bottom), BackColor = Color.Transparent
     };
 
     private static Glass Section(string title, out FlowLayoutPanel stack)
