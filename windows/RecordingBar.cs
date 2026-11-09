@@ -146,7 +146,7 @@ internal sealed class RecordingBar : Control
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-        using (var back = new SolidBrush(Parent?.BackColor ?? Night.Canvas)) g.FillRectangle(back, ClientRectangle);
+        Mist.PaintBehind(this, g);
         var bounds = new Rectangle(0, 0, Width - 1, Height - 1);
         using (var path = Rounded(bounds, Height / 2))
         {
